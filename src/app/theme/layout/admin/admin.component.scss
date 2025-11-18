@@ -1,0 +1,20 @@
+.pcoded-content {
+  padding-top: 10px !important;
+}
+
+.pcoded-inner-content {
+  app-breadcrumb {
+    display: block;
+    
+    .page-header {
+      margin-top: 0 !important;
+      padding-top: 0 !important;
+      
+      .page-block {
+        padding-top: 0 !important;
+        margin-top: 0 !important;
+      }
+    }
+  }
+}
+

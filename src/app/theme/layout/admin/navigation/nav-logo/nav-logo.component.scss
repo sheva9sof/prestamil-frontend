@@ -1,7 +1,12 @@
 .b-bg {
-  width: auto !important;
-  height: 40px !important;
-  padding: 5px;
+  width: 100% !important;
+  height: 60px !important;
+  padding: 8px 15px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(-135deg, #1565c0 0%, #ffffff 100%) !important; // Degradado azul fuerte a blanco
+  border-radius: 10px;
   
   img {
     max-width: 100%;

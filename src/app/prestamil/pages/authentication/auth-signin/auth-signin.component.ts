@@ -36,24 +36,64 @@ export class AuthSigninComponent implements OnInit {
       
       const { username, password } = this.loginForm.value;
       
+      // Mapear username a nombreUsuario para el backend
       this.authService.login(username, password).subscribe({
         next: (response) => {
-          this.isLoading = false;
+          console.log('Login response:', response);
           
-          if (response.success) {
-            // Guardar sesión
-            this.authService.setSession(response.token, response.user);
+          // Validar que la respuesta tenga los campos necesarios
+          if (!response || !response.token || !response.nombreUsuario) {
+            this.isLoading = false;
+            this.errorMessage = 'Usuario o contraseña incorrectos';
+            console.error('Invalid response:', response);
+            return;
+          }
+          
+          // Validar que el usuario esté activo
+          if (response.estatus === false) {
+            this.isLoading = false;
+            this.errorMessage = 'Usuario inactivo. Contacta al administrador.';
+            return;
+          }
+          
+          // Guardar sesión con la respuesta completa del login
+          this.authService.setSession(response);
+          console.log('Session saved, isAuthenticated:', this.authService.isAuthenticated());
+          
+          // Esperar un momento para asegurar que el estado se actualice
+          setTimeout(() => {
+            this.isLoading = false;
             
             // Obtener URL de retorno o usar dashboard por defecto
             const returnUrl = this.route.snapshot.queryParams['returnUrl'] || '/dashboard';
-            this.router.navigate([returnUrl]);
-          } else {
-            this.errorMessage = 'Usuario o contraseña incorrectos';
-          }
+            // Normalizar la URL (remover /default si existe)
+            const normalizedUrl = returnUrl.replace('/default', '').replace(/\/$/, '') || '/dashboard';
+            console.log('Navigating to:', normalizedUrl);
+            this.router.navigate([normalizedUrl]).then(
+              (success) => {
+                console.log('Navigation success:', success);
+              },
+              (error) => {
+                console.error('Navigation error:', error);
+                this.errorMessage = 'Error al redirigir. Por favor, intenta nuevamente.';
+              }
+            );
+          }, 100);
         },
         error: (error) => {
           this.isLoading = false;
-          this.errorMessage = 'Error al iniciar sesión. Por favor, intenta nuevamente.';
+          
+          // Manejar diferentes tipos de errores
+          if (error.status === 401 || error.status === 403) {
+            this.errorMessage = 'Usuario o contraseña incorrectos';
+          } else if (error.status === 0) {
+            this.errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión.';
+          } else if (error.error && error.error.message) {
+            this.errorMessage = error.error.message;
+          } else {
+            this.errorMessage = 'Error al iniciar sesión. Por favor, intenta nuevamente.';
+          }
+          
           console.error('Login error:', error);
         }
       });

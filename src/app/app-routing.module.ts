@@ -9,6 +9,17 @@ import { loginGuard } from './prestamil/core/guards/login.guard';
 
 const routes: Routes = [
   {
+    path: 'login',
+    component: GuestComponent,
+    canActivate: [loginGuard], // Evitar acceso si ya está autenticado
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./prestamil/pages/authentication/auth-signin/auth-signin.component').then((c) => c.AuthSigninComponent)
+      }
+    ]
+  },
+  {
     path: '',
     component: AdminComponent,
     canActivate: [authGuard], // Proteger todas las rutas hijas
@@ -37,17 +48,10 @@ const routes: Routes = [
       {
         path: 'apexchart',
         loadComponent: () => import('./prestamil/pages/core-chart/apex-chart/apex-chart.component').then((c) => c.ApexChartComponent)
-      }
-    ]
-  },
-  {
-    path: '',
-    component: GuestComponent,
-    children: [
+      },
       {
-        path: 'login',
-        canActivate: [loginGuard], // Evitar acceso si ya está autenticado
-        loadComponent: () => import('./prestamil/pages/authentication/auth-signin/auth-signin.component').then((c) => c.AuthSigninComponent)
+        path: '**',
+        redirectTo: 'dashboard'
       }
     ]
   }

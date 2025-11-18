@@ -1,12 +1,14 @@
 // angular import
-import { Component, inject, output } from '@angular/core';
+import { Component, inject, output, OnInit, OnDestroy } from '@angular/core';
 import { Location } from '@angular/common';
+import { Subscription } from 'rxjs';
 
 // project import
 import { environment } from 'src/environments/environment';
 import { NavigationItem, NavigationItems } from '../navigation';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { NavGroupComponent } from './nav-group/nav-group.component';
+import { AuthService } from 'src/app/prestamil/core/services/auth.service';
 
 @Component({
   selector: 'app-nav-content',
@@ -14,15 +16,17 @@ import { NavGroupComponent } from './nav-group/nav-group.component';
   templateUrl: './nav-content.component.html',
   styleUrls: ['./nav-content.component.scss']
 })
-export class NavContentComponent {
+export class NavContentComponent implements OnInit, OnDestroy {
   private location = inject(Location);
+  private authService = inject(AuthService);
+  private menuSubscription?: Subscription;
 
   // public method
   // version
   title = 'Demo application for version numbering';
   currentApplicationVersion = environment.appVersion;
 
-  navigations!: NavigationItem[];
+  navigations: NavigationItem[] = [];
   wrapperWidth: number;
   windowWidth = window.innerWidth;
 
@@ -30,7 +34,44 @@ export class NavContentComponent {
 
   // constructor
   constructor() {
-    this.navigations = NavigationItems;
+    // Inicializar con menú vacío, se actualizará desde el servicio
+  }
+
+  ngOnInit() {
+    // Suscribirse a los cambios del menú
+    this.menuSubscription = this.authService.menuItems$.subscribe(menuItems => {
+      if (menuItems && menuItems.length > 0) {
+        this.navigations = menuItems;
+      } else {
+        // Solo usar menú estático si el usuario NO está autenticado
+        // Si está autenticado pero sin menú, dejar vacío (se cargará cuando llegue)
+        if (!this.authService.isAuthenticated()) {
+          this.navigations = NavigationItems;
+        } else {
+          this.navigations = [];
+        }
+      }
+    });
+    
+    // Cargar menú inicial si existe
+    const menuItems = this.authService.getMenuItems();
+    if (menuItems && menuItems.length > 0) {
+      this.navigations = menuItems;
+    } else {
+      // Solo usar menú estático si el usuario NO está autenticado
+      if (!this.authService.isAuthenticated()) {
+        this.navigations = NavigationItems;
+      } else {
+        // Si está autenticado pero sin menú aún, dejar vacío
+        this.navigations = [];
+      }
+    }
+  }
+
+  ngOnDestroy() {
+    if (this.menuSubscription) {
+      this.menuSubscription.unsubscribe();
+    }
   }
 
   fireOutClick() {

@@ -1,15 +1,27 @@
-import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, of, delay } from 'rxjs';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { LoginResponse } from '../models/auth-response.model';
+import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
+import { transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
+import { environment } from 'src/environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private http = inject(HttpClient);
+  
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
+  
+  private menuItemsSubject = new BehaviorSubject<NavigationItem[]>([]);
+  public menuItems$ = this.menuItemsSubject.asObservable();
 
   private readonly AUTH_TOKEN_KEY = 'authToken';
   private readonly AUTH_USER_KEY = 'authUser';
+  private readonly MENU_ITEMS_KEY = 'menuItems';
+  private readonly API_URL = environment.apiUrl;
 
   constructor() {
     // Verificar si hay sesión guardada al iniciar
@@ -23,39 +35,71 @@ export class AuthService {
     const token = localStorage.getItem(this.AUTH_TOKEN_KEY);
     const isAuth = !!token; // En el futuro validar token con el backend
     this.isAuthenticatedSubject.next(isAuth);
+    
+    // Cargar menú si hay sesión activa
+    if (isAuth) {
+      this.loadMenuFromStorage();
+    }
+  }
+  
+  /**
+   * Cargar menú desde localStorage
+   */
+  private loadMenuFromStorage(): void {
+    const menuStr = localStorage.getItem(this.MENU_ITEMS_KEY);
+    if (menuStr) {
+      try {
+        const menuItems = JSON.parse(menuStr);
+        this.menuItemsSubject.next(menuItems);
+      } catch (e) {
+        console.error('Error al cargar menú desde storage:', e);
+      }
+    }
   }
 
   /**
-   * Login - Mock por ahora, en el futuro llamará a /login del backend
-   * @param username Usuario
+   * Login - Llamada al backend
+   * @param nombreUsuario Usuario
    * @param password Contraseña
    * @returns Observable con la respuesta del login
    */
-  login(username: string, password: string): Observable<any> {
-    // TODO: Reemplazar con llamada real al backend
-    // return this.http.post<AuthResponse>('/api/login', { username, password });
+  login(nombreUsuario: string, password: string): Observable<LoginResponse> {
+    const loginUrl = `${this.API_URL}/auth/login`;
+    const loginData = {
+      nombreUsuario,
+      password
+    };
     
-    // Mock: Simular llamada al servidor con delay
-    return of({
-      success: true,
-      token: 'mock-token-' + Date.now(),
-      user: {
-        username: username,
-        id: 1
+    console.log('Calling login API:', loginUrl, loginData);
+    
+    return this.http.post<LoginResponse>(loginUrl, loginData, {
+      headers: {
+        'Content-Type': 'application/json'
       }
-    }).pipe(
-      delay(1000) // Simular latencia de red
-    );
+    });
   }
 
   /**
    * Guardar sesión después de login exitoso
-   * @param token Token de autenticación
-   * @param user Información del usuario
+   * @param loginResponse Respuesta completa del login
    */
-  setSession(token: string, user: any): void {
-    localStorage.setItem(this.AUTH_TOKEN_KEY, token);
-    localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify(user));
+  setSession(loginResponse: LoginResponse): void {
+    localStorage.setItem(this.AUTH_TOKEN_KEY, loginResponse.token);
+    localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify({
+      nombreUsuario: loginResponse.nombreUsuario,
+      nombre: loginResponse.nombre,
+      apellidos: loginResponse.apellidos,
+      idRol: loginResponse.idRol
+    }));
+    
+    // Transformar y guardar el menú
+    if (loginResponse.opciones && loginResponse.opciones.length > 0) {
+      const menuItems = transformOpcionesToNavigationItems(loginResponse.opciones);
+      console.log('Transformed menu items:', JSON.stringify(menuItems, null, 2));
+      localStorage.setItem(this.MENU_ITEMS_KEY, JSON.stringify(menuItems));
+      this.menuItemsSubject.next(menuItems);
+    }
+    
     this.isAuthenticatedSubject.next(true);
   }
 
@@ -65,7 +109,17 @@ export class AuthService {
   logout(): void {
     localStorage.removeItem(this.AUTH_TOKEN_KEY);
     localStorage.removeItem(this.AUTH_USER_KEY);
+    localStorage.removeItem(this.MENU_ITEMS_KEY);
     this.isAuthenticatedSubject.next(false);
+    this.menuItemsSubject.next([]);
+  }
+  
+  /**
+   * Obtener items del menú
+   * @returns NavigationItem[] del menú del usuario
+   */
+  getMenuItems(): NavigationItem[] {
+    return this.menuItemsSubject.value;
   }
 
   /**

@@ -18,6 +18,17 @@ import { AuthService } from 'src/app/prestamil/core/services/auth.service';
 })
 export class NavRightComponent {
   // public props
+  get user() {
+    return this.authService.getUser();
+  }
+
+  get fullName(): string {
+    const user = this.user;
+    if (user) {
+      return `${user.nombre || ''} ${user.apellidos || ''}`.trim();
+    }
+    return '';
+  }
 
   // constructor
   constructor(

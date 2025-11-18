@@ -1,0 +1,68 @@
+import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
+import { OpcionMenu } from '../models/auth-response.model';
+
+/**
+ * Transforma una opción del backend a NavigationItem
+ */
+function transformOpcion(opcion: OpcionMenu): NavigationItem {
+  const hasSubmenus = opcion.submenus && opcion.submenus.length > 0;
+  
+  // Determinar el tipo basado en si tiene submenus
+  const type: 'item' | 'collapse' = hasSubmenus ? 'collapse' : 'item';
+  
+  // Obtener el icono directamente del backend (ya viene en formato Feather)
+  let icon: string | undefined;
+  if (opcion.icono === 'true' && opcion.nombreIcono) {
+    icon = opcion.nombreIcono;
+  }
+  
+  // Transformar los submenus recursivamente
+  const children: NavigationItem[] | undefined = hasSubmenus
+    ? opcion.submenus.map(submenu => transformOpcion(submenu))
+    : undefined;
+  
+  // Validar y limpiar la URL
+  let url: string | undefined = undefined;
+  if (opcion.url) {
+    // Normalizar URLs (remover /default si existe, limpiar barras finales)
+    url = opcion.url.replace('/default', '').replace(/\/$/, '') || undefined;
+    // Si la URL está vacía después de normalizar, usar undefined
+    if (url === '') {
+      url = undefined;
+    }
+  }
+  
+  return {
+    id: opcion.id.toString(),
+    title: opcion.opcion,
+    type: type,
+    icon: icon,
+    url: url,
+    classes: 'nav-item',
+    children: children
+  };
+}
+
+/**
+ * Transforma las opciones del backend a NavigationItem[] agrupadas
+ */
+export function transformOpcionesToNavigationItems(opciones: OpcionMenu[]): NavigationItem[] {
+  if (!opciones || opciones.length === 0) {
+    return [];
+  }
+  
+  // Transformar cada opción
+  const items = opciones.map(opcion => transformOpcion(opcion));
+  
+  // Agrupar todas las opciones en un grupo principal
+  return [
+    {
+      id: 'main-menu',
+      title: 'Menú Principal',
+      type: 'group',
+      icon: 'icon-navigation',
+      children: items
+    }
+  ];
+}
+
