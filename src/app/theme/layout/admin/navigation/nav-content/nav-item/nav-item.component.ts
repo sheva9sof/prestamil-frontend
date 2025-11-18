@@ -19,8 +19,6 @@ export class NavItemComponent {
   // public props
   item = input<NavigationItem>();
 
-  // constructor
-
   // public method
   closeOtherMenu(event: MouseEvent) {
     const ele = event.target as HTMLElement;

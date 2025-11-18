@@ -32,6 +32,29 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
     }
   }
   
+  // Si no tiene URL y no tiene submenús, asignar URL basada en el nombre de la opción
+  if (!url && !hasSubmenus) {
+    // Mapeo de nombres de opciones a rutas
+    const opcionToUrlMap: { [key: string]: string } = {
+      'Usuarios': '/usuarios',
+      'Usuario': '/usuarios',
+      'Hardware': '/hardware',
+      'Prendas': '/catalogos/prendas',
+      'Sucursal': '/configuracion/sucursal',
+      'Parametros prestamo': '/configuracion/parametros-prestamo',
+      'Parámetros Préstamo': '/configuracion/parametros-prestamo',
+      'Parametros Generales': '/configuracion/parametros-generales',
+      'Parámetros Generales': '/configuracion/parametros-generales',
+      'Plazos y Periodos': '/configuracion/plazos-periodos',
+      // Agregar más mapeos según sea necesario
+    };
+    
+    const mappedUrl = opcionToUrlMap[opcion.opcion];
+    if (mappedUrl) {
+      url = mappedUrl;
+    }
+  }
+  
   return {
     id: opcion.id.toString(),
     title: opcion.opcion,

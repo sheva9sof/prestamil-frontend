@@ -50,11 +50,65 @@ export class AuthService {
     if (menuStr) {
       try {
         const menuItems = JSON.parse(menuStr);
-        this.menuItemsSubject.next(menuItems);
+        // Regenerar URLs para elementos sin URL usando el mapeo
+        const regeneratedMenu = this.regenerateMenuUrls(menuItems);
+        console.log('Menu loaded from storage, regenerated:', JSON.stringify(regeneratedMenu, null, 2));
+        this.menuItemsSubject.next(regeneratedMenu);
+        // Guardar el menú regenerado
+        localStorage.setItem(this.MENU_ITEMS_KEY, JSON.stringify(regeneratedMenu));
       } catch (e) {
         console.error('Error al cargar menú desde storage:', e);
       }
     }
+  }
+
+  /**
+   * Regenerar URLs del menú para elementos que no tienen URL
+   */
+  private regenerateMenuUrls(menuItems: NavigationItem[]): NavigationItem[] {
+    const opcionToUrlMap: { [key: string]: string } = {
+      'Usuarios': '/usuarios',
+      'Usuario': '/usuarios',
+      'Hardware': '/hardware',
+      'Prendas': '/catalogos/prendas',
+      'Sucursal': '/configuracion/sucursal',
+      'Parametros prestamo': '/configuracion/parametros-prestamo',
+      'Parámetros Préstamo': '/configuracion/parametros-prestamo',
+      'Parametros Generales': '/configuracion/parametros-generales',
+      'Parámetros Generales': '/configuracion/parametros-generales',
+      'Plazos y Periodos': '/configuracion/plazos-periodos',
+    };
+
+    return menuItems.map(item => {
+      if (item.type === 'group' && item.children) {
+        return {
+          ...item,
+          children: item.children.map(child => {
+            if (child.type === 'item' && !child.url && !child.children) {
+              const mappedUrl = opcionToUrlMap[child.title];
+              if (mappedUrl) {
+                return { ...child, url: mappedUrl };
+              }
+            } else if (child.type === 'collapse' && child.children) {
+              return {
+                ...child,
+                children: child.children.map(subChild => {
+                  if (subChild.type === 'item' && !subChild.url) {
+                    const mappedUrl = opcionToUrlMap[subChild.title];
+                    if (mappedUrl) {
+                      return { ...subChild, url: mappedUrl };
+                    }
+                  }
+                  return subChild;
+                })
+              };
+            }
+            return child;
+          })
+        };
+      }
+      return item;
+    });
   }
 
   /**
@@ -119,7 +173,19 @@ export class AuthService {
    * @returns NavigationItem[] del menú del usuario
    */
   getMenuItems(): NavigationItem[] {
-    return this.menuItemsSubject.value;
+    const menuItems = this.menuItemsSubject.value;
+    // Si hay menú, regenerar URLs antes de retornar
+    if (menuItems && menuItems.length > 0) {
+      return this.regenerateMenuUrls(menuItems);
+    }
+    return menuItems;
+  }
+  
+  /**
+   * Forzar regeneración del menú desde localStorage
+   */
+  refreshMenu(): void {
+    this.loadMenuFromStorage();
   }
 
   /**

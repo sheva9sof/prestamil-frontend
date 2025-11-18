@@ -34,20 +34,42 @@ const routes: Routes = [
         loadComponent: () => import('./prestamil/dashboard/dashboard.component').then((c) => c.DashboardComponent)
       },
       {
-        path: 'basic',
-        loadChildren: () => import('./prestamil/ui-elements/ui-basic/ui-basic.module').then((m) => m.UiBasicModule)
+        path: 'usuarios',
+        loadComponent: () => import('./prestamil/pages/usuarios/usuarios.component').then((c) => c.UsuariosComponent)
       },
       {
-        path: 'forms',
-        loadComponent: () => import('./prestamil/pages/form-element/form-element').then((c) => c.FormElement)
+        path: 'hardware',
+        loadComponent: () => import('./prestamil/pages/hardware/hardware.component').then((c) => c.HardwareComponent)
       },
       {
-        path: 'tables',
-        loadComponent: () => import('./prestamil/pages/tables/tbl-bootstrap/tbl-bootstrap.component').then((c) => c.TblBootstrapComponent)
+        path: 'catalogos',
+        children: [
+          {
+            path: 'prendas',
+            loadComponent: () => import('./prestamil/pages/catalogos/prendas/prendas.component').then((c) => c.PrendasComponent)
+          }
+        ]
       },
       {
-        path: 'apexchart',
-        loadComponent: () => import('./prestamil/pages/core-chart/apex-chart/apex-chart.component').then((c) => c.ApexChartComponent)
+        path: 'configuracion',
+        children: [
+          {
+            path: 'sucursal',
+            loadComponent: () => import('./prestamil/pages/configuracion/sucursal/sucursal.component').then((c) => c.SucursalComponent)
+          },
+          {
+            path: 'parametros-prestamo',
+            loadComponent: () => import('./prestamil/pages/configuracion/parametros-prestamo/parametros-prestamo.component').then((c) => c.ParametrosPrestamoComponent)
+          },
+          {
+            path: 'parametros-generales',
+            loadComponent: () => import('./prestamil/pages/configuracion/parametros-generales/parametros-generales.component').then((c) => c.ParametrosGeneralesComponent)
+          },
+          {
+            path: 'plazos-periodos',
+            loadComponent: () => import('./prestamil/pages/configuracion/plazos-periodos/plazos-periodos.component').then((c) => c.PlazosPeriodosComponent)
+          }
+        ]
       },
       {
         path: '**',
