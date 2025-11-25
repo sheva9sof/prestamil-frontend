@@ -41,6 +41,10 @@ export class NavRightComponent {
   }
 
   // public method
+  goToUpdatePassword() {
+    this.router.navigate(['/configuracion/actualizar-password']);
+  }
+
   logout() {
     this.authService.logout();
     this.router.navigate(['/login']);

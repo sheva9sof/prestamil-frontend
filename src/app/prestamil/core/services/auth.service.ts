@@ -212,5 +212,52 @@ export class AuthService {
     const userStr = localStorage.getItem(this.AUTH_USER_KEY);
     return userStr ? JSON.parse(userStr) : null;
   }
+
+  /**
+   * Obtener el ID del usuario desde el token JWT
+   * @returns ID del usuario o null
+   */
+  getUserId(): number | null {
+    const token = this.getToken();
+    if (!token) {
+      return null;
+    }
+    
+    try {
+      // Decodificar el payload del token JWT (segunda parte)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.userId || payload.user_id || null;
+    } catch (e) {
+      console.error('Error al decodificar token:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Cambiar contraseña del usuario
+   * @param userId ID del usuario
+   * @param passwordActual Contraseña actual
+   * @param passwordNueva Nueva contraseña
+   * @returns Observable con la respuesta del servidor
+   */
+  cambiarPassword(userId: number, passwordActual: string, passwordNueva: string): Observable<any> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('No hay token de autenticación');
+    }
+
+    const url = `${this.API_URL}/api/usuarios/${userId}/cambiar-password`;
+    const body = {
+      passwordActual,
+      passwordNueva
+    };
+
+    return this.http.post(url, body, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+  }
 }
 

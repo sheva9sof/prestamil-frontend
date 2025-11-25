@@ -14,20 +14,17 @@
                 }
               </li>
               @for (breadcrumb of navigationList; track breadcrumb) {
-                @if (breadcrumb.url && breadcrumb.url !== false) {
-                  <li class="breadcrumb-item">
-                    <a [routerLink]="breadcrumb.url">{{ breadcrumb.title }}</a>
-                  </li>
-                }
-                @if ((!breadcrumb.url || breadcrumb.url === false) && breadcrumb.type !== 'group') {
-                  <li class="breadcrumb-item">
-                    <span>{{ breadcrumb.title }}</span>
-                  </li>
-                }
-                @if (breadcrumb.type === 'group') {
-                  <li class="breadcrumb-item">
-                    <span>{{ breadcrumb.title }}</span>
-                  </li>
+                @if (breadcrumb.type !== 'group') {
+                  @if (breadcrumb.url && breadcrumb.url !== false) {
+                    <li class="breadcrumb-item">
+                      <a [routerLink]="breadcrumb.url">{{ breadcrumb.title }}</a>
+                    </li>
+                  }
+                  @if (!breadcrumb.url || breadcrumb.url === false) {
+                    <li class="breadcrumb-item">
+                      <span>{{ breadcrumb.title }}</span>
+                    </li>
+                  }
                 }
               }
             </ul>

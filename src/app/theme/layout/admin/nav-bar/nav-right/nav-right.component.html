@@ -12,7 +12,13 @@
       <div class="dropdown-menu dropdown-menu-end profile-notification" ngbDropdownMenu>
         <ul class="pro-body">
           <li>
-            <button type="button" class="dropdown-item">
+            <button type="button" class="dropdown-item" (click)="goToUpdatePassword()">
+              <i class="feather icon-lock"></i>
+              Actualizar Contraseña
+            </button>
+          </li>
+          <li>
+            <button type="button" class="dropdown-item" (click)="goToUpdatePassword()">
               <i class="feather icon-user"></i>
               Perfil
             </button>

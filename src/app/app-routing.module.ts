@@ -15,7 +15,7 @@ const routes: Routes = [
     children: [
       {
         path: '',
-        loadComponent: () => import('./prestamil/pages/authentication/auth-signin/auth-signin.component').then((c) => c.AuthSigninComponent)
+        loadComponent: () => import('./prestamil/pages/authentication/login/login.component').then((c) => c.AuthSigninComponent)
       }
     ]
   },
@@ -68,6 +68,10 @@ const routes: Routes = [
           {
             path: 'plazos-periodos',
             loadComponent: () => import('./prestamil/pages/configuracion/plazos-periodos/plazos-periodos.component').then((c) => c.PlazosPeriodosComponent)
+          },
+          {
+            path: 'actualizar-password',
+            loadComponent: () => import('./prestamil/pages/configuracion/actualizar-password/actualizar-password.component').then((c) => c.ActualizarPasswordComponent)
           }
         ]
       },

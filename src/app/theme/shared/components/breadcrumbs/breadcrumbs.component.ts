@@ -47,9 +47,14 @@ export class BreadcrumbsComponent implements OnInit, OnDestroy {
     this.menuSubscription = this.authService.menuItems$.subscribe(menuItems => {
       if (menuItems && menuItems.length > 0) {
         this.navigations = menuItems;
+        // Actualizar breadcrumb cuando el menú cambia
+        this.updateBreadcrumb();
       } else {
-        // Usar menú estático como fallback
-        this.navigations = NavigationItems;
+        // Usar menú estático como fallback solo si no está autenticado
+        if (!this.authService.isAuthenticated()) {
+          this.navigations = NavigationItems;
+          this.updateBreadcrumb();
+        }
       }
     });
     
@@ -57,11 +62,22 @@ export class BreadcrumbsComponent implements OnInit, OnDestroy {
     const menuItems = this.authService.getMenuItems();
     if (menuItems && menuItems.length > 0) {
       this.navigations = menuItems;
-    } else {
+    } else if (!this.authService.isAuthenticated()) {
       this.navigations = NavigationItems;
     }
     
     this.setBreadcrumb();
+  }
+  
+  // Método para actualizar el breadcrumb con la URL actual
+  updateBreadcrumb() {
+    const currentUrl = this.route.url;
+    if (currentUrl) {
+      const breadcrumbList = this.filterNavigation(this.navigations, currentUrl);
+      this.navigationList = breadcrumbList;
+      const title = breadcrumbList[breadcrumbList.length - 1]?.title || 'Welcome';
+      this.titleService.setTitle(title + ' | Berry Angular Admin Template');
+    }
   }
 
   ngOnDestroy() {
@@ -74,13 +90,15 @@ export class BreadcrumbsComponent implements OnInit, OnDestroy {
   setBreadcrumb() {
     this.route.events.subscribe((router: Event) => {
       if (router instanceof NavigationEnd) {
-        const activeLink = router.url;
-        const breadcrumbList = this.filterNavigation(this.navigations, activeLink);
-        this.navigationList = breadcrumbList;
-        const title = breadcrumbList[breadcrumbList.length - 1]?.title || 'Welcome';
-        this.titleService.setTitle(title + ' | Berry Angular Admin Template');
+        this.updateBreadcrumb();
       }
     });
+    
+    // También actualizar el breadcrumb inmediatamente con la URL actual
+    // Esto es importante cuando se recarga la página
+    setTimeout(() => {
+      this.updateBreadcrumb();
+    }, 100);
   }
 
   filterNavigation(navItems: NavigationItem[], activeLink: string): titleType[] {

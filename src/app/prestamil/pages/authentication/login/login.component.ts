@@ -7,8 +7,8 @@ import { AuthService } from '../../../core/services/auth.service';
 @Component({
   selector: 'app-auth-signin',
   imports: [RouterModule, ReactiveFormsModule, CommonModule],
-  templateUrl: './auth-signin.component.html',
-  styleUrls: ['./auth-signin.component.scss']
+  templateUrl: './login.component.html',
+  styleUrls: ['./login.component.scss']
 })
 export class AuthSigninComponent implements OnInit {
   loginForm!: FormGroup;

@@ -1,8 +1,340 @@
 <div class="row">
   <div class="col-12">
+    <!-- Notificación flotante de éxito -->
+    <div *ngIf="successMessage" class="notification-toast notification-success">
+      <div class="notification-content">
+        <i class="feather icon-check-circle"></i>
+        <span>{{ successMessage }}</span>
+        <button type="button" class="notification-close" (click)="successMessage = ''">
+          <i class="feather icon-x"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal de carga -->
+    <ng-template #loadingModal let-modal>
+      <div class="modal-header" style="border-bottom: none;">
+        <h5 class="modal-title">Cargando información</h5>
+      </div>
+      <div class="modal-body text-center py-4">
+        <i class="feather icon-loader spin-icon" style="font-size: 48px; color: #5e72e4;"></i>
+        <p class="mt-3 mb-0" style="font-size: 16px; color: #2c3e50;">Cargando información desde el servidor...</p>
+      </div>
+    </ng-template>
+
     <app-card cardTitle="Sucursal">
-      <p>Gestión de sucursales</p>
+      <form [formGroup]="sucursalForm" class="sucursal-form" (ngSubmit)="onSubmit()">
+        
+        <!-- Información General -->
+        <div class="form-section">
+          <h5 class="section-title">Información General</h5>
+          <div class="row">
+            <!-- Campo ID oculto pero presente en el formulario para el PUT -->
+            <input 
+              type="hidden"
+              formControlName="id"
+            />
+            <div class="col-md-6 mb-3">
+              <label for="numeroSucursal" class="form-label">Número de Sucursal <span class="text-danger">*</span></label>
+              <input 
+                type="number" 
+                id="numeroSucursal"
+                formControlName="numeroSucursal"
+                class="form-control" 
+                [class.is-invalid]="numeroSucursal?.invalid && numeroSucursal?.touched"
+                placeholder="Número de Sucursal" 
+              />
+              <div *ngIf="numeroSucursal?.invalid && numeroSucursal?.touched" class="invalid-feedback d-block">
+                <span *ngIf="numeroSucursal?.errors?.['required']">El número de sucursal es requerido</span>
+              </div>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="nombre"
+                formControlName="nombre"
+                class="form-control" 
+                [class.is-invalid]="nombre?.invalid && nombre?.touched"
+                placeholder="Nombre de la sucursal" 
+              />
+              <div *ngIf="nombre?.invalid && nombre?.touched" class="invalid-feedback d-block">
+                <span *ngIf="nombre?.errors?.['required']">El nombre es requerido</span>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-12 mb-3">
+              <label for="idEmpresa" class="form-label">Empresa <span class="text-danger">*</span></label>
+              <select 
+                id="idEmpresa"
+                formControlName="idEmpresa"
+                class="form-control" 
+                [class.is-invalid]="idEmpresa?.invalid && idEmpresa?.touched"
+              >
+                <option value="">Seleccione una empresa</option>
+                <option *ngFor="let empresa of empresas" [value]="empresa.id">
+                  {{ empresa.nombre }}
+                </option>
+              </select>
+              <div *ngIf="idEmpresa?.invalid && idEmpresa?.touched" class="invalid-feedback d-block">
+                <span *ngIf="idEmpresa?.errors?.['required']">La empresa es requerida</span>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <!-- Campos ocultos pero presentes en el formulario -->
+            <input type="hidden" formControlName="idRazonSocial" />
+            <input type="hidden" formControlName="nombreEmpresa" />
+            <div class="col-md-12 mb-3">
+              <label for="razonSocial" class="form-label">Razón Social</label>
+              <input 
+                type="text" 
+                id="razonSocial"
+                formControlName="razonSocial"
+                class="form-control" 
+                readonly
+                placeholder="Razón Social (se llena automáticamente)" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Dirección -->
+        <div class="form-section">
+          <h5 class="section-title">Dirección</h5>
+          <div class="row">
+            <div class="col-md-8 mb-3">
+              <label for="calle" class="form-label">Calle <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="calle"
+                formControlName="calle"
+                class="form-control" 
+                [class.is-invalid]="calle?.invalid && calle?.touched"
+                placeholder="Calle" 
+              />
+              <div *ngIf="calle?.invalid && calle?.touched" class="invalid-feedback d-block">
+                <span *ngIf="calle?.errors?.['required']">La calle es requerida</span>
+              </div>
+            </div>
+            <div class="col-md-2 mb-3">
+              <label for="noExterior" class="form-label">No. Exterior <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="noExterior"
+                formControlName="noExterior"
+                class="form-control" 
+                [class.is-invalid]="noExterior?.invalid && noExterior?.touched"
+                placeholder="Ext." 
+              />
+              <div *ngIf="noExterior?.invalid && noExterior?.touched" class="invalid-feedback d-block">
+                <span *ngIf="noExterior?.errors?.['required']">El número exterior es requerido</span>
+              </div>
+            </div>
+            <div class="col-md-2 mb-3">
+              <label for="noInterior" class="form-label">No. Interior</label>
+              <input 
+                type="text" 
+                id="noInterior"
+                formControlName="noInterior"
+                class="form-control" 
+                placeholder="Int." 
+              />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="colonia" class="form-label">Colonia <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="colonia"
+                formControlName="colonia"
+                class="form-control" 
+                [class.is-invalid]="colonia?.invalid && colonia?.touched"
+                placeholder="Colonia" 
+              />
+              <div *ngIf="colonia?.invalid && colonia?.touched" class="invalid-feedback d-block">
+                <span *ngIf="colonia?.errors?.['required']">La colonia es requerida</span>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <label for="cp" class="form-label">Código Postal <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="cp"
+                formControlName="cp"
+                class="form-control" 
+                [class.is-invalid]="cp?.invalid && cp?.touched"
+                placeholder="CP" 
+                maxlength="5"
+              />
+              <div *ngIf="cp?.invalid && cp?.touched" class="invalid-feedback d-block">
+                <span *ngIf="cp?.errors?.['required']">El código postal es requerido</span>
+                <span *ngIf="cp?.errors?.['pattern']">El código postal debe tener 5 dígitos</span>
+              </div>
+            </div>
+            <div class="col-md-3 mb-3">
+              <label for="municipio" class="form-label">Municipio <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="municipio"
+                formControlName="municipio"
+                class="form-control" 
+                [class.is-invalid]="municipio?.invalid && municipio?.touched"
+                placeholder="Municipio" 
+              />
+              <div *ngIf="municipio?.invalid && municipio?.touched" class="invalid-feedback d-block">
+                <span *ngIf="municipio?.errors?.['required']">El municipio es requerido</span>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="estado" class="form-label">Estado <span class="text-danger">*</span></label>
+              <select 
+                id="estado"
+                formControlName="estado"
+                class="form-control" 
+                [class.is-invalid]="estado?.invalid && estado?.touched"
+              >
+                <option value="">Seleccione un estado</option>
+                <option *ngFor="let estado of estados" [value]="estado.nombre || estado.name || estado">
+                  {{ estado.nombre || estado.name || estado }}
+                </option>
+              </select>
+              <div *ngIf="estado?.invalid && estado?.touched" class="invalid-feedback d-block">
+                <span *ngIf="estado?.errors?.['required']">El estado es requerido</span>
+              </div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="pais" class="form-label">País <span class="text-danger">*</span></label>
+              <select 
+                id="pais"
+                formControlName="pais"
+                class="form-control" 
+                [class.is-invalid]="pais?.invalid && pais?.touched"
+              >
+                <option value="">Seleccione un país</option>
+                <option value="México">México</option>
+              </select>
+              <div *ngIf="pais?.invalid && pais?.touched" class="invalid-feedback d-block">
+                <span *ngIf="pais?.errors?.['required']">El país es requerido</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contacto -->
+        <div class="form-section">
+          <h5 class="section-title">Contacto</h5>
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label for="lada" class="form-label">LADA</label>
+              <input 
+                type="text" 
+                id="lada"
+                formControlName="lada"
+                class="form-control" 
+                [class.is-invalid]="lada?.invalid && lada?.touched"
+                placeholder="LADA" 
+              />
+              <div *ngIf="lada?.invalid && lada?.touched" class="invalid-feedback d-block">
+                <span *ngIf="lada?.errors?.['pattern']">La LADA debe ser numérica</span>
+              </div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="telefono" class="form-label">Teléfono</label>
+              <input 
+                type="text" 
+                id="telefono"
+                formControlName="telefono"
+                class="form-control" 
+                [class.is-invalid]="telefono?.invalid && telefono?.touched"
+                placeholder="Teléfono" 
+              />
+              <div *ngIf="telefono?.invalid && telefono?.touched" class="invalid-feedback d-block">
+                <span *ngIf="telefono?.errors?.['pattern']">El teléfono debe ser numérico</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Información Fiscal y Legal -->
+        <div class="form-section">
+          <h5 class="section-title">Información Fiscal y Legal</h5>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="rfc" class="form-label">RFC <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="rfc"
+                formControlName="rfc"
+                class="form-control" 
+                [class.is-invalid]="rfc?.invalid && rfc?.touched"
+                placeholder="RFC" 
+                maxlength="13"
+                style="text-transform: uppercase;"
+              />
+              <div *ngIf="rfc?.invalid && rfc?.touched" class="invalid-feedback d-block">
+                <span *ngIf="rfc?.errors?.['required']">El RFC es requerido</span>
+                <span *ngIf="rfc?.errors?.['pattern']">El formato del RFC no es válido</span>
+              </div>
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="fechaApertura" class="form-label">Fecha de Apertura <span class="text-danger">*</span></label>
+              <input 
+                type="date" 
+                id="fechaApertura"
+                formControlName="fechaApertura"
+                class="form-control" 
+                [class.is-invalid]="fechaApertura?.invalid && fechaApertura?.touched"
+              />
+              <div *ngIf="fechaApertura?.invalid && fechaApertura?.touched" class="invalid-feedback d-block">
+                <span *ngIf="fechaApertura?.errors?.['required']">La fecha de apertura es requerida</span>
+              </div>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="fechaRegistroProfeco" class="form-label">Fecha Registro PROFECO</label>
+              <input 
+                type="datetime-local" 
+                id="fechaRegistroProfeco"
+                formControlName="fechaRegistroProfeco"
+                class="form-control" 
+              />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="fechaContratoProfeco" class="form-label">Fecha Contrato PROFECO</label>
+              <input 
+                type="datetime-local" 
+                id="fechaContratoProfeco"
+                formControlName="fechaContratoProfeco"
+                class="form-control" 
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Mensaje de error -->
+        <div *ngIf="errorMessage" class="alert alert-danger mb-3" role="alert">
+          {{ errorMessage }}
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="form-actions">
+          <button 
+            type="submit" 
+            class="btn btn-primary btn-save" 
+            [disabled]="sucursalForm.invalid || isLoading">
+            <span *ngIf="!isLoading">Guardar</span>
+            <span *ngIf="isLoading">
+              <i class="feather icon-loader spin-icon"></i> Guardando...
+            </span>
+          </button>
+        </div>
+      </form>
     </app-card>
   </div>
 </div>
-
