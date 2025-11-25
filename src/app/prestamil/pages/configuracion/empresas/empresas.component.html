@@ -1,0 +1,254 @@
+<div class="row">
+  <div class="col-12">
+    <!-- Notificación flotante de éxito -->
+    <div *ngIf="successMessage" class="notification-toast notification-success">
+      <div class="notification-content">
+        <i class="feather icon-check-circle"></i>
+        <span>{{ successMessage }}</span>
+        <button type="button" class="notification-close" (click)="successMessage = ''">
+          <i class="feather icon-x"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal de carga -->
+    <ng-template #loadingModal let-modal>
+      <div class="modal-header" style="border-bottom: none;">
+        <h5 class="modal-title">Guardando cambios</h5>
+      </div>
+      <div class="modal-body text-center py-4">
+        <i class="feather icon-loader spin-icon" style="font-size: 48px; color: #5e72e4;"></i>
+        <p class="mt-3 mb-0" style="font-size: 16px; color: #2c3e50;">Guardando información en el servidor...</p>
+      </div>
+    </ng-template>
+
+    <!-- Modal de creación/edición -->
+    <ng-template #empresaModal let-modal>
+      <div class="modal-header">
+        <h5 class="modal-title">{{ isCreating ? 'Nueva Empresa' : 'Editar Empresa' }}</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="closeEmpresaModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <!-- Información General -->
+          <div class="form-section mb-4">
+            <h6 class="section-title">Información General</h6>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
+                <input 
+                  type="text" 
+                  id="nombre"
+                  class="form-control" 
+                  [(ngModel)]="formData.nombre"
+                  name="nombre"
+                  placeholder="Nombre de la empresa" 
+                  required
+                />
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="razonSocial" class="form-label">Razón Social <span class="text-danger">*</span></label>
+                <input 
+                  type="text" 
+                  id="razonSocial"
+                  class="form-control" 
+                  [(ngModel)]="formData.razonSocial"
+                  name="razonSocial"
+                  placeholder="Razón Social" 
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Dirección -->
+          <div class="form-section mb-4">
+            <h6 class="section-title">Dirección</h6>
+            <div class="row">
+              <div class="col-md-8 mb-3">
+                <label for="calle" class="form-label">Calle</label>
+                <input 
+                  type="text" 
+                  id="calle"
+                  class="form-control" 
+                  [(ngModel)]="formData.calle"
+                  name="calle"
+                  placeholder="Calle" 
+                />
+              </div>
+              <div class="col-md-2 mb-3">
+                <label for="noExterior" class="form-label">No. Exterior</label>
+                <input 
+                  type="text" 
+                  id="noExterior"
+                  class="form-control" 
+                  [(ngModel)]="formData.noExterior"
+                  name="noExterior"
+                  placeholder="Ext." 
+                />
+              </div>
+              <div class="col-md-2 mb-3">
+                <label for="noInterior" class="form-label">No. Interior</label>
+                <input 
+                  type="text" 
+                  id="noInterior"
+                  class="form-control" 
+                  [(ngModel)]="formData.noInterior"
+                  name="noInterior"
+                  placeholder="Int." 
+                />
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-6 mb-3">
+                <label for="colonia" class="form-label">Colonia</label>
+                <input 
+                  type="text" 
+                  id="colonia"
+                  class="form-control" 
+                  [(ngModel)]="formData.colonia"
+                  name="colonia"
+                  placeholder="Colonia" 
+                />
+              </div>
+              <div class="col-md-6 mb-3">
+                <label for="delegacion" class="form-label">Delegación</label>
+                <input 
+                  type="text" 
+                  id="delegacion"
+                  class="form-control" 
+                  [(ngModel)]="formData.delegacion"
+                  name="delegacion"
+                  placeholder="Delegación" 
+                />
+              </div>
+            </div>
+            <div class="row">
+              <div class="col-md-4 mb-3">
+                <label for="cp" class="form-label">Código Postal</label>
+                <input 
+                  type="text" 
+                  id="cp"
+                  class="form-control" 
+                  [(ngModel)]="formData.cp"
+                  name="cp"
+                  placeholder="00000" 
+                  maxlength="5"
+                />
+              </div>
+              <div class="col-md-4 mb-3">
+                <label for="estado" class="form-label">Estado</label>
+                <select 
+                  id="estado"
+                  class="form-control"
+                  [(ngModel)]="formData.estado"
+                  name="estado"
+                >
+                  <option value="">Seleccione un estado</option>
+                  <option *ngFor="let estado of estados" [value]="estado.nombre || estado">
+                    {{ estado.nombre || estado }}
+                  </option>
+                </select>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label for="pais" class="form-label">País</label>
+                <select 
+                  id="pais"
+                  class="form-control"
+                  [(ngModel)]="formData.pais"
+                  name="pais"
+                >
+                  <option value="">Seleccione un país</option>
+                  <option value="México">México</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Mensaje de error -->
+          <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+            {{ errorMessage }}
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button 
+          type="button" 
+          class="btn btn-secondary"
+          (click)="closeEmpresaModal()"
+          [disabled]="isLoading"
+        >
+          Cancelar
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-primary"
+          (click)="saveEmpresa()"
+          [disabled]="isLoading || !formData.nombre || !formData.razonSocial"
+        >
+          <i class="feather icon-save"></i>
+          {{ isLoading ? (isCreating ? 'Creando...' : 'Guardando...') : (isCreating ? 'Crear' : 'Guardar') }}
+        </button>
+      </div>
+    </ng-template>
+
+    <div>
+      <!-- Indicador de carga -->
+      <div *ngIf="isLoadingData" class="text-center py-5">
+        <i class="feather icon-loader spin-icon" style="font-size: 32px; color: #5e72e4;"></i>
+        <p class="mt-3">Cargando empresas...</p>
+      </div>
+
+      <!-- Mensaje de error -->
+      <div *ngIf="errorMessage && !isLoadingData" class="alert alert-danger mb-3" role="alert">
+        {{ errorMessage }}
+      </div>
+
+      <!-- Botón para crear nueva empresa -->
+      <div *ngIf="!isLoadingData" class="d-flex justify-content-end mb-3">
+        <button 
+          type="button" 
+          class="btn btn-success"
+          (click)="openCreateModal()"
+        >
+          <i class="feather icon-plus"></i> Nueva Empresa
+        </button>
+      </div>
+
+      <!-- Tabla de empresas -->
+      <div *ngIf="!isLoadingData" class="table-responsive">
+        <table class="table table-striped table-hover table-bordered">
+          <thead>
+            <tr>
+              <th style="width: 45%;">Nombre</th>
+              <th style="width: 45%;">Razón Social</th>
+              <th style="width: 10%;">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let empresa of empresas; trackBy: trackByFn">
+              <td>{{ empresa.nombre }}</td>
+              <td>{{ empresa.razonSocial }}</td>
+              <td>
+                <div class="btn-group" role="group">
+                  <button 
+                    type="button" 
+                    class="btn btn-sm btn-primary"
+                    (click)="openEditModal(empresa)"
+                  >
+                    <i class="feather icon-edit"></i> Editar
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mensaje cuando no hay empresas -->
+      <div *ngIf="!isLoadingData && empresas.length === 0" class="alert alert-info mt-3" role="alert">
+        No hay empresas registradas.
+      </div>
+    </div>
+  </div>
+</div>

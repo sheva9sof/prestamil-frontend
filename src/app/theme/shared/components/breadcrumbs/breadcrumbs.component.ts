@@ -110,15 +110,15 @@ export class BreadcrumbsComponent implements OnInit, OnDestroy {
       if (navItem.type === 'item' && navItem.url) {
         const normalizedNavUrl = navItem.url.split('?')[0].split('#')[0];
         if (normalizedNavUrl === normalizedActiveLink) {
-          return [
-            {
+        return [
+          {
               url: navItem.url || false,
-              title: navItem.title,
+            title: navItem.title,
               breadcrumbs: navItem.breadcrumbs !== false,
-              type: navItem.type
-            }
-          ];
-        }
+            type: navItem.type
+          }
+        ];
+      }
       }
       if ((navItem.type === 'group' || navItem.type === 'collapse') && navItem.children) {
         const breadcrumbList = this.filterNavigation(navItem.children, normalizedActiveLink);

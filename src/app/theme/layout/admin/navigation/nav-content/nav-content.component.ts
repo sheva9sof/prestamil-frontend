@@ -60,7 +60,7 @@ export class NavContentComponent implements OnInit, OnDestroy {
     } else {
       // Solo usar menú estático si el usuario NO está autenticado
       if (!this.authService.isAuthenticated()) {
-        this.navigations = NavigationItems;
+    this.navigations = NavigationItems;
       } else {
         // Si está autenticado pero sin menú aún, dejar vacío
         this.navigations = [];

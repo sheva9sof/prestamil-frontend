@@ -1,0 +1,307 @@
+// Estilos para el componente de empresas
+
+// Estilos para el modal de edición
+::ng-deep .edit-modal {
+  .modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+  
+  .modal-header {
+    border-bottom: 2px solid #e0e0e0;
+    padding: 20px 24px;
+    
+    .modal-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+  }
+  
+  .modal-body {
+    padding: 24px;
+    
+    .form-section {
+      .section-title {
+        color: #2c3e50;
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 16px;
+        padding-bottom: 8px;
+        border-bottom: 2px solid #5e72e4;
+      }
+    }
+    
+    .form-control {
+      border-radius: 6px;
+      border: 1px solid #d0d0d0;
+      padding: 10px 15px;
+      font-size: 14px;
+      transition: all 0.3s ease;
+      
+      &:focus {
+        border-color: #5e72e4;
+        box-shadow: 0 0 0 0.2rem rgba(94, 114, 228, 0.25);
+      }
+    }
+    
+    .form-label {
+      font-weight: 500;
+      color: #2c3e50;
+      margin-bottom: 8px;
+      font-size: 14px;
+      
+      .text-danger {
+        color: #dc3545;
+      }
+    }
+  }
+  
+  .modal-footer {
+    border-top: 2px solid #e0e0e0;
+    padding: 16px 24px;
+    
+    .btn {
+      padding: 10px 24px;
+      font-size: 14px;
+      font-weight: 500;
+      border-radius: 6px;
+      transition: all 0.3s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      
+      &.btn-primary {
+        background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);
+        border: none;
+        color: #fff;
+        box-shadow: 0 4px 12px rgba(94, 114, 228, 0.3);
+        
+        &:hover:not(:disabled) {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(94, 114, 228, 0.4);
+        }
+        
+        &:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+      }
+      
+      &.btn-secondary {
+        background: #6c757d;
+        border: none;
+        color: #fff;
+        
+        &:hover:not(:disabled) {
+          background: #5a6268;
+        }
+      }
+    }
+  }
+}
+
+// Estilos para el modal de carga
+::ng-deep .loading-modal {
+  .modal-content {
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  }
+  
+  .modal-header {
+    border-bottom: none;
+    padding: 24px 24px 0 24px;
+    
+    .modal-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #2c3e50;
+    }
+  }
+  
+  .modal-body {
+    padding: 0 24px 24px 24px;
+    
+    .spin-icon {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+    }
+  }
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+// Notificación flotante
+.notification-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  min-width: 300px;
+  max-width: 400px;
+  animation: slideInRight 0.3s ease-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  
+  &.notification-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+  }
+  
+  &.notification-error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+  }
+  
+  .notification-content {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    gap: 12px;
+    
+    i {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    
+    span {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .notification-close {
+      background: transparent;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      &:hover {
+        opacity: 1;
+      }
+      
+      i {
+        font-size: 16px;
+      }
+    }
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+// Estilos para la tabla
+.table {
+  thead {
+    th {
+      background-color: transparent;
+      color: #2c3e50;
+      font-weight: 700;
+      text-align: left;
+      vertical-align: middle;
+      padding: 16px 20px;
+      border-bottom: 2px solid #e0e0e0;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  }
+  
+  tbody {
+    td {
+      vertical-align: middle;
+      padding: 12px 20px;
+      
+      .form-control-sm {
+        font-size: 13px;
+        padding: 4px 8px;
+      }
+    }
+  }
+}
+
+// Estilos para botones de acción
+.btn-group {
+  .btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    
+    &.btn-primary {
+      background: linear-gradient(135deg, #5e72e4 0%, #825ee4 100%);
+      border: none;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(94, 114, 228, 0.3);
+      
+      &:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(94, 114, 228, 0.4);
+      }
+    }
+    
+    &.btn-success {
+      background: linear-gradient(135deg, #2dce89 0%, #2dcecc 100%);
+      border: none;
+      color: #fff;
+      box-shadow: 0 2px 8px rgba(45, 206, 137, 0.3);
+      
+      &:hover:not(:disabled) {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(45, 206, 137, 0.4);
+      }
+    }
+    
+    &.btn-secondary {
+      background: #6c757d;
+      border: none;
+      color: #fff;
+      
+      &:hover:not(:disabled) {
+        background: #5a6268;
+      }
+    }
+    
+    &:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    
+    i {
+      font-size: 14px;
+    }
+  }
+}
+
+.spin-icon {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+

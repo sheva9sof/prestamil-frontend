@@ -4,6 +4,8 @@ import { CommonModule } from '@angular/common';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
@@ -56,13 +58,17 @@ export class SucursalComponent implements OnInit, AfterViewInit {
       fechaApertura: ['', [Validators.required]],
       rfc: ['', [Validators.required, Validators.pattern(/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/i)]],
       fechaRegistroProfeco: [''],
-      fechaContratoProfeco: ['']
+      fechaContratoProfeco: [''],
+      lunes: [false],
+      martes: [false],
+      miercoles: [false],
+      jueves: [false],
+      viernes: [false],
+      sabado: [false],
+      domingo: [false]
     });
 
-    // Cargar empresas y estados
-    this.loadEmpresas();
-    this.loadEstados();
-    // loadSucursalData se llamará desde loadEmpresas cuando las empresas estén cargadas
+    // loadInitialData se llamará desde ngAfterViewInit para asegurar que el ViewChild esté disponible
 
     // Listener para actualizar campos relacionados cuando se selecciona una empresa
     this.sucursalForm.get('idEmpresa')?.valueChanges.subscribe((empresaId) => {
@@ -140,6 +146,199 @@ export class SucursalComponent implements OnInit, AfterViewInit {
   ngAfterViewInit() {
     // El ViewChild ahora está disponible
     console.log('ngAfterViewInit - Template disponible:', !!this.loadingModalTemplate);
+    // Cargar datos después de que la vista esté inicializada
+    setTimeout(() => {
+      this.loadInitialData();
+    }, 100);
+  }
+
+  loadInitialData() {
+    this.isLoadingData = true;
+    this.errorMessage = '';
+    
+    const token = this.authService.getToken();
+    if (!token) {
+      this.isLoadingData = false;
+      this.closeLoadingModal();
+      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
+      return;
+    }
+
+    // Realizar todas las llamadas en paralelo
+    const empresasRequest = this.http.get<any>(`${environment.apiUrl}/api/empresas`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      catchError(error => {
+        console.error('Error al cargar empresas:', error);
+        return of({ error: true, data: [] });
+      })
+    );
+
+    const estadosRequest = this.http.get<any>(`${environment.apiUrl}/api/master-data/estados`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      catchError(error => {
+        console.error('Error al cargar estados:', error);
+        return of({ error: true, data: [] });
+      })
+    );
+
+    const sucursalRequest = this.http.get<any>(`${environment.apiUrl}/api/sucursales`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      catchError(error => {
+        console.error('Error al cargar datos de sucursal:', error);
+        return of({ error: true, data: null });
+      })
+    );
+
+    // Abrir modal de carga
+    this.openLoadingModal();
+
+    // Ejecutar todas las llamadas en paralelo
+    forkJoin({
+      empresas: empresasRequest,
+      estados: estadosRequest,
+      sucursal: sucursalRequest
+    }).subscribe({
+      next: (results) => {
+        // Procesar empresas
+        if (!results.empresas.error) {
+          if (Array.isArray(results.empresas)) {
+            this.empresas = results.empresas;
+          } else if (results.empresas && Array.isArray(results.empresas.data)) {
+            this.empresas = results.empresas.data;
+          } else if (results.empresas && Array.isArray(results.empresas.empresas)) {
+            this.empresas = results.empresas.empresas;
+          } else {
+            this.empresas = [];
+          }
+        } else {
+          this.empresas = [];
+        }
+
+        // Procesar estados
+        if (!results.estados.error) {
+          if (Array.isArray(results.estados)) {
+            this.estados = results.estados;
+          } else if (results.estados && Array.isArray(results.estados.data)) {
+            this.estados = results.estados.data;
+          } else if (results.estados && Array.isArray(results.estados.estados)) {
+            this.estados = results.estados.estados;
+          } else {
+            this.estados = [];
+          }
+        } else {
+          this.estados = [];
+        }
+
+        // Procesar datos de sucursal
+        if (!results.sucursal.error && results.sucursal) {
+          this.processSucursalData(results.sucursal);
+        }
+
+        // Cerrar modal y finalizar carga
+        this.isLoadingData = false;
+        // Cerrar modal después de un pequeño delay para asegurar que el DOM se actualice
+        setTimeout(() => {
+          this.closeLoadingModal();
+        }, 100);
+      },
+      error: (error) => {
+        this.isLoadingData = false;
+        setTimeout(() => {
+          this.closeLoadingModal();
+        }, 100);
+        this.errorMessage = 'Error al cargar los datos. Por favor, intenta nuevamente.';
+        console.error('Error al cargar datos iniciales:', error);
+      }
+    });
+  }
+
+  processSucursalData(response: any) {
+    // Si la respuesta es un array, tomar el primer elemento
+    const sucursalData = Array.isArray(response) ? response[0] : response;
+    
+    if (sucursalData) {
+      // Formatear fechas para los inputs de tipo date/datetime-local
+      const formatDateForInput = (dateString: string | null): string => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        return date.toISOString().split('T')[0];
+      };
+
+      const formatDateTimeForInput = (dateString: string | null): string => {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        return `${year}-${month}-${day}T${hours}:${minutes}`;
+      };
+
+      // Llenar el formulario con los datos recibidos
+      const idRazonSocial = sucursalData.idRazonSocial;
+      const empresaEncontrada = this.empresas.find(emp => 
+        emp.id === idRazonSocial || 
+        emp.id === Number(idRazonSocial) || 
+        Number(emp.id) === idRazonSocial
+      );
+      
+      const empresaId = empresaEncontrada ? empresaEncontrada.id : (idRazonSocial || null);
+      const razonSocialValue = empresaEncontrada ? empresaEncontrada.razonSocial : (sucursalData.razonSocial || '');
+      const nombreEmpresaValue = empresaEncontrada ? empresaEncontrada.nombre : (sucursalData.nombreEmpresa || '');
+      
+      const idRazonSocialControl = this.sucursalForm.get('idRazonSocial');
+      const nombreEmpresaControl = this.sucursalForm.get('nombreEmpresa');
+      
+      if (idRazonSocialControl?.disabled) idRazonSocialControl.enable({ emitEvent: false });
+      if (nombreEmpresaControl?.disabled) nombreEmpresaControl.enable({ emitEvent: false });
+      
+      this.sucursalForm.patchValue({
+        id: sucursalData.id || null,
+        numeroSucursal: sucursalData.numeroSucursal || '',
+        nombre: sucursalData.nombre || '',
+        idEmpresa: empresaId,
+        idRazonSocial: sucursalData.idRazonSocial || '',
+        nombreEmpresa: nombreEmpresaValue,
+        razonSocial: razonSocialValue,
+        calle: sucursalData.calle || '',
+        noExterior: sucursalData.noExterior || '',
+        noInterior: sucursalData.noInterior || '',
+        colonia: sucursalData.colonia || '',
+        municipio: sucursalData.municipio || '',
+        cp: sucursalData.cp || '',
+        estado: sucursalData.estado || '',
+        pais: sucursalData.pais || '',
+        lada: sucursalData.lada || '',
+        telefono: sucursalData.telefono || '',
+        fechaApertura: formatDateForInput(sucursalData.fechaApertura),
+        rfc: sucursalData.rfc || '',
+        fechaRegistroProfeco: formatDateTimeForInput(sucursalData.fechaRegistroProfeco),
+        fechaContratoProfeco: formatDateTimeForInput(sucursalData.fechaContratoProfeco),
+        lunes: sucursalData.lunes || false,
+        martes: sucursalData.martes || false,
+        miercoles: sucursalData.miercoles || false,
+        jueves: sucursalData.jueves || false,
+        viernes: sucursalData.viernes || false,
+        sabado: sucursalData.sabado || false,
+        domingo: sucursalData.domingo || false
+      });
+      
+      if (idRazonSocialControl) idRazonSocialControl.disable({ emitEvent: false });
+      if (nombreEmpresaControl) nombreEmpresaControl.disable({ emitEvent: false });
+    }
   }
 
   loadEmpresas() {
@@ -169,19 +368,10 @@ export class SucursalComponent implements OnInit, AfterViewInit {
           console.warn('Formato de respuesta de empresas no reconocido:', response);
           this.empresas = [];
         }
-        
-        // Una vez cargadas las empresas, cargar los datos de la sucursal
-        // para poder preseleccionar la empresa correcta
-        // Esperar un momento para asegurar que el ViewChild esté disponible
-        setTimeout(() => {
-          this.loadSucursalData();
-        }, 200);
       },
       error: (error) => {
         console.error('Error al cargar empresas:', error);
         this.empresas = [];
-        // Intentar cargar datos de sucursal de todas formas
-        this.loadSucursalData();
       }
     });
   }
@@ -222,163 +412,26 @@ export class SucursalComponent implements OnInit, AfterViewInit {
     });
   }
 
-  loadSucursalData() {
-    this.isLoadingData = true;
-    this.errorMessage = '';
-    
-    // Abrir modal de carga
-    this.openLoadingModal();
-    
-    const token = this.authService.getToken();
-    if (!token) {
-      this.isLoadingData = false;
-      this.closeLoadingModal();
-      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
-      return;
-    }
-
-    const url = `${environment.apiUrl}/api/sucursales`;
-    
-    this.http.get<any>(url, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    }).subscribe({
-      next: (response) => {
-        // Si la respuesta es un array, tomar el primer elemento
-        const sucursalData = Array.isArray(response) ? response[0] : response;
-        
-        if (sucursalData) {
-          // Formatear fechas para los inputs de tipo date/datetime-local
-          const formatDateForInput = (dateString: string | null): string => {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            return date.toISOString().split('T')[0];
-          };
-
-          const formatDateTimeForInput = (dateString: string | null): string => {
-            if (!dateString) return '';
-            const date = new Date(dateString);
-            // Formato: YYYY-MM-DDTHH:mm
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `${year}-${month}-${day}T${hours}:${minutes}`;
-          };
-
-          // Llenar el formulario con los datos recibidos
-          // Establecer idEmpresa basado en idRazonSocial si existe
-          const idRazonSocial = sucursalData.idRazonSocial;
-          // Buscar la empresa por idRazonSocial en la lista de empresas cargadas
-          // Comparar tanto como número como string para asegurar coincidencia
-          const empresaEncontrada = this.empresas.find(emp => 
-            emp.id === idRazonSocial || 
-            emp.id === Number(idRazonSocial) || 
-            Number(emp.id) === idRazonSocial
-          );
-          
-          // Si encontramos la empresa, usar sus datos; si no, usar los datos del servidor
-          const empresaId = empresaEncontrada ? empresaEncontrada.id : (idRazonSocial || null);
-          const razonSocialValue = empresaEncontrada ? empresaEncontrada.razonSocial : (sucursalData.razonSocial || '');
-          const nombreEmpresaValue = empresaEncontrada ? empresaEncontrada.nombre : (sucursalData.nombreEmpresa || '');
-          
-          // Habilitar temporalmente los campos deshabilitados para poder actualizarlos
-          const idRazonSocialControl = this.sucursalForm.get('idRazonSocial');
-          const nombreEmpresaControl = this.sucursalForm.get('nombreEmpresa');
-          
-          if (idRazonSocialControl?.disabled) idRazonSocialControl.enable({ emitEvent: false });
-          if (nombreEmpresaControl?.disabled) nombreEmpresaControl.enable({ emitEvent: false });
-          
-          console.log('Preseleccionando empresa:', {
-            idRazonSocial,
-            empresaEncontrada,
-            empresaId,
-            razonSocialValue
-          });
-          
-          this.sucursalForm.patchValue({
-            id: sucursalData.id || null,
-            numeroSucursal: sucursalData.numeroSucursal || '',
-            nombre: sucursalData.nombre || '',
-            idEmpresa: empresaId,
-            idRazonSocial: sucursalData.idRazonSocial || '',
-            nombreEmpresa: nombreEmpresaValue,
-            razonSocial: razonSocialValue,
-            calle: sucursalData.calle || '',
-            noExterior: sucursalData.noExterior || '',
-            noInterior: sucursalData.noInterior || '',
-            colonia: sucursalData.colonia || '',
-            municipio: sucursalData.municipio || '',
-            cp: sucursalData.cp || '',
-            estado: sucursalData.estado || '',
-            pais: sucursalData.pais || '',
-            lada: sucursalData.lada || '',
-            telefono: sucursalData.telefono || '',
-            fechaApertura: formatDateForInput(sucursalData.fechaApertura),
-            rfc: sucursalData.rfc || '',
-            fechaRegistroProfeco: formatDateTimeForInput(sucursalData.fechaRegistroProfeco),
-            fechaContratoProfeco: formatDateTimeForInput(sucursalData.fechaContratoProfeco)
-          });
-          
-          // Deshabilitar nuevamente los campos después de actualizarlos
-          if (idRazonSocialControl) idRazonSocialControl.disable({ emitEvent: false });
-          if (nombreEmpresaControl) nombreEmpresaControl.disable({ emitEvent: false });
-        }
-        
-        // Cerrar el modal después de procesar todos los datos
-        this.isLoadingData = false;
-        setTimeout(() => {
-          this.closeLoadingModal();
-        }, 100);
-      },
-      error: (error) => {
-        this.isLoadingData = false;
-        this.closeLoadingModal();
-        
-        if (error.status === 401 || error.status === 403) {
-          this.errorMessage = 'No tienes permisos para acceder a esta información.';
-        } else if (error.status === 0) {
-          this.errorMessage = 'No se pudo conectar con el servidor. Verifica tu conexión.';
-        } else if (error.error && error.error.message) {
-          this.errorMessage = error.error.message;
-        } else {
-          this.errorMessage = 'Error al cargar los datos de la sucursal. Por favor, intenta nuevamente.';
-        }
-        
-        console.error('Error al cargar datos de sucursal:', error);
-      }
-    });
-  }
-
   openLoadingModal() {
-    console.log('Intentando abrir modal. Template disponible:', !!this.loadingModalTemplate);
-    console.log('Modal ref actual:', this.loadingModalRef);
-    
-    // Usar setTimeout para asegurar que el ViewChild esté disponible
-    setTimeout(() => {
-      if (this.loadingModalTemplate && !this.loadingModalRef) {
-        try {
-          this.loadingModalRef = this.modalService.open(this.loadingModalTemplate, {
-            backdrop: 'static',
-            keyboard: false,
-            centered: true,
-            size: 'sm',
-            windowClass: 'loading-modal'
-          });
-          console.log('Modal de carga abierto exitosamente');
-        } catch (error) {
-          console.error('Error al abrir modal:', error);
-        }
-      } else {
-        console.warn('Template del modal no disponible o modal ya abierto', {
-          template: !!this.loadingModalTemplate,
-          ref: !!this.loadingModalRef
+    if (this.loadingModalTemplate && !this.loadingModalRef) {
+      try {
+        this.loadingModalRef = this.modalService.open(this.loadingModalTemplate, {
+          backdrop: 'static',
+          keyboard: false,
+          centered: true,
+          size: 'sm',
+          windowClass: 'loading-modal'
         });
+        console.log('Modal de carga abierto exitosamente');
+      } catch (error) {
+        console.error('Error al abrir modal:', error);
       }
-    }, 100);
+    } else {
+      console.warn('Template del modal no disponible o modal ya abierto', {
+        template: !!this.loadingModalTemplate,
+        ref: !!this.loadingModalRef
+      });
+    }
   }
 
   closeLoadingModal() {
@@ -438,7 +491,14 @@ export class SucursalComponent implements OnInit, AfterViewInit {
         fechaApertura: formValue.fechaApertura || null,
         rfc: formValue.rfc || '',
         fechaRegistroProfeco: formValue.fechaRegistroProfeco || null,
-        fechaContratoProfeco: formValue.fechaContratoProfeco || null
+        fechaContratoProfeco: formValue.fechaContratoProfeco || null,
+        lunes: formValue.lunes || false,
+        martes: formValue.martes || false,
+        miercoles: formValue.miercoles || false,
+        jueves: formValue.jueves || false,
+        viernes: formValue.viernes || false,
+        sabado: formValue.sabado || false,
+        domingo: formValue.domingo || false
       };
 
       const url = `${environment.apiUrl}/api/sucursales/${sucursalId}`;

@@ -58,6 +58,10 @@ const routes: Routes = [
             loadComponent: () => import('./prestamil/pages/configuracion/sucursal/sucursal.component').then((c) => c.SucursalComponent)
           },
           {
+            path: 'empresas',
+            loadComponent: () => import('./prestamil/pages/configuracion/empresas/empresas.component').then((c) => c.EmpresasComponent)
+          },
+          {
             path: 'parametros-prestamo',
             loadComponent: () => import('./prestamil/pages/configuracion/parametros-prestamo/parametros-prestamo.component').then((c) => c.ParametrosPrestamoComponent)
           },

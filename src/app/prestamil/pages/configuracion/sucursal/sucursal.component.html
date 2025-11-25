@@ -22,7 +22,7 @@
       </div>
     </ng-template>
 
-    <app-card cardTitle="Sucursal">
+    <div>
       <form [formGroup]="sucursalForm" class="sucursal-form" (ngSubmit)="onSubmit()">
         
         <!-- Información General -->
@@ -96,6 +96,78 @@
                 readonly
                 placeholder="Razón Social (se llena automáticamente)" 
               />
+            </div>
+          </div>
+          
+          <!-- Días de la semana -->
+          <div class="row">
+            <div class="col-md-12 mb-3">
+              <label class="form-label">Días Laborales</label>
+              <div class="dias-trabajo-container">
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="lunes"
+                    formControlName="lunes"
+                  />
+                  <label class="form-check-label" for="lunes">Lunes</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="martes"
+                    formControlName="martes"
+                  />
+                  <label class="form-check-label" for="martes">Martes</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="miercoles"
+                    formControlName="miercoles"
+                  />
+                  <label class="form-check-label" for="miercoles">Miércoles</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="jueves"
+                    formControlName="jueves"
+                  />
+                  <label class="form-check-label" for="jueves">Jueves</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="viernes"
+                    formControlName="viernes"
+                  />
+                  <label class="form-check-label" for="viernes">Viernes</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="sabado"
+                    formControlName="sabado"
+                  />
+                  <label class="form-check-label" for="sabado">Sábado</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input 
+                    class="form-check-input" 
+                    type="checkbox" 
+                    id="domingo"
+                    formControlName="domingo"
+                  />
+                  <label class="form-check-label" for="domingo">Domingo</label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -335,6 +407,6 @@
           </button>
         </div>
       </form>
-    </app-card>
+    </div>
   </div>
 </div>

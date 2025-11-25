@@ -16,14 +16,14 @@
               @for (breadcrumb of navigationList; track breadcrumb) {
                 @if (breadcrumb.type !== 'group') {
                   @if (breadcrumb.url && breadcrumb.url !== false) {
-                    <li class="breadcrumb-item">
-                      <a [routerLink]="breadcrumb.url">{{ breadcrumb.title }}</a>
-                    </li>
-                  }
+                  <li class="breadcrumb-item">
+                    <a [routerLink]="breadcrumb.url">{{ breadcrumb.title }}</a>
+                  </li>
+                }
                   @if (!breadcrumb.url || breadcrumb.url === false) {
-                    <li class="breadcrumb-item">
+                  <li class="breadcrumb-item">
                       <span>{{ breadcrumb.title }}</span>
-                    </li>
+                  </li>
                   }
                 }
               }

@@ -72,6 +72,8 @@ export class AuthService {
       'Hardware': '/hardware',
       'Prendas': '/catalogos/prendas',
       'Sucursal': '/configuracion/sucursal',
+      'Empresas': '/configuracion/empresas',
+      'Empresa': '/configuracion/empresas',
       'Parametros prestamo': '/configuracion/parametros-prestamo',
       'Parámetros Préstamo': '/configuracion/parametros-prestamo',
       'Parametros Generales': '/configuracion/parametros-generales',
