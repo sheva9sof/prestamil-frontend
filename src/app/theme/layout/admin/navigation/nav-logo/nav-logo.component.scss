@@ -1,19 +1,28 @@
 .b-bg {
-  width: 100% !important;
-  height: 60px !important;
-  padding: 8px 15px;
+      /* Contenedor con fondo armónico al lateral (usa color del menú). */
+      width: auto !important;
+      height: 60px !important;
+      padding: 6px 10px; /* un poco de espacio alrededor del logo */
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(-135deg, #1565c0 0%, #ffffff 100%) !important; // Degradado azul fuerte a blanco
-  border-radius: 10px;
-  
+  /* Usamos un color que armoniza con $menu-dark-background (#3f4d67).
+     Puedes ajustar la opacidad para más/menos contraste. */
+  background: rgba(63,77,103,0.08) !important; /* suave y armónico */
+  background-image: none !important;
+  border-radius: 8px;
+
+  /* Si quieres un tamaño fijo del logo, descomenta y ajusta: */
+  /* width: 120px; */
+
   img {
+    display: block;
+    width: auto;       /* la imagen controla su ancho */
+    height: 48px;      /* altura del logo dentro del contenedor */
     max-width: 100%;
     max-height: 100%;
-    width: auto;
-    height: 100%;
     object-fit: contain;
+    background: transparent;
   }
 }
 

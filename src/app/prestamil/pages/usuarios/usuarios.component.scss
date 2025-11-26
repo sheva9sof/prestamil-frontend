@@ -1,2 +1,13 @@
-// Estilos para el componente de usuarios
+/* Estilos para el componente de usuarios */
+
+.usuarios-actions {
+	display: flex;
+	gap: 8px;
+}
+
+.table td, .table th {
+	vertical-align: middle;
+}
+
+.modal-body .form-control { max-width: 100%; }
 
