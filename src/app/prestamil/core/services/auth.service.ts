@@ -140,7 +140,17 @@ export class AuthService {
    * @param loginResponse Respuesta completa del login
    */
   setSession(loginResponse: LoginResponse): void {
-    localStorage.setItem(this.AUTH_TOKEN_KEY, loginResponse.token);
+    // Guardar solo el token crudo (sin el prefijo "Bearer ") para evitar duplicados
+    const rawToken = loginResponse.token && loginResponse.token.startsWith('Bearer ')
+      ? loginResponse.token.substring(7)
+      : loginResponse.token;
+    if (rawToken) {
+      localStorage.setItem(this.AUTH_TOKEN_KEY, rawToken);
+      console.debug('[AuthService] token saved (length):', rawToken.length);
+    } else {
+      localStorage.removeItem(this.AUTH_TOKEN_KEY);
+      console.debug('[AuthService] no token in response, storage cleared');
+    }
     localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify({
       nombreUsuario: loginResponse.nombreUsuario,
       nombre: loginResponse.nombre,
