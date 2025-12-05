@@ -1,0 +1,80 @@
+<div class="row">
+  <div class="col-12">
+    <!-- Spinner de logout -->
+    <div *ngIf="isLoggingOut" class="logout-spinner-overlay">
+      <div class="logout-spinner-content">
+        <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+          <span class="visually-hidden">Cerrando sesión...</span>
+        </div>
+        <p class="mt-3 text-light">Cerrando sesión...</p>
+      </div>
+    </div>
+
+    <!-- Notificación flotante de éxito -->
+    <div *ngIf="successMessage" class="notification-toast notification-success">
+      <div class="notification-content">
+        <i class="feather icon-check-circle"></i>
+        <span>{{ successMessage }}</span>
+        <button type="button" class="notification-close" (click)="successMessage = ''">
+          <i class="feather icon-x"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Notificación flotante de error -->
+    <div *ngIf="errorMessage" class="notification-toast notification-error">
+      <div class="notification-content">
+        <i class="feather icon-alert-circle"></i>
+        <span>{{ errorMessage }}</span>
+        <button type="button" class="notification-close" (click)="errorMessage = ''">
+          <i class="feather icon-x"></i>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal de confirmación personalizado -->
+    <ng-template #confirmModal let-modal>
+      <div class="modal-header">
+        <h5 class="modal-title">{{ confirmTitle }}</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
+      </div>
+      <div class="modal-body">
+        <p>{{ confirmMessage }}</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+        <button type="button" class="btn btn-primary" (click)="modal.close('confirm')">Confirmar</button>
+      </div>
+    </ng-template>
+
+    <app-card cardTitle="Turnos">
+      <div class="mb-3">
+        <ng-container *ngIf="turno && turno.activo; else noTurno">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <strong>Estado:</strong>
+              <span class="badge bg-success">ABIERTO</span>
+              <span> - Iniciado por: {{ turno?.nombreUsuario || turno?.usuarioId }}</span>
+            </div>
+            <div>
+                <button class="btn btn-danger" *ngIf="turno && turno.activo" (click)="cerrar()">Cerrar turno</button>
+              </div>
+          </div>
+        </ng-container>
+        <ng-template #noTurno>
+          <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
+            <div><strong>No hay un turno abierto en este momento.</strong></div>
+            <div *ngIf="puedeAbrir">
+              <button class="btn btn-primary" (click)="iniciar()">Iniciar turno</button>
+            </div>
+          </div>
+        </ng-template>
+      </div>
+
+      <div *ngIf="turno && turno.fechaInicio">
+        <p class="mb-1"><strong>Inicio:</strong> {{ turno?.fechaInicio | date:'short' }}</p>
+        <p *ngIf="turno?.fechaFin" class="mb-0"><strong>Fin:</strong> {{ turno?.fechaFin | date:'short' }}</p>
+      </div>
+    </app-card>
+  </div>
+</div>

@@ -1,6 +1,8 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { BehaviorSubject, Observable } from 'rxjs';
+import { BehaviorSubject, Observable, throwError, of } from 'rxjs';
+import { tap, switchMap } from 'rxjs/operators';
+import { Router } from '@angular/router';
 import { LoginResponse } from '../models/auth-response.model';
 import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
 import { transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
@@ -11,12 +13,16 @@ import { environment } from 'src/environments/environment';
 })
 export class AuthService {
   private http = inject(HttpClient);
+  private router = inject(Router);
   
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
   
   private menuItemsSubject = new BehaviorSubject<NavigationItem[]>([]);
   public menuItems$ = this.menuItemsSubject.asObservable();
+  
+  private isLoggingOutSubject = new BehaviorSubject<boolean>(false);
+  public isLoggingOut$ = this.isLoggingOutSubject.asObservable();
 
   private readonly AUTH_TOKEN_KEY = 'authToken';
   private readonly AUTH_USER_KEY = 'authUser';
@@ -67,6 +73,7 @@ export class AuthService {
    */
   private regenerateMenuUrls(menuItems: NavigationItem[]): NavigationItem[] {
     const opcionToUrlMap: { [key: string]: string } = {
+    'Turnos': '/turnos',
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
@@ -270,6 +277,57 @@ export class AuthService {
         'Content-Type': 'application/json'
       }
     });
+  }
+
+  /**
+   * Refrescar el menú del usuario actual desde el backend
+   * Llama al endpoint /me para obtener el perfil actualizado con las opciones de menú
+   * Si no hay opciones de menú, desloguea automáticamente al usuario
+   * @returns Observable con la respuesta del login actualizada
+   */
+  refreshMenuFromBackend(): Observable<LoginResponse> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('No hay token de autenticación');
+    }
+
+    const url = `${this.API_URL}/api/usuarios/me`;
+    
+    return this.http.get<LoginResponse>(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      switchMap((response: LoginResponse) => {
+        // Actualizar el menú con la respuesta del backend
+        if (response.opciones && response.opciones.length > 0) {
+          const menuItems = transformOpcionesToNavigationItems(response.opciones);
+          console.log('Menu refreshed from backend:', JSON.stringify(menuItems, null, 2));
+          localStorage.setItem(this.MENU_ITEMS_KEY, JSON.stringify(menuItems));
+          this.menuItemsSubject.next(menuItems);
+          return of(response);
+        } else {
+          // Si no hay opciones, limpiar el menú y desloguear al usuario
+          console.log('No menu items received from backend, logging out user');
+          this.isLoggingOutSubject.next(true);
+          localStorage.setItem(this.MENU_ITEMS_KEY, JSON.stringify([]));
+          this.menuItemsSubject.next([]);
+          
+          // Desloguear automáticamente al usuario
+          this.logout();
+          
+          // Navegar después de un pequeño delay para que el usuario vea el spinner
+          setTimeout(() => {
+            this.isLoggingOutSubject.next(false);
+            this.router.navigate(['/login']);
+          }, 1500);
+          
+          // Lanzar error para que el componente no continúe con el flujo normal
+          return throwError(() => new Error('USUARIO_SIN_MENUS_AUTORIZADO'));
+        }
+      })
+    );
   }
 }
 

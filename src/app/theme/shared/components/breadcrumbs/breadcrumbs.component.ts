@@ -6,7 +6,7 @@ import { Title } from '@angular/platform-browser';
 import { Subscription } from 'rxjs';
 
 // project import
-import { NavigationItem, NavigationItems } from 'src/app/theme/layout/admin/navigation/navigation';
+import { NavigationItem } from 'src/app/theme/layout/admin/navigation/navigation';
 import { SharedModule } from '../../shared.module';
 import { AuthService } from 'src/app/prestamil/core/services/auth.service';
 
@@ -52,7 +52,6 @@ export class BreadcrumbsComponent implements OnInit, OnDestroy {
       } else {
         // Usar menú estático como fallback solo si no está autenticado
         if (!this.authService.isAuthenticated()) {
-          this.navigations = NavigationItems;
           this.updateBreadcrumb();
         }
       }
@@ -62,8 +61,6 @@ export class BreadcrumbsComponent implements OnInit, OnDestroy {
     const menuItems = this.authService.getMenuItems();
     if (menuItems && menuItems.length > 0) {
       this.navigations = menuItems;
-    } else if (!this.authService.isAuthenticated()) {
-      this.navigations = NavigationItems;
     }
     
     this.setBreadcrumb();

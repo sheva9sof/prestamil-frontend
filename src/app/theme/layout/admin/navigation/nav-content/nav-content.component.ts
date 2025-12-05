@@ -5,7 +5,7 @@ import { Subscription } from 'rxjs';
 
 // project import
 import { environment } from 'src/environments/environment';
-import { NavigationItem, NavigationItems } from '../navigation';
+import { NavigationItem } from '../navigation';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { NavGroupComponent } from './nav-group/nav-group.component';
 import { AuthService } from 'src/app/prestamil/core/services/auth.service';
@@ -20,6 +20,7 @@ export class NavContentComponent implements OnInit, OnDestroy {
   private location = inject(Location);
   private authService = inject(AuthService);
   private menuSubscription?: Subscription;
+  private combinedSubscription?: Subscription;
 
   // public method
   // version
@@ -43,13 +44,8 @@ export class NavContentComponent implements OnInit, OnDestroy {
       if (menuItems && menuItems.length > 0) {
         this.navigations = menuItems;
       } else {
-        // Solo usar menú estático si el usuario NO está autenticado
-        // Si está autenticado pero sin menú, dejar vacío (se cargará cuando llegue)
-        if (!this.authService.isAuthenticated()) {
-          this.navigations = NavigationItems;
-        } else {
+
           this.navigations = [];
-        }
       }
     });
     
@@ -58,19 +54,18 @@ export class NavContentComponent implements OnInit, OnDestroy {
     if (menuItems && menuItems.length > 0) {
       this.navigations = menuItems;
     } else {
-      // Solo usar menú estático si el usuario NO está autenticado
-      if (!this.authService.isAuthenticated()) {
-    this.navigations = NavigationItems;
-      } else {
-        // Si está autenticado pero sin menú aún, dejar vacío
+
         this.navigations = [];
-      }
+
     }
   }
 
   ngOnDestroy() {
     if (this.menuSubscription) {
       this.menuSubscription.unsubscribe();
+    }
+    if (this.combinedSubscription) {
+      this.combinedSubscription.unsubscribe();
     }
   }
 

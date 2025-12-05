@@ -38,6 +38,10 @@ const routes: Routes = [
         loadComponent: () => import('./prestamil/pages/usuarios/usuarios.component').then((c) => c.UsuariosComponent)
       },
       {
+        path: 'turnos',
+        loadComponent: () => import('./prestamil/pages/turnos/turnos.component').then((c) => c.TurnosComponent)
+      },
+      {
         path: 'hardware',
         loadComponent: () => import('./prestamil/pages/hardware/hardware.component').then((c) => c.HardwareComponent)
       },

@@ -1,0 +1,150 @@
+// Estilos para el componente de turnos
+
+// Spinner overlay de logout
+.logout-spinner-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.3s ease-out;
+  
+  .logout-spinner-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    
+    p {
+      font-size: 16px;
+      font-weight: 500;
+      margin: 0;
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+// Notificación flotante
+.notification-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  min-width: 300px;
+  max-width: 400px;
+  animation: slideInRight 0.3s ease-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  
+  &.notification-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+  }
+  
+  &.notification-error {
+    background-color: #fee;
+    border: 1px solid #fcc;
+    color: #c33;
+  }
+  
+  .notification-content {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    gap: 12px;
+    
+    i {
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+    
+    span {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    
+    .notification-close {
+      background: transparent;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: inherit;
+      opacity: 0.7;
+      transition: opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      
+      &:hover {
+        opacity: 1;
+      }
+      
+      i {
+        font-size: 16px;
+      }
+    }
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+// Estilos para el modal de confirmación
+::ng-deep .modal-content {
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+::ng-deep .modal-header {
+  border-bottom: 1px solid #e0e0e0;
+  padding: 20px 24px;
+  
+  .modal-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #2c3e50;
+  }
+}
+
+::ng-deep .modal-body {
+  padding: 24px;
+  
+  p {
+    margin: 0;
+    font-size: 15px;
+    color: #495057;
+  }
+}
+
+::ng-deep .modal-footer {
+  border-top: 1px solid #e0e0e0;
+  padding: 16px 24px;
+  
+  .btn {
+    min-width: 100px;
+  }
+}

@@ -16,6 +16,21 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
     icon = opcion.nombreIcono;
   }
   
+  // Fallback: Si no hay icono pero es una opción conocida, asignar icono por defecto
+  if (!icon && !hasSubmenus) {
+    const defaultIcons: { [key: string]: string } = {
+      'Turnos': 'icon-calendar',
+      'Usuarios': 'icon-users',
+      'Usuario': 'icon-user',
+      'Hardware': 'icon-cpu',
+      'Prendas': 'icon-package',
+      'Sucursal': 'icon-home',
+      'Empresas': 'icon-briefcase',
+      'Empresa': 'icon-briefcase',
+    };
+    icon = defaultIcons[opcion.opcion];
+  }
+  
   // Transformar los submenus recursivamente
   const children: NavigationItem[] | undefined = hasSubmenus
     ? opcion.submenus.map(submenu => transformOpcion(submenu))
@@ -36,6 +51,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   if (!url && !hasSubmenus) {
     // Mapeo de nombres de opciones a rutas
     const opcionToUrlMap: { [key: string]: string } = {
+      'Turnos': '/turnos',
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',

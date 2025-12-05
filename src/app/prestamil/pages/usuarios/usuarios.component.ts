@@ -1,8 +1,8 @@
 // angular import
-import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
+import { Component, OnInit, AfterViewInit, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ReactiveFormsModule, FormBuilder, FormGroup, Validators, AbstractControl, ValidationErrors } from '@angular/forms';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
@@ -16,7 +16,7 @@ import { RolService, Rol } from '../../core/services/rol.service';
   templateUrl: './usuarios.component.html',
   styleUrls: ['./usuarios.component.scss']
 })
-export class UsuariosComponent implements OnInit {
+export class UsuariosComponent implements OnInit, AfterViewInit {
   usuarios: Usuario[] = [];
   usuariosFiltrados: Usuario[] = [];
   loading = false;
@@ -31,6 +31,8 @@ export class UsuariosComponent implements OnInit {
   editId: number | null = null;
 
   @ViewChild('usuarioModal') usuarioModal!: TemplateRef<any>;
+  @ViewChild('loadingModal') loadingModalTemplate!: TemplateRef<any>;
+  private loadingModalRef: NgbModalRef | null = null;
 
   constructor(private usuarioService: UsuarioService, private modalService: NgbModal, private fb: FormBuilder, private rolService: RolService) {
     this.form = this.fb.group({
@@ -56,6 +58,26 @@ export class UsuariosComponent implements OnInit {
   }
 
   ngOnInit(): void {
+    // La carga inicial se hará en ngAfterViewInit para asegurar que el ViewChild esté disponible
+  }
+
+  ngAfterViewInit(): void {
+    // El ViewChild ahora está disponible, cargar datos
+    setTimeout(() => {
+      this.loadInitialData();
+    }, 100);
+  }
+
+  loadInitialData(): void {
+    // Mostrar modal de carga
+    if (this.loadingModalTemplate) {
+      this.loadingModalRef = this.modalService.open(this.loadingModalTemplate, {
+        backdrop: 'static',
+        keyboard: false,
+        centered: true
+      });
+    }
+
     // Cargar roles primero y luego usuarios para poder mapear nombres de rol localmente
     this.rolService.findAll().subscribe({
       next: (r) => {
@@ -87,8 +109,22 @@ export class UsuariosComponent implements OnInit {
         });
         this.aplicarFiltros();
         this.loading = false;
+        
+        // Cerrar modal de carga
+        if (this.loadingModalRef) {
+          this.loadingModalRef.close();
+          this.loadingModalRef = null;
+        }
       },
-      error: () => (this.loading = false)
+      error: () => {
+        this.loading = false;
+        
+        // Cerrar modal de carga en caso de error
+        if (this.loadingModalRef) {
+          this.loadingModalRef.close();
+          this.loadingModalRef = null;
+        }
+      }
     });
   }
 
