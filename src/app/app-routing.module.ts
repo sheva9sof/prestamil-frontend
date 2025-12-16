@@ -34,6 +34,10 @@ const routes: Routes = [
         loadComponent: () => import('./prestamil/dashboard/dashboard.component').then((c) => c.DashboardComponent)
       },
       {
+        path: 'sse-status',
+        loadComponent: () => import('./prestamil/dashboard/sse-status.component').then((c) => c.SseStatusComponent)
+      },
+      {
         path: 'usuarios',
         loadComponent: () => import('./prestamil/pages/usuarios/usuarios.component').then((c) => c.UsuariosComponent)
       },

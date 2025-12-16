@@ -8,6 +8,17 @@
   (NavCollapsedMob)="navMobClick()"
 />
 <app-nav-bar class="navbar pcoded-header navbar-expand-lg navbar-light" (NavCollapsedMob)="navMobClick()" />
+
+<!-- Spinner de logout -->
+<div *ngIf="isLoggingOut" class="logout-overlay">
+  <div class="logout-spinner-container">
+    <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;">
+      <span class="visually-hidden">Cerrando sesión...</span>
+    </div>
+    <p class="mt-3 text-white">Cerrando sesión...</p>
+  </div>
+</div>
+
 <div class="pcoded-main-container">
   <div class="pcoded-wrapper">
     <div class="pcoded-content">

@@ -14,6 +14,7 @@ export class AuthSigninComponent implements OnInit {
   loginForm!: FormGroup;
   isLoading = false;
   errorMessage = '';
+  infoMessage = '';
 
   constructor(
     private router: Router,
@@ -27,6 +28,12 @@ export class AuthSigninComponent implements OnInit {
       username: ['', [Validators.required, Validators.minLength(5)]],
       password: ['', [Validators.required, Validators.minLength(5)]]
     });
+    
+    // Verificar si hay un mensaje de logout/error en los query params
+    const message = this.route.snapshot.queryParams['message'];
+    if (message) {
+      this.infoMessage = message;
+    }
   }
 
   login() {
@@ -36,17 +43,24 @@ export class AuthSigninComponent implements OnInit {
       
       const { username, password } = this.loginForm.value;
       
-      // Mapear username a nombreUsuario para el backend
+      // Llamar al backend con username
       this.authService.login(username, password).subscribe({
         next: (response) => {
           console.log('Login response:', response);
           
-          // Validar que la respuesta tenga los campos necesarios
-          if (!response || !response.token || !response.nombreUsuario) {
+          // Validar que la respuesta tenga los campos necesarios (sin token)
+          // En sesiones stateful, el token no se envía, solo la cookie HttpOnly
+          const usuarioNombre = (response as any).username;
+          if (!response || !usuarioNombre) {
             this.isLoading = false;
             this.errorMessage = 'Usuario o contraseña incorrectos';
             console.error('Invalid response:', response);
             return;
+          }
+          
+          // Normalizar respuesta: asegurar que tenga nombreUsuario
+          if (!(response as any).nombreUsuario && (response as any).username) {
+            (response as any).nombreUsuario = (response as any).username;
           }
           
           // Validar que el usuario esté activo

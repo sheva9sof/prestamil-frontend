@@ -11,55 +11,32 @@ export class TurnoService {
   private authService = inject(AuthService);
   private readonly API = `${environment.apiUrl}/api/turnos`;
 
-  private getAuthHeaders(): { headers?: HttpHeaders } {
-    const token = this.authService.getToken();
-    if (!token) return {};
-    const value = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-    return { headers: new HttpHeaders({ Authorization: value }) };
+  private getAuthHeaders(): { headers: HttpHeaders; withCredentials: boolean } {
+    return {
+      headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
+      withCredentials: true
+    };
   }
 
   private currentTurnoSubject = new BehaviorSubject<Turno | null>(null);
   public currentTurno$ = this.currentTurnoSubject.asObservable();
 
   iniciar(): Observable<Turno> {
-    // Log temporal para depuración: mostrar token y confirmar header esperado
-    try {
-      const token = this.authService.getToken();
-      console.debug('[TurnoService] iniciar() - token (raw):', token);
-      console.debug('[TurnoService] iniciar() - Authorization header expected:', token?.startsWith('Bearer ') ? token : `Bearer ${token}`);
-    } catch (e) {
-      console.warn('[TurnoService] iniciar() - error leyendo token:', e);
-    }
-
-    // según controlador, no requiere body
+    console.debug('[TurnoService] iniciar() - usando autenticación con cookies');
     return this.http.post<Turno>(`${this.API}/iniciar`, {}, this.getAuthHeaders()).pipe(
       tap(t => this.currentTurnoSubject.next(t))
     );
   }
 
   cerrar(id: number): Observable<Turno> {
-    try {
-      const token = this.authService.getToken();
-      console.debug('[TurnoService] cerrar() - token (raw):', token);
-      console.debug('[TurnoService] cerrar() - Authorization header expected:', token?.startsWith('Bearer ') ? token : `Bearer ${token}`);
-    } catch (e) {
-      console.warn('[TurnoService] cerrar() - error leyendo token:', e);
-    }
-
+    console.debug('[TurnoService] cerrar() - usando autenticación con cookies');
     return this.http.post<Turno>(`${this.API}/cerrar/${id}`, {}, this.getAuthHeaders()).pipe(
       tap(t => this.currentTurnoSubject.next(t))
     );
   }
 
   activo(): Observable<Turno> {
-    try {
-      const token = this.authService.getToken();
-      console.debug('[TurnoService] activo() - token (raw):', token);
-      console.debug('[TurnoService] activo() - Authorization header expected:', token?.startsWith('Bearer ') ? token : `Bearer ${token}`);
-    } catch (e) {
-      console.warn('[TurnoService] activo() - error leyendo token:', e);
-    }
-
+    console.debug('[TurnoService] activo() - usando autenticación con cookies');
     return this.http.get<Turno>(`${this.API}/activo`, this.getAuthHeaders()).pipe(
       tap(t => this.currentTurnoSubject.next(t))
     );

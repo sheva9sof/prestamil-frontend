@@ -48,10 +48,9 @@ export class ParametrosGeneralesComponent implements OnInit {
     this.isLoadingData = true;
     this.errorMessage = '';
     
-    const token = this.authService.getToken();
-    if (!token) {
+    if (!this.authService.isAuthenticated()) {
       this.isLoadingData = false;
-      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
+      this.errorMessage = 'No hay sesión activa. Por favor, inicia sesión nuevamente.';
       return;
     }
 
@@ -59,9 +58,9 @@ export class ParametrosGeneralesComponent implements OnInit {
     
     this.http.get<ParametroSistema[]>(url, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).subscribe({
       next: (response) => {
         this.isLoadingData = false;
@@ -114,11 +113,10 @@ export class ParametrosGeneralesComponent implements OnInit {
     // Abrir modal de carga
     this.openLoadingModal();
     
-    const token = this.authService.getToken();
-    if (!token) {
+    if (!this.authService.isAuthenticated()) {
       this.isLoading = false;
       this.closeLoadingModal();
-      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
+      this.errorMessage = 'No hay sesión activa. Por favor, inicia sesión nuevamente.';
       return;
     }
 
@@ -146,9 +144,9 @@ export class ParametrosGeneralesComponent implements OnInit {
     
     this.http.put<any>(url, body, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).subscribe({
       next: (response) => {
         this.isLoading = false;

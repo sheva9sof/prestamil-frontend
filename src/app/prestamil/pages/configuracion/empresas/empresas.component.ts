@@ -63,18 +63,17 @@ export class EmpresasComponent implements OnInit {
     this.isLoadingData = true;
     this.errorMessage = '';
     
-    const token = this.authService.getToken();
-    if (!token) {
+    if (!this.authService.isAuthenticated()) {
       this.isLoadingData = false;
-      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
+      this.errorMessage = 'No hay sesión activa. Por favor, inicia sesión nuevamente.';
       return;
     }
 
     const empresasRequest = this.http.get<any>(`${environment.apiUrl}/api/empresas`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       catchError(error => {
         console.error('Error al cargar empresas:', error);
@@ -84,9 +83,9 @@ export class EmpresasComponent implements OnInit {
 
     const estadosRequest = this.http.get<any>(`${environment.apiUrl}/api/master-data/estados`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       catchError(error => {
         console.error('Error al cargar estados:', error);
@@ -216,11 +215,10 @@ export class EmpresasComponent implements OnInit {
     this.successMessage = '';
     this.openLoadingModal('Creando empresa...');
 
-    const token = this.authService.getToken();
-    if (!token) {
+    if (!this.authService.isAuthenticated()) {
       this.isLoading = false;
       this.closeLoadingModal();
-      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
+      this.errorMessage = 'No hay sesión activa. Por favor, inicia sesión nuevamente.';
       return;
     }
 
@@ -241,9 +239,9 @@ export class EmpresasComponent implements OnInit {
     
     this.http.post<any>(url, body, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).subscribe({
       next: (response) => {
         this.isLoading = false;
@@ -292,11 +290,10 @@ export class EmpresasComponent implements OnInit {
     this.successMessage = '';
     this.openLoadingModal('Guardando cambios...');
 
-    const token = this.authService.getToken();
-    if (!token) {
+    if (!this.authService.isAuthenticated()) {
       this.isLoading = false;
       this.closeLoadingModal();
-      this.errorMessage = 'No hay token de autenticación. Por favor, inicia sesión nuevamente.';
+      this.errorMessage = 'No hay sesión activa. Por favor, inicia sesión nuevamente.';
       return;
     }
 
@@ -317,9 +314,9 @@ export class EmpresasComponent implements OnInit {
     
     this.http.put<any>(url, body, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).subscribe({
       next: (response) => {
         this.isLoading = false;

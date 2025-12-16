@@ -5,6 +5,11 @@ import { catchError } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
 import { Router } from '@angular/router';
 
+/**
+ * Interceptor para manejar errores de autenticación
+ * - 401 Unauthorized: sesión expirada o inválida
+ * - 440 Login Timeout: sesión expirada (usado por algunos servidores)
+ */
 @Injectable()
 export class AuthErrorInterceptor implements HttpInterceptor {
   private authService = inject(AuthService);
@@ -13,16 +18,25 @@ export class AuthErrorInterceptor implements HttpInterceptor {
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
       catchError((err: HttpErrorResponse) => {
-        if (err && err.status === 401) {
-          // Token inválido o expirado: limpiar sesión y redirigir a login
+        // Manejar errores 401 (Unauthorized) o 440 (Login Timeout)
+        if (err && (err.status === 401 || err.status === 440)) {
+          console.log('[AuthErrorInterceptor] Sesión expirada o inválida (status:', err.status, ')');
+          
           try {
+            // Limpiar sesión y desconectar SSE
             this.authService.logout();
           } catch (e) {
-            console.warn('Error during logout after 401', e);
+            console.warn('[AuthErrorInterceptor] Error durante logout después de', err.status, ':', e);
           }
-          // Navegar al login
-          this.router.navigate(['/login']);
+          
+          // Navegar al login con mensaje
+          this.router.navigate(['/login'], {
+            queryParams: { 
+              message: 'Sesión expirada. Por favor, inicia sesión nuevamente.' 
+            }
+          });
         }
+        
         return throwError(() => err);
       })
     );
