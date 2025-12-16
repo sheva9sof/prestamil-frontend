@@ -1,0 +1,112 @@
+// Estilos para el componente de estado SSE
+
+.page-header {
+  margin-bottom: 20px;
+}
+
+// Animación de pulso para estado conectado
+.badge.bg-success {
+  animation: pulse-success 2s infinite;
+}
+
+@keyframes pulse-success {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+// Animación de parpadeo para error
+.badge.bg-danger {
+  animation: blink-danger 1s infinite;
+}
+
+@keyframes blink-danger {
+  0%, 50%, 100% {
+    opacity: 1;
+  }
+  25%, 75% {
+    opacity: 0.3;
+  }
+}
+
+// Estilos para historial
+.list-group-item {
+  transition: background-color 0.3s ease;
+  
+  &:hover {
+    opacity: 0.9;
+  }
+}
+
+.list-group-item-success {
+  background-color: #d4edda !important;
+  border-color: #c3e6cb !important;
+}
+
+.list-group-item-danger {
+  background-color: #f8d7da !important;
+  border-color: #f5c6cb !important;
+}
+
+.list-group-item-warning {
+  background-color: #fff3cd !important;
+  border-color: #ffeeba !important;
+}
+
+// Estilos para código
+code {
+  background-color: #f4f4f4;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 90%;
+}
+
+pre {
+  border-radius: 5px;
+  
+  code {
+    background-color: transparent;
+    padding: 0;
+    color: inherit;
+  }
+}
+
+// Icono de estado grande
+.text-center i[style*="font-size: 48px"] {
+  display: block;
+  margin-bottom: 10px;
+  
+  &.text-success {
+    animation: pulse-icon 2s infinite;
+  }
+}
+
+@keyframes pulse-icon {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+// Responsive
+@media (max-width: 768px) {
+  .text-center i[style*="font-size: 48px"] {
+    font-size: 36px !important;
+  }
+  
+  dl.row {
+    dt {
+      text-align: left !important;
+      margin-bottom: 5px;
+    }
+    
+    dd {
+      margin-bottom: 15px;
+    }
+  }
+}

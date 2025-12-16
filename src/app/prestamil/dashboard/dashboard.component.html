@@ -1,4 +1,27 @@
 <div class="row">
+  <!-- SSE Connection Status Card -->
+  <div class="col-md-12 mb-3">
+    <app-card cardTitle="Estado de Sesión SSE (Server-Sent Events)" [hidHeader]="false">
+      <div class="row">
+        <div class="col-md-4">
+          <p class="mb-2"><strong>Usuario:</strong> {{ currentUser?.nombreUsuario || 'N/A' }}</p>
+          <p class="mb-2">
+            <strong>Estado SSE:</strong> 
+            <span [class]="sseStatus === 'conectado' ? 'badge bg-success' : sseStatus === 'error' ? 'badge bg-danger' : 'badge bg-secondary'">
+              {{ sseStatus }}
+            </span>
+          </p>
+        </div>
+        <div class="col-md-8">
+          <p class="mb-2"><strong>Último evento:</strong> {{ sseLastEvent || 'Ninguno' }}</p>
+          <p class="text-muted small mb-0">
+            Esta conexión permite expulsar inmediatamente a un usuario cuando inicia sesión en otra PC de la misma sucursal.
+          </p>
+        </div>
+      </div>
+    </app-card>
+  </div>
+  
   @for (sale of sales; track sale) {
     <div class="{{ sale.design }} col-xl-4">
       <app-card [hidHeader]="true">

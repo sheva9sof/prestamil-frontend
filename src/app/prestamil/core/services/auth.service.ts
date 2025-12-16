@@ -7,6 +7,7 @@ import { LoginResponse } from '../models/auth-response.model';
 import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
 import { transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
 import { environment } from 'src/environments/environment';
+import { AuthStreamService } from './auth-stream.service';
 
 @Injectable({
   providedIn: 'root'
@@ -14,6 +15,7 @@ import { environment } from 'src/environments/environment';
 export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private authStreamService = inject(AuthStreamService);
   
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
@@ -24,7 +26,6 @@ export class AuthService {
   private isLoggingOutSubject = new BehaviorSubject<boolean>(false);
   public isLoggingOut$ = this.isLoggingOutSubject.asObservable();
 
-  private readonly AUTH_TOKEN_KEY = 'authToken';
   private readonly AUTH_USER_KEY = 'authUser';
   private readonly MENU_ITEMS_KEY = 'menuItems';
   private readonly API_URL = environment.apiUrl;
@@ -36,15 +37,26 @@ export class AuthService {
 
   /**
    * Verificar estado de autenticación al iniciar la aplicación
+   * En sesiones stateful, la cookie HttpOnly se verifica automáticamente por el backend
    */
   checkAuthStatus(): void {
-    const token = localStorage.getItem(this.AUTH_TOKEN_KEY);
-    const isAuth = !!token; // En el futuro validar token con el backend
+    const authUser = localStorage.getItem(this.AUTH_USER_KEY);
+    const isAuth = !!authUser;
     this.isAuthenticatedSubject.next(isAuth);
     
     // Cargar menú si hay sesión activa
     if (isAuth) {
       this.loadMenuFromStorage();
+      
+      // Reconectar SSE con el usuario actual
+      try {
+        const user = JSON.parse(authUser);
+        if (user && user.nombreUsuario) {
+          this.authStreamService.connect(user.nombreUsuario);
+        }
+      } catch (e) {
+        console.error('Error al reconectar SSE:', e);
+      }
     }
   }
   
@@ -122,14 +134,15 @@ export class AuthService {
 
   /**
    * Login - Llamada al backend
-   * @param nombreUsuario Usuario
+   * La autenticación ahora se basa en cookies HttpOnly stateful
+   * @param username Usuario
    * @param password Contraseña
    * @returns Observable con la respuesta del login
    */
-  login(nombreUsuario: string, password: string): Observable<LoginResponse> {
+  login(username: string, password: string): Observable<LoginResponse> {
     const loginUrl = `${this.API_URL}/auth/login`;
     const loginData = {
-      nombreUsuario,
+      username,  // Enviar "username" como espera el backend
       password
     };
     
@@ -138,32 +151,29 @@ export class AuthService {
     return this.http.post<LoginResponse>(loginUrl, loginData, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true // IMPORTANTE: Para recibir y enviar cookies HttpOnly
     });
   }
 
   /**
    * Guardar sesión después de login exitoso
+   * Ya NO guardamos token, solo datos de UI (authUser y menuItems)
+   * La cookie de sesión HttpOnly viaja automáticamente
    * @param loginResponse Respuesta completa del login
    */
   setSession(loginResponse: LoginResponse): void {
-    // Guardar solo el token crudo (sin el prefijo "Bearer ") para evitar duplicados
-    const rawToken = loginResponse.token && loginResponse.token.startsWith('Bearer ')
-      ? loginResponse.token.substring(7)
-      : loginResponse.token;
-    if (rawToken) {
-      localStorage.setItem(this.AUTH_TOKEN_KEY, rawToken);
-      console.debug('[AuthService] token saved (length):', rawToken.length);
-    } else {
-      localStorage.removeItem(this.AUTH_TOKEN_KEY);
-      console.debug('[AuthService] no token in response, storage cleared');
-    }
+    // Normalizar: usar nombreUsuario o username
+    const nombreUsuario = loginResponse.nombreUsuario || loginResponse.username;
+    
+    // Guardar solo datos del usuario para UI (sin token)
     localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify({
-      nombreUsuario: loginResponse.nombreUsuario,
+      nombreUsuario: nombreUsuario,
       nombre: loginResponse.nombre,
       apellidos: loginResponse.apellidos,
       idRol: loginResponse.idRol
     }));
+    console.debug('[AuthService] Usuario guardado en localStorage (sin token)');
     
     // Transformar y guardar el menú
     if (loginResponse.opciones && loginResponse.opciones.length > 0) {
@@ -173,18 +183,45 @@ export class AuthService {
       this.menuItemsSubject.next(menuItems);
     }
     
+    // Actualizar estado de autenticación
     this.isAuthenticatedSubject.next(true);
+    
+    // Conectar SSE para recibir eventos de logout forzado
+    if (nombreUsuario) {
+      console.log('[AuthService] Conectando SSE para usuario:', nombreUsuario);
+      this.authStreamService.connect(nombreUsuario);
+    }
   }
 
   /**
-   * Logout - Limpiar sesión
+   * Logout - Limpiar sesión y desconectar SSE
+   * Llama al endpoint de logout del backend para invalidar la sesión
    */
   logout(): void {
-    localStorage.removeItem(this.AUTH_TOKEN_KEY);
+    console.log('[AuthService] Iniciando logout');
+    
+    // Desconectar SSE primero
+    this.authStreamService.disconnect();
+    
+    // Llamar al endpoint de logout del backend
+    this.http.post(`${this.API_URL}/auth/logout`, {}, { withCredentials: true })
+      .subscribe({
+        next: () => {
+          console.log('[AuthService] Logout exitoso en backend');
+        },
+        error: (err) => {
+          console.warn('[AuthService] Error al hacer logout en backend:', err);
+        }
+      });
+    
+    // Limpiar datos locales
     localStorage.removeItem(this.AUTH_USER_KEY);
     localStorage.removeItem(this.MENU_ITEMS_KEY);
     this.isAuthenticatedSubject.next(false);
     this.menuItemsSubject.next([]);
+    
+    // Navegar a login
+    this.router.navigate(['/login']);
   }
   
   /**
@@ -216,14 +253,6 @@ export class AuthService {
   }
 
   /**
-   * Obtener token de autenticación
-   * @returns Token o null si no existe
-   */
-  getToken(): string | null {
-    return localStorage.getItem(this.AUTH_TOKEN_KEY);
-  }
-
-  /**
    * Obtener información del usuario
    * @returns Usuario o null si no existe
    */
@@ -233,38 +262,23 @@ export class AuthService {
   }
 
   /**
-   * Obtener el ID del usuario desde el token JWT
+   * Obtener el ID del usuario desde los datos almacenados
    * @returns ID del usuario o null
    */
   getUserId(): number | null {
-    const token = this.getToken();
-    if (!token) {
-      return null;
-    }
-    
-    try {
-      // Decodificar el payload del token JWT (segunda parte)
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.userId || payload.user_id || null;
-    } catch (e) {
-      console.error('Error al decodificar token:', e);
-      return null;
-    }
+    const user = this.getUser();
+    return user?.idUsuario || user?.userId || user?.id || null;
   }
 
   /**
    * Cambiar contraseña del usuario
+   * Ya no se envía Authorization header, la sesión viaja en cookie HttpOnly
    * @param userId ID del usuario
    * @param passwordActual Contraseña actual
    * @param passwordNueva Nueva contraseña
    * @returns Observable con la respuesta del servidor
    */
   cambiarPassword(userId: number, passwordActual: string, passwordNueva: string): Observable<any> {
-    const token = this.getToken();
-    if (!token) {
-      throw new Error('No hay token de autenticación');
-    }
-
     const url = `${this.API_URL}/api/usuarios/${userId}/cambiar-password`;
     const body = {
       passwordActual,
@@ -273,9 +287,9 @@ export class AuthService {
 
     return this.http.post(url, body, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     });
   }
 
@@ -286,18 +300,13 @@ export class AuthService {
    * @returns Observable con la respuesta del login actualizada
    */
   refreshMenuFromBackend(): Observable<LoginResponse> {
-    const token = this.getToken();
-    if (!token) {
-      throw new Error('No hay token de autenticación');
-    }
-
     const url = `${this.API_URL}/api/usuarios/me`;
     
     return this.http.get<LoginResponse>(url, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       switchMap((response: LoginResponse) => {
         // Actualizar el menú con la respuesta del backend

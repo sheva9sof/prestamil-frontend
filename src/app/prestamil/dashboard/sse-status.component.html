@@ -1,0 +1,242 @@
+<div class="row">
+  <div class="col-md-12">
+    <!-- Header -->
+    <div class="page-header mb-4">
+      <h5>Estado de Conexión SSE (Server-Sent Events)</h5>
+      <p class="text-muted">
+        Monitor en tiempo real de la conexión SSE para expulsión inmediata de usuarios
+      </p>
+    </div>
+
+    <!-- Card principal: Estado actual -->
+    <app-card cardTitle="Estado Actual de la Conexión SSE" [hidHeader]="false">
+      <div class="row">
+        <div class="col-md-4">
+          <div class="text-center mb-3">
+            <i [class]="statusIcon" style="font-size: 48px;"></i>
+          </div>
+          <h4 class="text-center">
+            <span [class]="statusBadgeClass">{{ sseStatus | uppercase }}</span>
+          </h4>
+        </div>
+        
+        <div class="col-md-8">
+          <dl class="row">
+            <dt class="col-sm-4">Usuario:</dt>
+            <dd class="col-sm-8">
+              <strong>{{ currentUser?.nombreUsuario || 'N/A' }}</strong>
+              <br>
+              <small class="text-muted">{{ currentUser?.nombre }} {{ currentUser?.apellidos }}</small>
+            </dd>
+
+            <dt class="col-sm-4">Estado conexión:</dt>
+            <dd class="col-sm-8">
+              <span *ngIf="isConnected" class="text-success">
+                <i class="feather icon-wifi"></i> Conectado
+              </span>
+              <span *ngIf="!isConnected" class="text-danger">
+                <i class="feather icon-wifi-off"></i> Desconectado
+              </span>
+            </dd>
+
+            <dt class="col-sm-4">Último evento:</dt>
+            <dd class="col-sm-8">
+              <code>{{ sseLastEvent || 'Ninguno' }}</code>
+            </dd>
+
+            <dt class="col-sm-4">Endpoint SSE:</dt>
+            <dd class="col-sm-8">
+              <small class="text-muted">
+                GET /auth/stream/logout?username={{ currentUser?.nombreUsuario || '{user}' }}
+              </small>
+            </dd>
+          </dl>
+
+          <div class="mt-3">
+            <button 
+              class="btn btn-sm btn-primary me-2" 
+              (click)="reconnectSSE()"
+              [disabled]="!currentUser">
+              <i class="feather icon-refresh-cw"></i> Reconectar
+            </button>
+            <button 
+              class="btn btn-sm btn-danger" 
+              (click)="disconnectSSE()"
+              [disabled]="!isConnected">
+              <i class="feather icon-x"></i> Desconectar
+            </button>
+          </div>
+        </div>
+      </div>
+    </app-card>
+
+    <!-- Card: Historial de eventos -->
+    <app-card cardTitle="Historial de Eventos SSE" [hidHeader]="false">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <p class="text-muted mb-0">
+          Últimos {{ connectionHistory.length }} eventos (máximo {{ maxHistorySize }})
+        </p>
+        <button 
+          class="btn btn-sm btn-outline-secondary" 
+          (click)="clearHistory()"
+          [disabled]="connectionHistory.length === 0">
+          <i class="feather icon-trash-2"></i> Limpiar
+        </button>
+      </div>
+
+      <div *ngIf="connectionHistory.length === 0" class="alert alert-info">
+        <i class="feather icon-info"></i> No hay eventos registrados aún.
+      </div>
+
+      <ul class="list-group" *ngIf="connectionHistory.length > 0">
+        <li 
+          *ngFor="let item of connectionHistory" 
+          class="list-group-item"
+          [ngClass]="getHistoryItemClass(item.status)">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <strong>{{ item.status }}</strong>
+              <p class="mb-0 small text-muted" *ngIf="item.event">
+                {{ item.event }}
+              </p>
+            </div>
+            <span class="badge bg-secondary">{{ item.timestamp }}</span>
+          </div>
+        </li>
+      </ul>
+    </app-card>
+
+    <!-- Card: Instrucciones de prueba -->
+    <app-card cardTitle="🧪 Instrucciones de Prueba - Force Logout via SSE" [hidHeader]="false">
+      <div class="alert alert-warning">
+        <i class="feather icon-alert-triangle"></i>
+        <strong>Objetivo:</strong> Verificar que al iniciar sesión en otra PC con el mismo usuario, 
+        la primera PC reciba un evento "force-logout" y cierre sesión inmediatamente.
+      </div>
+
+      <h6 class="mt-4"><i class="feather icon-check-square"></i> Requisitos previos:</h6>
+      <ul>
+        <li>Backend configurado con Spring Session JDBC</li>
+        <li>Endpoint SSE <code>GET /auth/stream/logout</code> implementado</li>
+        <li>Lógica de detección de login duplicado en backend</li>
+        <li>Dos navegadores o dos ventanas de incógnito</li>
+      </ul>
+
+      <h6 class="mt-4"><i class="feather icon-list"></i> Pasos de prueba:</h6>
+      <ol class="mb-4">
+        <li>
+          <strong>PC 1 (o Navegador 1):</strong>
+          <ul>
+            <li>Inicia sesión con usuario <code>user1</code></li>
+            <li>Navega a esta página o deja el dashboard abierto</li>
+            <li>Verifica que el estado sea <span class="badge bg-success">CONECTADO</span></li>
+            <li>Deja esta ventana abierta y visible</li>
+          </ul>
+        </li>
+
+        <li class="mt-3">
+          <strong>PC 2 (o Navegador 2 en modo incógnito):</strong>
+          <ul>
+            <li>Abre el navegador y ve a <code>http://localhost:4200/login</code></li>
+            <li>Inicia sesión con el <strong>mismo usuario</strong> <code>user1</code></li>
+            <li>El backend debe detectar que <code>user1</code> ya tiene sesión activa en PC 1</li>
+            <li>El backend debe emitir evento SSE <code>force-logout</code> a PC 1</li>
+          </ul>
+        </li>
+
+        <li class="mt-3">
+          <strong>Resultado esperado en PC 1:</strong>
+          <ul>
+            <li>
+              <i class="feather icon-zap text-warning"></i> 
+              Inmediatamente (en menos de 1 segundo) recibe evento <code>force-logout</code>
+            </li>
+            <li>
+              <i class="feather icon-log-out text-danger"></i> 
+              La sesión se cierra automáticamente
+            </li>
+            <li>
+              <i class="feather icon-arrow-right text-info"></i> 
+              Redirige a <code>/login</code> con mensaje: 
+              <em>"Sesión revocada: nuevo inicio en esta sucursal"</em>
+            </li>
+            <li>
+              <i class="feather icon-list"></i> 
+              En el historial de eventos aparece: 
+              <span class="badge bg-warning">FORCE-LOGOUT</span>
+            </li>
+          </ul>
+        </li>
+      </ol>
+
+      <h6 class="mt-4"><i class="feather icon-terminal"></i> Verificación en consola del navegador:</h6>
+      <p>Abre DevTools (F12) en PC 1 y busca estos logs:</p>
+      <pre class="bg-dark text-white p-3 rounded"><code>[AuthStreamService] Conexión SSE establecida
+[AuthStreamService] Evento force-logout recibido: ...
+[AuthStreamService] Procesando force-logout: ...
+[AuthStreamService] Cerrando conexión SSE
+[AuthService] Iniciando logout</code></pre>
+
+      <div class="alert alert-info mt-4">
+        <i class="feather icon-info"></i>
+        <strong>Nota:</strong> La reconexión automática está configurada con backoff exponencial 
+        (máximo 5 intentos: 2s, 4s, 8s, 16s, 32s).
+      </div>
+    </app-card>
+
+    <!-- Card: Código de ejemplo del backend -->
+    <app-card cardTitle="📝 Código de Ejemplo - Backend (Spring Boot)" [hidHeader]="false">
+      <h6>Endpoint SSE en el backend:</h6>
+      <pre class="bg-dark text-white p-3 rounded"><code>&#64;RestController
+&#64;RequestMapping("/auth")
+public class AuthController {{"{"}
+    private final Map&lt;String, SseEmitter&gt; emitters = new ConcurrentHashMap&lt;&gt;();
+
+    &#64;GetMapping("/stream/logout")
+    public SseEmitter streamLogout(&#64;RequestParam String username) {{"{"}
+        SseEmitter emitter = new SseEmitter(Long.MAX_VALUE);
+        
+        // Si ya hay un emitter para este usuario, enviamos force-logout
+        SseEmitter oldEmitter = emitters.put(username, emitter);
+        if (oldEmitter != null) {{"{"}
+            try {{"{"}
+                oldEmitter.send(SseEmitter.event()
+                    .name("force-logout")
+                    .data("Nuevo login detectado en otra PC"));
+                oldEmitter.complete();
+            {"}"} catch (Exception e) {{"{"}
+                // El cliente anterior ya estaba desconectado
+            {"}"}
+        {"}"}
+        
+        emitter.onCompletion(() -> emitters.remove(username));
+        emitter.onTimeout(() -> emitters.remove(username));
+        emitter.onError(e -> emitters.remove(username));
+        
+        return emitter;
+    {"}"}
+{"}"}</code></pre>
+
+      <h6 class="mt-4">Detección de login duplicado en endpoint de login:</h6>
+      <pre class="bg-dark text-white p-3 rounded"><code>&#64;PostMapping("/login")
+public ResponseEntity&lt;LoginResponse&gt; login(&#64;RequestBody LoginRequest request) {{"{"}
+    // ... validar credenciales ...
+    
+    // Detectar si el usuario ya tiene sesión activa
+    String username = request.getNombreUsuario();
+    SseEmitter oldEmitter = emitters.get(username);
+    if (oldEmitter != null) {{"{"}
+        try {{"{"}
+            oldEmitter.send(SseEmitter.event()
+                .name("force-logout")
+                .data("Nuevo login en sucursal"));
+        {"}"} catch (Exception e) {{"{"}
+            // Cliente ya desconectado
+        {"}"}
+    {"}"}
+    
+    return ResponseEntity.ok(loginResponse);
+{"}"}</code></pre>
+    </app-card>
+  </div>
+</div>

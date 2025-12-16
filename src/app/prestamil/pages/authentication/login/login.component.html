@@ -53,6 +53,11 @@
             </div>
           </div>
           
+          <!-- Mensaje informativo (por ejemplo, sesión revocada) -->
+          <div *ngIf="infoMessage" class="alert alert-info mb-3" role="alert">
+            {{ infoMessage }}
+          </div>
+          
           <!-- Mensaje de error -->
           <div *ngIf="errorMessage" class="alert alert-danger mb-3" role="alert">
             {{ errorMessage }}

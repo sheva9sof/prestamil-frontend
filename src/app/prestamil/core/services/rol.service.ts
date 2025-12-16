@@ -15,11 +15,11 @@ export class RolService {
   private http = inject(HttpClient);
   private readonly API_URL = environment.apiUrl + '/api/roles';
 
-  private getAuthHeaders(): { headers?: HttpHeaders } {
-    const token = localStorage.getItem('authToken');
-    if (!token) return {};
-    const value = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-    return { headers: new HttpHeaders({ Authorization: value }) };
+  private getAuthHeaders(): { headers: HttpHeaders; withCredentials: boolean } {
+    return {
+      headers: new HttpHeaders({ 'Content-Type': 'application/json' }),
+      withCredentials: true
+    };
   }
 
   findAll(): Observable<Rol[]> {

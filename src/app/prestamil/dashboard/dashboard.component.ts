@@ -1,9 +1,12 @@
 // angular import
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { Subscription } from 'rxjs';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
+import { AuthStreamService } from '../core/services/auth-stream.service';
+import { AuthService } from '../core/services/auth.service';
 
 declare const AmCharts;
 
@@ -26,9 +29,28 @@ import mapColor from 'src/fake-data/map-color-data.json';
   templateUrl: './dashboard.component.html',
   styleUrls: ['./dashboard.component.scss']
 })
-export class DashboardComponent implements OnInit {
+export class DashboardComponent implements OnInit, OnDestroy {
+  private authStreamService = inject(AuthStreamService);
+  private authService = inject(AuthService);
+  private sseSubscription?: Subscription;
+  
+  // Estado de la conexión SSE
+  sseStatus = 'desconectado';
+  sseLastEvent = '';
+  currentUser: any;
+
   // life cycle event
   ngOnInit() {
+    // Obtener usuario actual
+    this.currentUser = this.authService.getUser();
+    
+    // Suscribirse a eventos del SSE
+    this.sseSubscription = this.authStreamService.connectionStatus$.subscribe(status => {
+      this.sseStatus = status.status;
+      this.sseLastEvent = status.lastEvent || '';
+      console.log('[Dashboard] Estado SSE:', this.sseStatus, this.sseLastEvent);
+    });
+    
     setTimeout(() => {
       const latlong = dataJson;
 
@@ -232,6 +254,12 @@ export class DashboardComponent implements OnInit {
         ]
       });
     }, 500);
+  }
+  
+  ngOnDestroy() {
+    if (this.sseSubscription) {
+      this.sseSubscription.unsubscribe();
+    }
   }
 
   // public method

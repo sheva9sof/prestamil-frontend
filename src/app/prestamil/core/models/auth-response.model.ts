@@ -13,7 +13,8 @@ export interface OpcionMenu {
 }
 
 export interface LoginResponse {
-  nombreUsuario: string;
+  nombreUsuario?: string; // Campo esperado del backend (opcional para compatibilidad)
+  username?: string; // Campo alternativo del backend (opcional para compatibilidad)
   password: string | null;
   nombre: string;
   apellidos: string;
