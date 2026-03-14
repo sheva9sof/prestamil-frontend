@@ -197,31 +197,67 @@ export class AuthService {
    * Logout - Limpiar sesión y desconectar SSE
    * Llama al endpoint de logout del backend para invalidar la sesión
    */
-  logout(): void {
+  logout(options: { notifyBackend?: boolean; message?: string } = {}): void {
+    if (this.isLoggingOutSubject.value) {
+      return;
+    }
+
+    const { notifyBackend = true, message } = options;
+
     console.log('[AuthService] Iniciando logout');
-    
-    // Desconectar SSE primero
+    this.isLoggingOutSubject.next(true);
+    this.clearLocalSession();
+
+    if (notifyBackend) {
+      this.http.post(`${this.API_URL}/auth/logout`, {})
+        .subscribe({
+          next: () => {
+            console.log('[AuthService] Logout exitoso en backend');
+          },
+          error: (err) => {
+            console.warn('[AuthService] Error al hacer logout en backend:', err);
+          }
+        });
+    }
+
+    void this.navigateToLogin(message);
+  }
+
+  /**
+   * Manejar invalidación de sesión reportada por el backend en una petición protegida.
+   */
+  handleSessionInvalidation(message = 'Sesión expirada. Por favor, inicia sesión nuevamente.'): void {
+    this.logout({
+      notifyBackend: false,
+      message
+    });
+  }
+
+  /**
+   * Limpiar el estado local de autenticación.
+   */
+  private clearLocalSession(): void {
     this.authStreamService.disconnect();
-    
-    // Llamar al endpoint de logout del backend
-    this.http.post(`${this.API_URL}/auth/logout`, {}, { withCredentials: true })
-      .subscribe({
-        next: () => {
-          console.log('[AuthService] Logout exitoso en backend');
-        },
-        error: (err) => {
-          console.warn('[AuthService] Error al hacer logout en backend:', err);
-        }
-      });
-    
-    // Limpiar datos locales
     localStorage.removeItem(this.AUTH_USER_KEY);
     localStorage.removeItem(this.MENU_ITEMS_KEY);
     this.isAuthenticatedSubject.next(false);
     this.menuItemsSubject.next([]);
-    
-    // Navegar a login
-    this.router.navigate(['/login']);
+  }
+
+  /**
+   * Redirigir al login y resetear el estado transitorio de logout.
+   */
+  private async navigateToLogin(message?: string): Promise<void> {
+    const queryParams = message ? { message } : undefined;
+
+    try {
+      await this.router.navigate(['/login'], {
+        queryParams,
+        replaceUrl: true
+      });
+    } finally {
+      this.isLoggingOutSubject.next(false);
+    }
   }
   
   /**
@@ -285,12 +321,7 @@ export class AuthService {
       passwordNueva
     };
 
-    return this.http.post(url, body, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    });
+    return this.http.post(url, body);
   }
 
   /**
@@ -301,13 +332,8 @@ export class AuthService {
    */
   refreshMenuFromBackend(): Observable<LoginResponse> {
     const url = `${this.API_URL}/api/usuarios/me`;
-    
-    return this.http.get<LoginResponse>(url, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    }).pipe(
+
+    return this.http.get<LoginResponse>(url).pipe(
       switchMap((response: LoginResponse) => {
         // Actualizar el menú con la respuesta del backend
         if (response.opciones && response.opciones.length > 0) {

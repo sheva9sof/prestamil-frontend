@@ -3,7 +3,7 @@ import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
 import { AuthService } from '../../core/services/auth.service';
-import { Router } from '@angular/router';
+import { environment } from 'src/environments/environment';
 
 /**
  * Interceptor para manejar errores de autenticación
@@ -13,28 +13,18 @@ import { Router } from '@angular/router';
 @Injectable()
 export class AuthErrorInterceptor implements HttpInterceptor {
   private authService = inject(AuthService);
-  private router = inject(Router);
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
       catchError((err: HttpErrorResponse) => {
-        // Manejar errores 401 (Unauthorized) o 440 (Login Timeout)
-        if (err && (err.status === 401 || err.status === 440)) {
-          console.log('[AuthErrorInterceptor] Sesión expirada o inválida (status:', err.status, ')');
-          
-          try {
-            // Limpiar sesión y desconectar SSE
-            this.authService.logout();
-          } catch (e) {
-            console.warn('[AuthErrorInterceptor] Error durante logout después de', err.status, ':', e);
-          }
-          
-          // Navegar al login con mensaje
-          this.router.navigate(['/login'], {
-            queryParams: { 
-              message: 'Sesión expirada. Por favor, inicia sesión nuevamente.' 
-            }
-          });
+        const isBackendRequest = req.url.startsWith(environment.apiUrl);
+        const isAuthLifecycleRequest = req.url.startsWith(`${environment.apiUrl}/auth/login`) ||
+          req.url.startsWith(`${environment.apiUrl}/auth/logout`);
+        const isSessionError = err && (err.status === 401 || err.status === 403 || err.status === 440);
+
+        if (isBackendRequest && !isAuthLifecycleRequest && isSessionError && this.authService.isAuthenticated()) {
+          console.log('[AuthErrorInterceptor] Sesión expirada, inválida o revocada (status:', err.status, ')');
+          this.authService.handleSessionInvalidation('Sesión expirada o revocada. Por favor, inicia sesión nuevamente.');
         }
         
         return throwError(() => err);
