@@ -1,7 +1,232 @@
 <div class="row">
   <div class="col-12">
-    <app-card cardTitle="Prendas">
-      <p>Gestión de prendas</p>
+    <!-- Modal de creación/edición -->
+    <ng-template #prendaModal let-modal>
+      <div class="modal-header">
+        <h5 class="modal-title">Nueva Prenda</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="closePrendaModal()"></button>
+      </div>
+      <div class="modal-body">
+        <form>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="modalTipoPrenda" class="form-label">Tipo de prenda <span class="text-danger">*</span></label>
+              <select 
+                id="modalTipoPrenda" 
+                class="form-control" 
+                [(ngModel)]="formData.tipoPrenda"
+                (ngModelChange)="onTipoPrendaModalChange()"
+                name="modalTipoPrenda"
+                [disabled]="isLoadingTipos"
+                required
+              >
+                <option value="" *ngIf="!isLoadingTipos">Seleccione un tipo</option>
+                <option value="" *ngIf="isLoadingTipos" disabled>Cargando...</option>
+                <option *ngFor="let tipo of tiposPrenda" [value]="tipo.id">{{ tipo.tipo }}</option>
+              </select>
+              <small *ngIf="isLoadingTipos" class="text-muted d-block mt-1">
+                <i class="feather icon-loader spin-icon"></i> Cargando tipos de prenda...
+              </small>
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="modalCategoria" class="form-label">Categoria <span class="text-danger">*</span></label>
+              <select 
+                id="modalCategoria" 
+                class="form-control" 
+                [(ngModel)]="formData.categoria"
+                name="modalCategoria"
+                [disabled]="isLoadingCategoriasModal || !formData.tipoPrenda"
+                required
+              >
+                <option value="">Seleccione una categoría</option>
+                <option *ngFor="let categoria of categoriasModal" [value]="categoria.idAtributo">{{ categoria.nombreAtributo }}</option>
+              </select>
+              <small *ngIf="isLoadingCategoriasModal" class="text-muted d-block mt-1">
+                <i class="feather icon-loader spin-icon"></i> Cargando categorías...
+              </small>
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-12 mb-3">
+              <label for="modalValor" class="form-label">Valor <span class="text-danger">*</span></label>
+              <input 
+                type="text" 
+                id="modalValor"
+                class="form-control" 
+                [(ngModel)]="formData.valor"
+                name="modalValor"
+                placeholder="Ingrese el valor" 
+                required
+              />
+            </div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button 
+          type="button" 
+          class="btn btn-secondary"
+          (click)="closePrendaModal()"
+          [disabled]="isLoadingGuardar"
+        >
+          Cancelar
+        </button>
+        <button 
+          type="button" 
+          class="btn btn-primary"
+          (click)="guardarPrenda()"
+          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !formData.valor.trim()"
+        >
+          <i class="feather icon-save"></i>
+          {{ isLoadingGuardar ? 'Guardando...' : 'Guardar' }}
+        </button>
+      </div>
+    </ng-template>
+
+    <app-card cardTitle="Prendas" [hidHeader]="true">
+      <!-- Filtros de búsqueda -->
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label for="tipoPrenda" class="form-label">Tipo de prenda</label>
+          <select id="tipoPrenda" class="form-control" [(ngModel)]="filtroTipoPrenda" (ngModelChange)="onTipoPrendaChange()" [disabled]="isLoadingTipos">
+            <option value="" *ngIf="!isLoadingTipos">Seleccione un tipo</option>
+            <option value="" *ngIf="isLoadingTipos" disabled>Cargando...</option>
+            <option *ngFor="let tipo of tiposPrenda" [value]="tipo.id">{{ tipo.tipo }}</option>
+          </select>
+          <small *ngIf="isLoadingTipos" class="text-muted d-block mt-1">
+            <i class="feather icon-loader spin-icon"></i> Cargando tipos de prenda...
+          </small>
+        </div>
+        <div class="col-md-4">
+          <label for="categoria" class="form-label">Categoria</label>
+          <select id="categoria" class="form-control" [(ngModel)]="filtroCategoria" [disabled]="isLoadingCategorias || !filtroTipoPrenda">
+            <option value="">Seleccione una categoría</option>
+            <option *ngFor="let categoria of categorias" [value]="categoria.idAtributo">{{ categoria.nombreAtributo }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <button type="button" class="btn btn-primary" (click)="buscar()" [disabled]="isLoadingPrendas || !filtroCategoria">
+            <span *ngIf="!isLoadingPrendas">Buscar</span>
+            <span *ngIf="isLoadingPrendas">
+              <i class="feather icon-loader spin-icon"></i> Buscando...
+            </span>
+          </button>
+        </div>
+        <div class="col-md-8 text-end">
+          <button 
+            type="button" 
+            class="btn btn-success"
+            (click)="agregarPrenda()"
+          >
+            <i class="feather icon-plus"></i> Agregar
+          </button>
+        </div>
+      </div>
+      
+      <!-- Buscador -->
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="feather icon-search"></i>
+            </span>
+            <input 
+              type="text" 
+              class="form-control" 
+              placeholder="Buscar por tipo, categoría o valor..."
+              [(ngModel)]="terminoBusqueda"
+              (ngModelChange)="onBusquedaChange()"
+            />
+          </div>
+        </div>
+        <div class="col-md-6 text-end">
+          <span class="text-muted" *ngIf="prendasFiltradas.length > 0">
+            Mostrando {{ (paginaActual - 1) * itemsPorPagina + 1 }} - {{ Math.min(paginaActual * itemsPorPagina, prendasFiltradas.length) }} de {{ prendasFiltradas.length }} resultados
+          </span>
+        </div>
+      </div>
+      
+      <!-- Tabla de prendas -->
+      <div class="table-responsive">
+        <table class="table table-hover table-bordered prendas-table">
+          <thead>
+            <tr>
+              <th>Tipo de prenda</th>
+              <th>Categoria</th>
+              <th>Valor</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="isLoadingPrendas">
+              <td colspan="4" class="text-center">
+                <i class="feather icon-loader spin-icon"></i> Cargando prendas...
+              </td>
+            </tr>
+            <tr *ngFor="let prenda of prendasPaginadas; trackBy: trackByFn">
+              <td>{{ prenda.tipo }}</td>
+              <td>{{ prenda.nombreAtributo }}</td>
+              <td>{{ prenda.valor }}</td>
+              <td>
+                <div class="action-buttons">
+                  <button 
+                    type="button" 
+                    class="btn-edit"
+                    (click)="editarPrenda(prenda)"
+                    title="Editar">
+                    <i class="feather icon-edit-2"></i>
+                    <span>Editar</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Mensaje cuando no hay prendas -->
+      <div *ngIf="!isLoadingPrendas && prendas.length === 0" class="alert alert-info mt-3" role="alert">
+        No se encontraron prendas.
+      </div>
+      
+      <!-- Mensaje cuando no hay resultados de búsqueda -->
+      <div *ngIf="!isLoadingPrendas && prendas.length > 0 && prendasFiltradas.length === 0" class="alert alert-warning mt-3" role="alert">
+        No se encontraron resultados para "{{ terminoBusqueda }}".
+      </div>
+
+      <!-- Paginación -->
+      <div *ngIf="!isLoadingPrendas && prendasFiltradas.length > 0" class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          <label class="me-2">Items por página:</label>
+          <select class="form-select form-select-sm d-inline-block w-auto" [(ngModel)]="itemsPorPagina" (ngModelChange)="paginaActual = 1; calcularPaginacion()">
+            <option [value]="5">5</option>
+            <option [value]="10">10</option>
+            <option [value]="20">20</option>
+            <option [value]="50">50</option>
+          </select>
+        </div>
+        <nav>
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="paginaActual === 1">
+              <a class="page-link" href="#" (click)="$event.preventDefault(); cambiarPagina(paginaActual - 1)">
+                <i class="feather icon-chevron-left"></i>
+              </a>
+            </li>
+            <li class="page-item" *ngFor="let pagina of getPaginas()" [class.active]="pagina === paginaActual">
+              <a class="page-link" href="#" (click)="$event.preventDefault(); cambiarPagina(pagina)">
+                {{ pagina }}
+              </a>
+            </li>
+            <li class="page-item" [class.disabled]="paginaActual === totalPaginas">
+              <a class="page-link" href="#" (click)="$event.preventDefault(); cambiarPagina(paginaActual + 1)">
+                <i class="feather icon-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
     </app-card>
   </div>
 </div>
