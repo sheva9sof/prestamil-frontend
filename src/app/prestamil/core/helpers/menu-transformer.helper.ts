@@ -10,26 +10,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   // Determinar el tipo basado en si tiene submenus
   const type: 'item' | 'collapse' = hasSubmenus ? 'collapse' : 'item';
   
-  // Obtener el icono directamente del backend (ya viene en formato Feather)
-  let icon: string | undefined;
-  if (opcion.icono === 'true' && opcion.nombreIcono) {
-    icon = opcion.nombreIcono;
-  }
-  
-  // Fallback: Si no hay icono pero es una opción conocida, asignar icono por defecto
-  if (!icon && !hasSubmenus) {
-    const defaultIcons: { [key: string]: string } = {
-      'Turnos': 'icon-calendar',
-      'Usuarios': 'icon-users',
-      'Usuario': 'icon-user',
-      'Hardware': 'icon-cpu',
-      'Prendas': 'icon-package',
-      'Sucursal': 'icon-home',
-      'Empresas': 'icon-briefcase',
-      'Empresa': 'icon-briefcase',
-    };
-    icon = defaultIcons[opcion.opcion];
-  }
+  const icon: string | undefined = opcion.nombreIcono ?? undefined;
   
   // Transformar los submenus recursivamente
   const children: NavigationItem[] | undefined = hasSubmenus
@@ -52,10 +33,12 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
     // Mapeo de nombres de opciones a rutas
     const opcionToUrlMap: { [key: string]: string } = {
       'Turnos': '/turnos',
+      'Clientes': '/clientes',
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
       'Prendas': '/catalogos/prendas',
+      'Descuentos': '/catalogos/descuentos',
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',
       'Empresa': '/configuracion/empresas',
