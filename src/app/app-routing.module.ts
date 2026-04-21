@@ -42,6 +42,10 @@ const routes: Routes = [
         loadComponent: () => import('./prestamil/pages/usuarios/usuarios.component').then((c) => c.UsuariosComponent)
       },
       {
+        path: 'clientes',
+        loadComponent: () => import('./prestamil/pages/clientes/clientes.component').then((c) => c.ClientesComponent)
+      },
+      {
         path: 'turnos',
         loadComponent: () => import('./prestamil/pages/turnos/turnos.component').then((c) => c.TurnosComponent)
       },
@@ -55,6 +59,10 @@ const routes: Routes = [
           {
             path: 'prendas',
             loadComponent: () => import('./prestamil/pages/catalogos/prendas/prendas.component').then((c) => c.PrendasComponent)
+          },
+          {
+            path: 'descuentos',
+            loadComponent: () => import('./prestamil/pages/catalogos/descuentos/descuentos.component').then((c) => c.DescuentosComponent)
           }
         ]
       },
