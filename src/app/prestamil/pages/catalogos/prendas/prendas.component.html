@@ -3,40 +3,42 @@
     <!-- Modal de creación/edición -->
     <ng-template #prendaModal let-modal>
       <div class="modal-header">
-        <h5 class="modal-title">Nueva Prenda</h5>
+        <h5 class="modal-title">{{ isEditingPrenda ? 'Editar prenda' : 'Nueva Prenda' }}</h5>
         <button type="button" class="btn-close" aria-label="Close" (click)="closePrendaModal()"></button>
       </div>
       <div class="modal-body">
+        <div *ngIf="modalError" class="alert alert-danger mb-3" role="alert">{{ modalError }}</div>
         <form>
           <div class="row">
             <div class="col-md-6 mb-3">
-              <label for="modalTipoPrenda" class="form-label">Tipo de prenda <span class="text-danger">*</span></label>
+              <label for="modalTipoPrenda" class="form-label">Tipo de prenda <span class="text-danger" *ngIf="!isEditingPrenda">*</span></label>
               <select 
                 id="modalTipoPrenda" 
                 class="form-control" 
                 [(ngModel)]="formData.tipoPrenda"
                 (ngModelChange)="onTipoPrendaModalChange()"
                 name="modalTipoPrenda"
-                [disabled]="isLoadingTipos"
-                required
+                [disabled]="isLoadingTipos || isEditingPrenda"
+                [required]="!isEditingPrenda"
               >
                 <option value="" *ngIf="!isLoadingTipos">Seleccione un tipo</option>
                 <option value="" *ngIf="isLoadingTipos" disabled>Cargando...</option>
-                <option *ngFor="let tipo of tiposPrenda" [value]="tipo.id">{{ tipo.tipo }}</option>
+                <option *ngFor="let tipo of tiposPrenda" [value]="tipo.id">{{ tipo.tipo || tipo.nombre }}</option>
               </select>
               <small *ngIf="isLoadingTipos" class="text-muted d-block mt-1">
                 <i class="feather icon-loader spin-icon"></i> Cargando tipos de prenda...
               </small>
+              <small *ngIf="isEditingPrenda" class="text-muted d-block mt-1">No editable en esta pantalla.</small>
             </div>
             <div class="col-md-6 mb-3">
-              <label for="modalCategoria" class="form-label">Categoria <span class="text-danger">*</span></label>
+              <label for="modalCategoria" class="form-label">Categoria <span class="text-danger" *ngIf="!isEditingPrenda">*</span></label>
               <select 
                 id="modalCategoria" 
                 class="form-control" 
                 [(ngModel)]="formData.categoria"
                 name="modalCategoria"
-                [disabled]="isLoadingCategoriasModal || !formData.tipoPrenda"
-                required
+                [disabled]="isLoadingCategoriasModal || !formData.tipoPrenda || isEditingPrenda"
+                [required]="!isEditingPrenda"
               >
                 <option value="">Seleccione una categoría</option>
                 <option *ngFor="let categoria of categoriasModal" [value]="categoria.idAtributo">{{ categoria.nombreAtributo }}</option>
@@ -44,20 +46,57 @@
               <small *ngIf="isLoadingCategoriasModal" class="text-muted d-block mt-1">
                 <i class="feather icon-loader spin-icon"></i> Cargando categorías...
               </small>
+              <small *ngIf="isEditingPrenda" class="text-muted d-block mt-1">No editable en esta pantalla.</small>
             </div>
           </div>
           <div class="row">
             <div class="col-12 mb-3">
-              <label for="modalValor" class="form-label">Valor <span class="text-danger">*</span></label>
-              <input 
-                type="text" 
-                id="modalValor"
-                class="form-control" 
-                [(ngModel)]="formData.valor"
-                name="modalValor"
-                placeholder="Ingrese el valor" 
+              <label for="modalDescripcion" class="form-label">Descripción <span class="text-danger">*</span></label>
+              <input
+                type="text"
+                id="modalDescripcion"
+                class="form-control"
+                [(ngModel)]="formData.descripcion"
+                name="modalDescripcion"
+                placeholder="Ej. 6k, 8k, descripción del valor"
                 required
               />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="modalClave" class="form-label">Clave</label>
+              <input
+                type="text"
+                id="modalClave"
+                class="form-control"
+                [(ngModel)]="formData.clave"
+                name="modalClave"
+                placeholder="Opcional"
+              />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="modalKilataje" class="form-label">Kilataje</label>
+              <input
+                type="text"
+                id="modalKilataje"
+                class="form-control"
+                [(ngModel)]="formData.kilataje"
+                name="modalKilataje"
+                placeholder="Opcional"
+              />
+            </div>
+            <div class="col-md-4 mb-3 d-flex align-items-end">
+              <div class="form-check mb-2">
+                <input
+                  id="modalContienePiedad"
+                  class="form-check-input"
+                  type="checkbox"
+                  name="modalContienePiedad"
+                  [(ngModel)]="formData.contienePiedad"
+                />
+                <label class="form-check-label" for="modalContienePiedad">Contiene piedad</label>
+              </div>
             </div>
           </div>
         </form>
@@ -75,10 +114,10 @@
           type="button" 
           class="btn btn-primary"
           (click)="guardarPrenda()"
-          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !formData.valor.trim()"
+          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !formData.descripcion.trim()"
         >
           <i class="feather icon-save"></i>
-          {{ isLoadingGuardar ? 'Guardando...' : 'Guardar' }}
+          {{ isLoadingGuardar ? 'Guardando...' : (isEditingPrenda ? 'Actualizar' : 'Guardar') }}
         </button>
       </div>
     </ng-template>
@@ -91,7 +130,7 @@
           <select id="tipoPrenda" class="form-control" [(ngModel)]="filtroTipoPrenda" (ngModelChange)="onTipoPrendaChange()" [disabled]="isLoadingTipos">
             <option value="" *ngIf="!isLoadingTipos">Seleccione un tipo</option>
             <option value="" *ngIf="isLoadingTipos" disabled>Cargando...</option>
-            <option *ngFor="let tipo of tiposPrenda" [value]="tipo.id">{{ tipo.tipo }}</option>
+            <option *ngFor="let tipo of tiposPrenda" [value]="tipo.id">{{ tipo.tipo || tipo.nombre }}</option>
           </select>
           <small *ngIf="isLoadingTipos" class="text-muted d-block mt-1">
             <i class="feather icon-loader spin-icon"></i> Cargando tipos de prenda...
@@ -135,7 +174,7 @@
             <input 
               type="text" 
               class="form-control" 
-              placeholder="Buscar por tipo, categoría o valor..."
+              placeholder="Buscar por tipo, categoría, descripción, clave o kilataje..."
               [(ngModel)]="terminoBusqueda"
               (ngModelChange)="onBusquedaChange()"
             />
@@ -154,21 +193,31 @@
           <thead>
             <tr>
               <th>Tipo de prenda</th>
-              <th>Categoria</th>
-              <th>Valor</th>
+              <th>Categoría</th>
+              <th>Descripción</th>
+              <th>Clave</th>
+              <th>Kilataje</th>
+              <th>Piedad</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngIf="isLoadingPrendas">
-              <td colspan="4" class="text-center">
+              <td colspan="7" class="text-center">
                 <i class="feather icon-loader spin-icon"></i> Cargando prendas...
               </td>
             </tr>
             <tr *ngFor="let prenda of prendasPaginadas; trackBy: trackByFn">
               <td>{{ prenda.tipo }}</td>
               <td>{{ prenda.nombreAtributo }}</td>
-              <td>{{ prenda.valor }}</td>
+              <td>{{ textoPrenda(prenda) }}</td>
+              <td>{{ textoCelda(prenda.clave) }}</td>
+              <td>{{ textoCelda(prenda.kilataje) }}</td>
+              <td>
+                <span *ngIf="prenda.contienePiedad === true" class="text-success">Sí</span>
+                <span *ngIf="prenda.contienePiedad === false" class="text-muted">No</span>
+                <span *ngIf="prenda.contienePiedad == null" class="text-muted">—</span>
+              </td>
               <td>
                 <div class="action-buttons">
                   <button 

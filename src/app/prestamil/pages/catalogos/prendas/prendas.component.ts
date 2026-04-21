@@ -18,12 +18,19 @@ interface Prenda {
   nombreAtributo: string;
   idTipoPrenda: number;
   tipo: string;
-  valor: string;
+  /** Respuestas antiguas; preferir `descripcion`. */
+  valor?: string | null;
+  clave?: string | null;
+  descripcion?: string | null;
+  kilataje?: string | null;
+  contienePiedad?: boolean | null;
 }
 
 interface TipoPrenda {
   id: number;
-  nombre: string;
+  /** Etiqueta (API suele enviar `tipo`; compatibilidad con `nombre`). */
+  tipo?: string;
+  nombre?: string;
 }
 
 interface Categoria {
@@ -61,15 +68,24 @@ export class PrendasComponent implements OnInit {
   formData: {
     tipoPrenda: string;
     categoria: string;
-    valor: string;
+    descripcion: string;
+    clave: string;
+    kilataje: string;
+    contienePiedad: boolean;
   } = {
     tipoPrenda: '',
     categoria: '',
-    valor: ''
+    descripcion: '',
+    clave: '',
+    kilataje: '',
+    contienePiedad: false
   };
   categoriasModal: Categoria[] = [];
   isLoadingCategoriasModal: boolean = false;
   isLoadingGuardar: boolean = false;
+  isEditingPrenda = false;
+  idValorAtributoEdicion: number | null = null;
+  modalError = '';
 
   constructor(
     private http: HttpClient,
@@ -83,19 +99,18 @@ export class PrendasComponent implements OnInit {
 
   cargarTiposPrenda(): void {
     this.isLoadingTipos = true;
-    const token = this.authService.getToken();
-    
-    if (!token) {
-      console.error('No hay token de autenticación');
+
+    if (!this.authService.isAuthenticated()) {
+      console.error('No hay sesión activa');
       this.isLoadingTipos = false;
       return;
     }
 
     this.http.get<TipoPrenda[]>(`${environment.apiUrl}/api/prendas/tipos`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       catchError(error => {
         console.error('Error al cargar tipos de prenda:', error);
@@ -104,7 +119,11 @@ export class PrendasComponent implements OnInit {
       })
     ).subscribe({
       next: (data) => {
-        this.tiposPrenda = data;
+        this.tiposPrenda = (data ?? []).map((t) => ({
+          id: Number(t.id),
+          tipo: (t as TipoPrenda & { tipo?: string }).tipo ?? t.nombre ?? '',
+          nombre: t.nombre
+        }));
         this.isLoadingTipos = false;
       },
       error: (error) => {
@@ -127,19 +146,18 @@ export class PrendasComponent implements OnInit {
 
   cargarCategorias(tipoId: number): void {
     this.isLoadingCategorias = true;
-    const token = this.authService.getToken();
-    
-    if (!token) {
-      console.error('No hay token de autenticación');
+
+    if (!this.authService.isAuthenticated()) {
+      console.error('No hay sesión activa');
       this.isLoadingCategorias = false;
       return;
     }
 
     this.http.get<Categoria[]>(`${environment.apiUrl}/api/prendas/subtipos/${tipoId}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       catchError(error => {
         console.error('Error al cargar categorías:', error);
@@ -166,19 +184,18 @@ export class PrendasComponent implements OnInit {
     }
 
     this.isLoadingPrendas = true;
-    const token = this.authService.getToken();
-    
-    if (!token) {
-      console.error('No hay token de autenticación');
+
+    if (!this.authService.isAuthenticated()) {
+      console.error('No hay sesión activa');
       this.isLoadingPrendas = false;
       return;
     }
 
     this.http.get<Prenda[]>(`${environment.apiUrl}/api/prendas/valores/${this.filtroCategoria}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       catchError(error => {
         console.error('Error al cargar prendas:', error);
@@ -206,11 +223,17 @@ export class PrendasComponent implements OnInit {
     
     if (this.terminoBusqueda.trim()) {
       const busqueda = this.terminoBusqueda.toLowerCase().trim();
-      filtradas = this.prendas.filter(prenda => 
-        prenda.tipo.toLowerCase().includes(busqueda) ||
-        prenda.nombreAtributo.toLowerCase().includes(busqueda) ||
-        prenda.valor.toLowerCase().includes(busqueda)
-      );
+      filtradas = this.prendas.filter((prenda) => {
+        const texto = (s: string | null | undefined) => (s ?? '').toLowerCase();
+        return (
+          texto(prenda.tipo).includes(busqueda) ||
+          texto(prenda.nombreAtributo).includes(busqueda) ||
+          texto(prenda.valor).includes(busqueda) ||
+          texto(prenda.descripcion).includes(busqueda) ||
+          texto(prenda.clave).includes(busqueda) ||
+          texto(prenda.kilataje).includes(busqueda)
+        );
+      });
     }
     
     this.prendasFiltradas = filtradas;
@@ -242,10 +265,16 @@ export class PrendasComponent implements OnInit {
   }
 
   agregarPrenda(): void {
+    this.isEditingPrenda = false;
+    this.idValorAtributoEdicion = null;
+    this.modalError = '';
     this.formData = {
       tipoPrenda: '',
       categoria: '',
-      valor: ''
+      descripcion: '',
+      clave: '',
+      kilataje: '',
+      contienePiedad: false
     };
     this.categoriasModal = [];
     
@@ -265,12 +294,32 @@ export class PrendasComponent implements OnInit {
       this.prendaModalRef.close();
       this.prendaModalRef = null;
     }
+    this.isEditingPrenda = false;
+    this.idValorAtributoEdicion = null;
+    this.modalError = '';
     this.formData = {
       tipoPrenda: '',
       categoria: '',
-      valor: ''
+      descripcion: '',
+      clave: '',
+      kilataje: '',
+      contienePiedad: false
     };
     this.categoriasModal = [];
+  }
+
+  textoPrenda(prenda: Prenda): string {
+    const d = prenda.descripcion?.trim();
+    if (d) {
+      return d;
+    }
+    const v = prenda.valor?.trim();
+    return v ?? '—';
+  }
+
+  textoCelda(s: string | null | undefined): string {
+    const t = (s ?? '').trim();
+    return t ? t : '—';
   }
 
   onTipoPrendaModalChange(): void {
@@ -284,21 +333,23 @@ export class PrendasComponent implements OnInit {
     }
   }
 
-  cargarCategoriasModal(tipoId: number): void {
+  cargarCategoriasModal(
+    tipoId: number,
+    opciones?: { preseleccionarCategoria?: string }
+  ): void {
     this.isLoadingCategoriasModal = true;
-    const token = this.authService.getToken();
-    
-    if (!token) {
-      console.error('No hay token de autenticación');
+
+    if (!this.authService.isAuthenticated()) {
+      console.error('No hay sesión activa');
       this.isLoadingCategoriasModal = false;
       return;
     }
 
     this.http.get<Categoria[]>(`${environment.apiUrl}/api/prendas/subtipos/${tipoId}`, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
-      }
+      },
+      withCredentials: true
     }).pipe(
       catchError(error => {
         console.error('Error al cargar categorías:', error);
@@ -309,6 +360,9 @@ export class PrendasComponent implements OnInit {
       next: (data) => {
         this.categoriasModal = data;
         this.isLoadingCategoriasModal = false;
+        if (opciones?.preseleccionarCategoria != null && opciones.preseleccionarCategoria !== '') {
+          this.formData.categoria = opciones.preseleccionarCategoria;
+        }
       },
       error: (error) => {
         console.error('Error al cargar categorías:', error);
@@ -318,37 +372,116 @@ export class PrendasComponent implements OnInit {
   }
 
   guardarPrenda(): void {
-    // Validar formulario
-    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.formData.valor.trim()) {
-      console.warn('Por favor complete todos los campos');
+    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.formData.descripcion.trim()) {
+      console.warn('Por favor complete todos los campos obligatorios');
       return;
     }
 
     this.isLoadingGuardar = true;
-    const token = this.authService.getToken();
-    
-    if (!token) {
-      console.error('No hay token de autenticación');
+    this.modalError = '';
+
+    if (!this.authService.isAuthenticated()) {
+      console.error('No hay sesión activa');
       this.isLoadingGuardar = false;
+      this.modalError = 'No hay sesión activa.';
       return;
     }
 
-    // Aquí implementarías la llamada al API para guardar
-    // Por ahora solo simulamos el guardado
-    setTimeout(() => {
-      console.log('Guardando prenda:', this.formData);
+    const idTipoPrenda = Number(this.formData.tipoPrenda);
+    const idAtributo = Number(this.formData.categoria);
+    const descripcion = this.formData.descripcion.trim();
+    const clave = this.formData.clave.trim() || null;
+    const kilataje = this.formData.kilataje.trim() || null;
+
+    if (!Number.isFinite(idTipoPrenda) || !Number.isFinite(idAtributo)) {
       this.isLoadingGuardar = false;
-      this.closePrendaModal();
-      // Recargar los datos después de guardar
-      if (this.filtroCategoria) {
-        this.buscar();
-      }
-    }, 1000);
+      this.modalError = 'Tipo o categoría no válidos.';
+      return;
+    }
+
+    const body = {
+      idTipoPrenda,
+      idAtributo,
+      descripcion,
+      clave,
+      kilataje,
+      contienePiedad: this.formData.contienePiedad
+    };
+
+    if (this.isEditingPrenda && this.idValorAtributoEdicion != null) {
+      const url = `${environment.apiUrl}/api/prendas/valores/${this.idValorAtributoEdicion}`;
+      this.http
+        .put<Prenda>(url, body, {
+          headers: { 'Content-Type': 'application/json' },
+          withCredentials: true
+        })
+        .subscribe({
+          next: () => {
+            this.isLoadingGuardar = false;
+            this.closePrendaModal();
+            if (this.filtroCategoria) {
+              this.buscar();
+            }
+          },
+          error: (err) => {
+            this.isLoadingGuardar = false;
+            this.modalError =
+              err.error?.message || 'No se pudo actualizar el valor. Intenta de nuevo.';
+            console.error('Error al actualizar prenda:', err);
+          }
+        });
+      return;
+    }
+
+    const url = `${environment.apiUrl}/api/prendas/valores`;
+    this.http
+      .post<Prenda>(url, body, {
+        headers: { 'Content-Type': 'application/json' },
+        withCredentials: true
+      })
+      .subscribe({
+        next: () => {
+          this.isLoadingGuardar = false;
+          this.closePrendaModal();
+          if (this.filtroCategoria) {
+            this.buscar();
+          }
+        },
+        error: (err) => {
+          this.isLoadingGuardar = false;
+          this.modalError =
+            err.error?.message || 'No se pudo crear el valor. Intenta de nuevo.';
+          console.error('Error al crear prenda:', err);
+        }
+      });
   }
 
   editarPrenda(prenda: Prenda): void {
-    // Implementar lógica de edición aquí
-    console.log('Editando prenda:', prenda);
+    this.modalError = '';
+    this.isEditingPrenda = true;
+    this.idValorAtributoEdicion = prenda.idValorAtributo;
+    this.formData = {
+      tipoPrenda: String(prenda.idTipoPrenda),
+      categoria: String(prenda.idAtributo),
+      descripcion: (prenda.descripcion ?? prenda.valor ?? '').toString(),
+      clave: (prenda.clave ?? '').toString(),
+      kilataje: (prenda.kilataje ?? '').toString(),
+      contienePiedad: !!prenda.contienePiedad
+    };
+    this.categoriasModal = [];
+    this.cargarCategoriasModal(prenda.idTipoPrenda, {
+      preseleccionarCategoria: String(prenda.idAtributo)
+    });
+
+    if (this.prendaModalTemplate) {
+      this.prendaModalRef = this.modalService.open(this.prendaModalTemplate, {
+        backdrop: 'static',
+        keyboard: false,
+        centered: true,
+        size: 'lg',
+        windowClass: 'edit-modal'
+      });
+    }
   }
 
   trackByFn(index: number, item: Prenda): number {
