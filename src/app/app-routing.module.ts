@@ -50,6 +50,11 @@ const routes: Routes = [
         loadComponent: () => import('./prestamil/pages/hardware/hardware.component').then((c) => c.HardwareComponent)
       },
       {
+        path: 'avaluos/mock',
+        loadComponent: () =>
+          import('./prestamil/pages/avaluos/avaluo-mock/avaluo-mock.component').then((c) => c.AvaluoMockComponent)
+      },
+      {
         path: 'catalogos',
         children: [
           {

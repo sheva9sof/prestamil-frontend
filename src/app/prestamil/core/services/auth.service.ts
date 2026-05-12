@@ -89,6 +89,8 @@ export class AuthService {
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
+      'Avaluos': '/avaluos/mock',
+      'Avaluos Prendarios': '/avaluos/mock',
       'Prendas': '/catalogos/prendas',
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',

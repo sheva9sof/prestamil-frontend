@@ -55,6 +55,8 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
+      'Avaluos': '/avaluos/mock',
+      'Avaluos Prendarios': '/avaluos/mock',
       'Prendas': '/catalogos/prendas',
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',
