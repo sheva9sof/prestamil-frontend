@@ -72,7 +72,7 @@ const routes: Routes = [
           },
           {
             path: 'empresas',
-            loadComponent: () => import('./prestamil/pages/configuracion/empresas/empresas.component').then((c) => c.EmpresasComponent)
+            loadComponent: () => import('./prestamil/pages/catalogos/empresas/empresas.component').then((c) => c.EmpresasComponent)
           },
           {
             path: 'parametros-prestamo',

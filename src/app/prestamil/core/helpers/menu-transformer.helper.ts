@@ -101,7 +101,7 @@ export function transformOpcionesToNavigationItems(opciones: OpcionMenu[]): Navi
   return [
     {
       id: 'main-menu',
-      title: 'Menú Principal',
+      title: '',
       type: 'group',
       icon: 'icon-navigation',
       children: items
