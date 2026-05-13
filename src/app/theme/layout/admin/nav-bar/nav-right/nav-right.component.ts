@@ -1,9 +1,9 @@
 // angular import
-import { Component, inject } from '@angular/core';
+import { Component, inject, TemplateRef, ViewChild } from '@angular/core';
 import { Router } from '@angular/router';
 
 // bootstrap import
-import { NgbDropdownConfig } from '@ng-bootstrap/ng-bootstrap';
+import { NgbDropdownConfig, NgbModal } from '@ng-bootstrap/ng-bootstrap';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
@@ -17,6 +17,8 @@ import { AuthService } from 'src/app/prestamil/core/services/auth.service';
   providers: [NgbDropdownConfig]
 })
 export class NavRightComponent {
+  @ViewChild('logoutModal') logoutModal!: TemplateRef<unknown>;
+
   // public props
   get user() {
     return this.authService.getUser();
@@ -33,7 +35,8 @@ export class NavRightComponent {
   // constructor
   constructor(
     private router: Router,
-    private authService: AuthService
+    private authService: AuthService,
+    private modalService: NgbModal
   ) {
     const config = inject(NgbDropdownConfig);
 
@@ -46,7 +49,14 @@ export class NavRightComponent {
   }
 
   logout() {
-    this.authService.logout();
-    this.router.navigate(['/login']);
+    this.modalService.open(this.logoutModal, { centered: true, size: 'sm' }).result.then(
+      (result) => {
+        if (result === 'confirm') {
+          this.authService.logout();
+          this.router.navigate(['/login']);
+        }
+      },
+      () => {}
+    );
   }
 }
