@@ -8,6 +8,7 @@ import { NavigationItem } from '../../../theme/layout/admin/navigation/navigatio
 import { transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
 import { environment } from 'src/environments/environment';
 import { AuthStreamService } from './auth-stream.service';
+import { SessionWarningService } from './session-warning.service';
 
 @Injectable({
   providedIn: 'root'
@@ -16,6 +17,7 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
   private authStreamService = inject(AuthStreamService);
+  private sessionWarningService = inject(SessionWarningService);
   
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
@@ -193,6 +195,9 @@ export class AuthService {
     if (nombreUsuario) {
       console.log('[AuthService] Conectando SSE para usuario:', nombreUsuario);
       this.authStreamService.connect(nombreUsuario);
+      const timeoutMinutes = loginResponse.sessionTimeoutMinutes ?? 30;
+      const warningMinutes = loginResponse.warningMinutes ?? 3;
+      this.sessionWarningService.initialize(timeoutMinutes, warningMinutes);
     }
   }
 
@@ -240,6 +245,7 @@ export class AuthService {
    * Limpiar el estado local de autenticación.
    */
   private clearLocalSession(): void {
+    this.sessionWarningService.stop();
     this.authStreamService.disconnect();
     localStorage.removeItem(this.AUTH_USER_KEY);
     localStorage.removeItem(this.MENU_ITEMS_KEY);
