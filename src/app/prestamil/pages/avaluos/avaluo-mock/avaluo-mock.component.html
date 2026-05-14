@@ -1,0 +1,178 @@
+<div class="row page-header align-items-center">
+  <div class="col-md-8">
+    <h5 class="mb-1">Avaluos Prendarios - Mock Visual</h5>
+    <p class="text-muted mb-0">Pantalla de demo para validacion con cliente.</p>
+  </div>
+  <div class="col-md-4 text-md-right mt-2 mt-md-0">
+    <span class="badge" [ngClass]="operacionAbierta ? 'badge-success' : 'badge-danger'">
+      {{ operacionAbierta ? 'Operacion ABIERTA' : 'Operacion CERRADA' }}
+    </span>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-12">
+    <app-card>
+      <div class="mock-header-grid">
+        <div><strong>Sucursal:</strong> {{ sucursal }}</div>
+        <div><strong>Usuario:</strong> {{ usuario }}</div>
+        <div><strong>Rol:</strong> {{ rol }}</div>
+        <div><strong>Fecha abierta:</strong> {{ fechaAbierta }}</div>
+      </div>
+    </app-card>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-12">
+    <div class="alert" [ngClass]="operacionAbierta ? 'alert-info' : 'alert-danger'" role="alert">
+      {{ mensajeFlujo }}
+    </div>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <app-card cardTitle="1) Datos de cliente/pignorante">
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label>Buscar cliente</label>
+          <input class="form-control" value="CLI-000245" />
+        </div>
+        <div class="form-group col-md-4">
+          <label>Identificacion</label>
+          <input class="form-control" [value]="clienteDemo.identificacion" />
+        </div>
+        <div class="form-group col-md-4">
+          <label>Folio cliente</label>
+          <input class="form-control" [value]="clienteDemo.folio" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-md-6">
+          <label>Nombre</label>
+          <input class="form-control" [value]="clienteDemo.nombre" />
+        </div>
+        <div class="form-group col-md-6">
+          <label>Beneficiario</label>
+          <input class="form-control" [value]="clienteDemo.beneficiario" />
+        </div>
+      </div>
+
+      <div>
+        <strong>Prestamo acumulado:</strong>
+        <span>${{ clienteDemo.prestamoAcumulado | number: '1.0-0' }}</span>
+      </div>
+    </app-card>
+  </div>
+
+  <div class="col-lg-4">
+    <app-card cardTitle="2) Resumen rapido">
+      <ul class="summary-list">
+        <li><span>Partidas:</span><strong>{{ totalPartidas }}</strong></li>
+        <li><span>Peso total:</span><strong>{{ pesoTotal | number: '1.1-1' }} gr</strong></li>
+        <li><span>Avaluo total:</span><strong>${{ avaluoTotal | number: '1.0-0' }}</strong></li>
+        <li><span>Prestamo total:</span><strong>${{ prestamoTotal | number: '1.0-0' }}</strong></li>
+      </ul>
+    </app-card>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-lg-8">
+    <app-card cardTitle="3) Captura de prenda (mock por tipo)">
+      <div class="btn-group mb-3" role="group" aria-label="Tipos de prenda">
+        <button
+          type="button"
+          class="btn btn-sm"
+          *ngFor="let tipo of tiposPrenda"
+          [ngClass]="tipoSeleccionado === tipo ? 'btn-primary' : 'btn-outline-primary'"
+          (click)="seleccionarTipo(tipo)"
+        >
+          {{ tipo }}
+        </button>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group col-md-4">
+          <label>Plazo</label>
+          <input class="form-control" value="30 dias" />
+        </div>
+        <div class="form-group col-md-4">
+          <label>Tipo de prenda</label>
+          <input class="form-control" [value]="tipoSeleccionado" />
+        </div>
+        <div class="form-group col-md-4">
+          <label>Cantidad</label>
+          <input class="form-control" value="1" />
+        </div>
+      </div>
+
+      <div [ngSwitch]="tipoSeleccionado" class="mock-fields-box">
+        <div *ngSwitchCase="'Alhajas'">
+          <strong>Campos visibles:</strong> Kilataje, Hechura, Color, Claridad, Peso total, Precio por gramo.
+        </div>
+        <div *ngSwitchCase="'Plata'">
+          <strong>Campos visibles:</strong> Estandar 720/925, Peso, Condicion.
+        </div>
+        <div *ngSwitchCase="'Varios'">
+          <strong>Campos visibles:</strong> Subtipo, Marca, Modelo, Serie, Estado.
+        </div>
+        <div *ngSwitchDefault>
+          <strong>Campos visibles:</strong> Tipo, Marca, Modelo, Anio, VIN/Serie, Condicion general.
+        </div>
+      </div>
+    </app-card>
+  </div>
+
+  <div class="col-lg-4">
+    <app-card cardTitle="4) Acciones principales">
+      <div class="action-buttons">
+        <button class="btn btn-primary btn-sm" (click)="simularAgregarPartida()">Agregar partida</button>
+        <button class="btn btn-outline-primary btn-sm" (click)="simularAccion('Recalcular avaluo')">Recalcular avaluo</button>
+        <button class="btn btn-outline-secondary btn-sm" (click)="simularAccion('Cancelar partida')">Cancelar partida</button>
+        <button class="btn btn-outline-danger btn-sm" (click)="simularAccion('Borrar partida')">Borrar partida</button>
+        <button class="btn btn-outline-info btn-sm" (click)="simularAccion('Ver vencimientos')">Ver vencimientos</button>
+        <button class="btn btn-success btn-sm" (click)="simularGenerarContrato()">Generar contrato</button>
+      </div>
+    </app-card>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col-12">
+    <app-card cardTitle="5) Tabla de detalle (demo)">
+      <div class="table-responsive">
+        <table class="table table-sm table-striped table-bordered mb-0">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tipo</th>
+              <th>Descripcion</th>
+              <th>Cantidad</th>
+              <th>Peso</th>
+              <th>Avaluo real</th>
+              <th>Prestamo</th>
+              <th>Vencimiento</th>
+              <th>Estatus</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let item of partidas">
+              <td>{{ item.id }}</td>
+              <td>{{ item.tipo }}</td>
+              <td>{{ item.descripcion }}</td>
+              <td>{{ item.cantidad }}</td>
+              <td>{{ item.peso | number: '1.1-1' }}</td>
+              <td>${{ item.avaluoReal | number: '1.0-0' }}</td>
+              <td>${{ item.prestamo | number: '1.0-0' }}</td>
+              <td>{{ item.vencimiento }}</td>
+              <td>{{ item.estatus }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </app-card>
+  </div>
+</div>
