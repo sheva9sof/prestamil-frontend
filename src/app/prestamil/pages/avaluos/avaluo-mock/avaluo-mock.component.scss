@@ -1,0 +1,58 @@
+.page-header {
+  margin-bottom: 0.75rem;
+}
+
+.mock-header-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.summary-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.summary-list li {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #eceff5;
+  padding: 0.35rem 0;
+}
+
+.summary-list li:last-child {
+  border-bottom: 0;
+}
+
+.mock-fields-box {
+  border: 1px dashed #c8d1e6;
+  border-radius: 6px;
+  background: #f8faff;
+  padding: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.45rem;
+}
+
+.table th,
+.table td {
+  vertical-align: middle;
+}
+
+@media (max-width: 991px) {
+  .mock-header-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 576px) {
+  .mock-header-grid {
+    grid-template-columns: 1fr;
+  }
+}
