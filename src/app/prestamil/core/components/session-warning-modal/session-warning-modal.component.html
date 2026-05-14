@@ -1,0 +1,32 @@
+<ng-container *ngIf="warningState$ | async as state">
+  <div *ngIf="state.show" class="session-warning-overlay" role="dialog" aria-modal="true" aria-labelledby="sessionWarningTitle">
+    <div class="session-warning-dialog">
+      <div class="session-warning-header">
+        <i class="feather icon-clock text-warning" style="font-size: 2rem;"></i>
+        <h5 id="sessionWarningTitle" class="mt-2 mb-0">Sesión por expirar</h5>
+      </div>
+
+      <div class="session-warning-body">
+        <p class="text-muted mb-1">La sesión se cerrará en</p>
+        <div class="countdown" [class.countdown-urgent]="state.secondsRemaining <= 30">
+          {{ formatTime(state.secondsRemaining) }}
+        </div>
+        <p class="text-muted mt-1">¿Deseas continuar?</p>
+      </div>
+
+      <div class="session-warning-footer">
+        <button
+          class="btn btn-primary"
+          (click)="extendSession()"
+          [disabled]="isExtending"
+        >
+          <span *ngIf="isExtending" class="spinner-border spinner-border-sm me-1" role="status"></span>
+          Extender sesión
+        </button>
+        <button class="btn btn-outline-secondary" (click)="logout()">
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  </div>
+</ng-container>
