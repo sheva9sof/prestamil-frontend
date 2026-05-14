@@ -168,6 +168,7 @@ export class AuthService {
     
     // Guardar solo datos del usuario para UI (sin token)
     localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify({
+      id: loginResponse.id,
       nombreUsuario: nombreUsuario,
       nombre: loginResponse.nombre,
       apellidos: loginResponse.apellidos,
@@ -321,7 +322,7 @@ export class AuthService {
       passwordNueva
     };
 
-    return this.http.post(url, body);
+    return this.http.put(url, body);
   }
 
   /**
