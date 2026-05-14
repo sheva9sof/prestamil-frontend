@@ -34,5 +34,7 @@ export interface LoginResponse {
   inicioSesion: string;
   opciones: OpcionMenu[];
   token: string;
+  sessionTimeoutMinutes?: number;
+  warningMinutes?: number;
 }
 
