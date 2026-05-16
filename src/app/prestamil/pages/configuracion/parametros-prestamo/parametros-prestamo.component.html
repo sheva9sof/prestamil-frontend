@@ -1,8 +1,66 @@
 <div class="row">
   <div class="col-12">
-    <app-card cardTitle="Parámetros Préstamo" [hidHeader]="true">
-      <p>Gestión de parámetros de préstamo</p>
-    </app-card>
+
+    <!-- Spinner de carga inicial -->
+    <div *ngIf="isLoading" class="text-center py-5">
+      <i class="feather icon-loader spin-icon" style="font-size: 32px; color: #5e72e4;"></i>
+      <p class="mt-3">Cargando parámetros de préstamo...</p>
+    </div>
+
+    <!-- Banner de error -->
+    <div *ngIf="errorMessage && !isLoading" class="alert alert-danger" role="alert">
+      <i class="feather icon-alert-circle me-2"></i>
+      {{ errorMessage }}
+    </div>
+
+    <!-- Sin plazos activos -->
+    <div *ngIf="!isLoading && !errorMessage && parametrosPorPlazo.length === 0" class="alert alert-info">
+      No hay plazos activos con parámetros configurados.
+    </div>
+
+    <!-- Tarjetas agrupadas por plazo -->
+    <ng-container *ngFor="let item of parametrosPorPlazo; trackBy: trackByPlazo">
+      <app-card [hidHeader]="false" [cardTitle]="item.plazo.nombre + ' — ' + item.plazo.diasPorPeriodo + ' días x ' + item.plazo.numeroPeriodos + ' periodos'">
+
+        <!-- Sin parámetros para este plazo -->
+        <div *ngIf="item.parametros.length === 0" class="alert alert-warning small mb-0">
+          Sin parámetros configurados para esta sucursal.
+        </div>
+
+        <!-- Tabla de parámetros (solo lectura) -->
+        <div *ngIf="item.parametros.length > 0" class="table-responsive">
+          <table class="table table-sm table-striped table-bordered small mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Tipo de prenda</th>
+                <th class="text-end">% Interés</th>
+                <th class="text-end">% Almacén</th>
+                <th class="text-end">% G.Admin</th>
+                <th class="text-end">% Int. Total</th>
+                <th class="text-end">CAT</th>
+                <th class="text-center">Max Refrendos</th>
+                <th class="text-end">% Préstamo s/Avalúo</th>
+                <th class="text-end">Importe Mín.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of item.parametros; trackBy: trackByParam">
+                <td>{{ p.tipoPrenda?.tipo ?? ('Tipo ' + p.tipoPrendaId) }}</td>
+                <td class="text-end">{{ p.porcInteres | number:'1.4-4' }}</td>
+                <td class="text-end">{{ p.porcAlmacen | number:'1.4-4' }}</td>
+                <td class="text-end">{{ p.porcGastosAdmin | number:'1.4-4' }}</td>
+                <td class="text-end">{{ p.porcInteresTotal | number:'1.4-4' }}</td>
+                <td class="text-end">{{ p.cat | number:'1.4-4' }}</td>
+                <td class="text-center">{{ p.numMaxRefrendos }}</td>
+                <td class="text-end">{{ p.porcPrestamoSAvaluo | number:'1.4-4' }}</td>
+                <td class="text-end">{{ p.importeMinPrestamo | number:'1.2-2' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </app-card>
+    </ng-container>
+
   </div>
 </div>
-
