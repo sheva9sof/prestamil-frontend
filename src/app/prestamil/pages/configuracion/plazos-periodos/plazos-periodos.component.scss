@@ -18,3 +18,8 @@
   max-height: 220px;
   overflow-y: auto;
 }
+
+// Modal de configuración: ancho extendido para mostrar las 3 tablas en horizontal
+::ng-deep .modal-detalle-plazo .modal-dialog {
+  max-width: min(95vw, 1600px) !important;
+}
