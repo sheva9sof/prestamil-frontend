@@ -190,21 +190,19 @@ export class ParametrosGeneralesComponent implements OnInit {
   }
 
   openLoadingModal() {
-    setTimeout(() => {
-      if (this.loadingModalTemplate && !this.loadingModalRef) {
-        try {
-          this.loadingModalRef = this.modalService.open(this.loadingModalTemplate, {
-            backdrop: 'static',
-            keyboard: false,
-            centered: true,
-            size: 'sm',
-            windowClass: 'loading-modal'
-          });
-        } catch (error) {
-          console.error('Error al abrir modal:', error);
-        }
+    if (this.loadingModalTemplate && !this.loadingModalRef) {
+      try {
+        this.loadingModalRef = this.modalService.open(this.loadingModalTemplate, {
+          backdrop: 'static',
+          keyboard: false,
+          centered: true,
+          size: 'sm',
+          windowClass: 'loading-modal'
+        });
+      } catch (error) {
+        console.error('Error al abrir modal:', error);
       }
-    }, 100);
+    }
   }
 
   closeLoadingModal() {
