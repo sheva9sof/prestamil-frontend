@@ -2,15 +2,20 @@
 import { Component, OnInit, ViewChild, TemplateRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { NgbModal, NgbModalRef, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
+import { forkJoin } from 'rxjs';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
+import { environment } from 'src/environments/environment';
 import { PlazoService } from '../../../core/services/plazo.service';
 import {
   PlazoResponse,
   PlazoRequest,
+  PlazoParametroRequest,
   PlazoParametroResponse,
+  PlazoHechuraAlhajaRequest,
   PlazoHechuraAlhajaResponse
 } from '../../../core/models/plazo.model';
 
@@ -31,6 +36,7 @@ export class PlazosPeriodosComponent implements OnInit {
 
   private readonly plazoService = inject(PlazoService);
   private readonly modalService = inject(NgbModal);
+  private readonly http = inject(HttpClient);
 
   // === Lista de plazos ===
   plazos: PlazoResponse[] = [];
@@ -67,6 +73,18 @@ export class PlazosPeriodosComponent implements OnInit {
   // Edición inline de precio base en tabla alhajas
   editandoPrecioBase: { [key: string]: number | null } = {};
 
+  // Task 3 — Tab Parámetros editable
+  parametrosForm: { [tipoPrendaId: number]: Partial<PlazoParametroRequest> } = {};
+  savingParam: { [tipoPrendaId: number]: boolean } = {};
+  paramSaveError: { [tipoPrendaId: number]: string } = {};
+  paramSaveSuccess: { [tipoPrendaId: number]: boolean } = {};
+
+  // Task 4 — Agregar/inicializar alhajas
+  nuevaAlhaja: Partial<PlazoHechuraAlhajaRequest> = { kilataje: 14, hechura: 'N', precioBase: 0, porcAumento: 0 };
+  isAgregandoAlhaja = false;
+  isInicializando = false;
+  alhajaError = '';
+
   ngOnInit(): void {
     this.loadPlazos();
     this.cargarTiposPrenda();
@@ -92,9 +110,10 @@ export class PlazosPeriodosComponent implements OnInit {
   }
 
   cargarTiposPrenda(): void {
-    // Los tipos de prenda se cargan desde el plazo seleccionado (plazo.tiposPrenda[])
-    // No se requiere endpoint separado para el filtro en esta vista de dos paneles
-    this.isLoadingTipos = false;
+    this.http.get<TipoPrendaRef[]>(`${environment.apiUrl}/api/prendas/tipos`).subscribe({
+      next: (data) => { this.tiposPrenda = data ?? []; },
+      error: (err) => { console.error('Error cargando tipos de prenda', err); this.tiposPrenda = []; }
+    });
   }
 
   // =========================================================================
@@ -122,10 +141,33 @@ export class PlazosPeriodosComponent implements OnInit {
     if (!this.selectedPlazo) return;
     this.isLoadingTab = true;
     this.parametros = [];
+    this.parametrosForm = {};
     this.plazoService.getParametrosBySucursal(this.selectedPlazo.id, this.sucursalId).subscribe({
       next: (data) => {
         this.parametros = data;
         this.isLoadingTab = false;
+        // Pre-popular parametrosForm: una entrada por cada tipo de prenda asociado al plazo
+        const tipos = this.selectedPlazo?.tiposPrenda ?? [];
+        tipos.forEach(t => {
+          const existing = this.parametros.find(p => p.tipoPrendaId === t.id);
+          if (existing) {
+            this.parametrosForm[t.id] = { ...existing } as Partial<PlazoParametroRequest>;
+          } else {
+            this.parametrosForm[t.id] = {
+              porcInteres: 0,
+              porcAlmacen: 0,
+              porcGastosAdmin: 0,
+              cat: 0,
+              numMaxRefrendos: 0,
+              porcPrestamoSAvaluo: 0,
+              usaAvaluoReal: false,
+              porcPrestamoSAvaluoReal: 0,
+              diasGraciaSinInteres: 0,
+              diasAntesPaseVenta: 0,
+              importeMinPrestamo: 0
+            };
+          }
+        });
       },
       error: (err) => {
         this.isLoadingTab = false;
@@ -214,6 +256,75 @@ export class PlazosPeriodosComponent implements OnInit {
       error: (err) => {
         this.isRecalculando = false;
         this.tabError = 'Error al recalcular precios: ' + (err?.error?.message ?? err.message ?? 'Error desconocido');
+      }
+    });
+  }
+
+  // =========================================================================
+  // Task 3 — Guardar parámetros editables por tipo de prenda
+  // =========================================================================
+
+  guardarParametro(tipoPrendaId: number): void {
+    if (!this.selectedPlazo) return;
+    this.savingParam[tipoPrendaId] = true;
+    this.paramSaveError[tipoPrendaId] = '';
+    const form = this.parametrosForm[tipoPrendaId] ?? {};
+    this.plazoService.guardarParametro(this.selectedPlazo.id, tipoPrendaId, form as PlazoParametroRequest, this.sucursalId).subscribe({
+      next: (saved) => {
+        this.savingParam[tipoPrendaId] = false;
+        this.paramSaveSuccess[tipoPrendaId] = true;
+        const idx = this.parametros.findIndex(p => p.tipoPrendaId === tipoPrendaId);
+        if (idx >= 0) this.parametros[idx] = saved; else this.parametros.push(saved);
+        setTimeout(() => { this.paramSaveSuccess[tipoPrendaId] = false; }, 3000);
+      },
+      error: (err) => {
+        this.savingParam[tipoPrendaId] = false;
+        this.paramSaveError[tipoPrendaId] = err?.error?.message ?? 'Error al guardar';
+      }
+    });
+  }
+
+  // =========================================================================
+  // Task 4 — Agregar/inicializar alhajas
+  // =========================================================================
+
+  agregarAlhaja(): void {
+    if (!this.selectedPlazo) return;
+    this.isAgregandoAlhaja = true;
+    this.alhajaError = '';
+    const req = this.nuevaAlhaja as PlazoHechuraAlhajaRequest;
+    this.plazoService.crearAlhaja(this.selectedPlazo.id, req, this.sucursalId).subscribe({
+      next: (created) => {
+        this.isAgregandoAlhaja = false;
+        this.alhajas = [...this.alhajas, created];
+        this.nuevaAlhaja = { kilataje: 14, hechura: 'N', precioBase: 0, porcAumento: 0 };
+      },
+      error: (err) => {
+        this.isAgregandoAlhaja = false;
+        this.alhajaError = err?.error?.message ?? 'Error al agregar alhaja';
+      }
+    });
+  }
+
+  inicializarTablaEstandar(): void {
+    if (!this.selectedPlazo) return;
+    this.isInicializando = true;
+    this.alhajaError = '';
+    const kilatajes = [10, 14, 18, 24];
+    const hechuras: Array<'F' | 'N' | 'E'> = ['F', 'N', 'E'];
+    const requests = kilatajes.flatMap(k => hechuras.map(h =>
+      this.plazoService.crearAlhaja(this.selectedPlazo!.id, {
+        kilataje: k, hechura: h, precioBase: 0, porcAumento: 0
+      }, this.sucursalId)
+    ));
+    forkJoin(requests).subscribe({
+      next: (results) => {
+        this.isInicializando = false;
+        this.alhajas = results;
+      },
+      error: (err) => {
+        this.isInicializando = false;
+        this.alhajaError = err?.error?.message ?? 'Error al inicializar tabla estándar';
       }
     });
   }

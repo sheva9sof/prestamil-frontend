@@ -7,6 +7,7 @@ import {
   PlazoResponse,
   PlazoParametroRequest,
   PlazoParametroResponse,
+  PlazoHechuraAlhajaRequest,
   PlazoHechuraAlhajaResponse
 } from '../models/plazo.model';
 
@@ -81,6 +82,18 @@ export class PlazoService {
     return this.http.put<PlazoHechuraAlhajaResponse>(
       `${this.API_URL}/${plazoId}/alhajas/${kilataje}/${hechura}`,
       { precioBase },
+      { params: { sucursalId: String(sucursalId) } }
+    );
+  }
+
+  crearAlhaja(
+    plazoId: number,
+    request: PlazoHechuraAlhajaRequest,
+    sucursalId: number = 1
+  ): Observable<PlazoHechuraAlhajaResponse> {
+    return this.http.post<PlazoHechuraAlhajaResponse>(
+      `${this.API_URL}/${plazoId}/alhajas`,
+      request,
       { params: { sucursalId: String(sucursalId) } }
     );
   }
