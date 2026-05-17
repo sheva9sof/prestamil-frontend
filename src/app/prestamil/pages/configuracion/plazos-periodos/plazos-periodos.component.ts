@@ -33,6 +33,7 @@ interface TipoPrendaRef {
 })
 export class PlazosPeriodosComponent implements OnInit {
   @ViewChild('plazoModal') plazoModalTemplate!: TemplateRef<unknown>;
+  @ViewChild('detalleModal') detalleModalTemplate!: TemplateRef<unknown>;
 
   private readonly plazoService = inject(PlazoService);
   private readonly modalService = inject(NgbModal);
@@ -54,6 +55,7 @@ export class PlazosPeriodosComponent implements OnInit {
   currentPlazo: PlazoResponse | null = null;
   formData: Partial<PlazoRequest & { id?: number; tiposPrendaRefs?: TipoPrendaRef[] }> = {};
   plazoModalRef: NgbModalRef | null = null;
+  detalleModalRef: NgbModalRef | null = null;
   tiposPrendaSeleccionados: number[] = [];
   tiposPrendaOriginalesModal: TipoPrendaRef[] = [];
 
@@ -125,6 +127,12 @@ export class PlazosPeriodosComponent implements OnInit {
     this.tabError = '';
     this.activeTab = 'parametros';
     this.cargarParametros();
+    this.detalleModalRef = this.modalService.open(this.detalleModalTemplate, {
+      size: 'xl',
+      centered: true,
+      scrollable: true,
+      windowClass: 'modal-detalle-plazo'
+    });
   }
 
   // =========================================================================
@@ -132,8 +140,7 @@ export class PlazosPeriodosComponent implements OnInit {
   // =========================================================================
 
   get detalleTabs(): Array<{ id: string; label: string; isAlhajas: boolean }> {
-    const tipos = this.selectedPlazo?.tiposPrenda ?? [];
-    return tipos.map(t => ({
+    return (this.selectedPlazo?.tiposPrenda ?? []).map(t => ({
       id: this.normalizarNombreTipoPrenda(t),
       label: t.tipo,
       isAlhajas: this.esTipoAlhaja(t)
@@ -167,9 +174,7 @@ export class PlazosPeriodosComponent implements OnInit {
     }
     if (this.isAlhajasTab(tab)) {
       this.cargarAlhajas();
-      return;
     }
-    // Tab no-alhajas (Plata, Varios, Autos/Motos...): sin carga por ahora.
   }
 
   cargarParametros(): void {
@@ -209,6 +214,15 @@ export class PlazosPeriodosComponent implements OnInit {
         this.tabError = 'Error al cargar parámetros: ' + (err?.error?.message ?? err.message ?? 'Error desconocido');
       }
     });
+  }
+
+  get alhajasPorHechura(): Array<{ label: string; hechura: string; items: PlazoHechuraAlhajaResponse[] }> {
+    // Soporta códigos legacy 'HF'/'HN'/'HE' y nuevos 'F'/'N'/'E'
+    return [
+      { label: 'Fina',     hechura: 'F', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('F')) },
+      { label: 'Normal',   hechura: 'N', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('N')) },
+      { label: 'Especial', hechura: 'E', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('E')) }
+    ];
   }
 
   cargarAlhajas(): void {
@@ -372,15 +386,8 @@ export class PlazosPeriodosComponent implements OnInit {
     return this.tiposPrendaSeleccionados.some((id) => Number(id) === Number(tipoId));
   }
 
-  onTipoPrendaCheckChange(tipoId: number, checked: boolean): void {
-    const id = Number(tipoId);
-    if (checked) {
-      if (!this.tiposPrendaSeleccionados.some((x) => Number(x) === id)) {
-        this.tiposPrendaSeleccionados = [...this.tiposPrendaSeleccionados, id];
-      }
-    } else {
-      this.tiposPrendaSeleccionados = this.tiposPrendaSeleccionados.filter((x) => Number(x) !== id);
-    }
+  onTipoPrendaRadioChange(tipoId: number): void {
+    this.tiposPrendaSeleccionados = [Number(tipoId)];
   }
 
   openCreateModal(): void {
