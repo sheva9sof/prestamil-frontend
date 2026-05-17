@@ -59,7 +59,7 @@ export class PlazosPeriodosComponent implements OnInit {
 
   // === Panel derecho (detalle) ===
   selectedPlazo: PlazoResponse | null = null;
-  activeTab: 'parametros' | 'alhajas' = 'parametros';
+  activeTab: string = 'parametros';
   parametros: PlazoParametroResponse[] = [];
   alhajas: PlazoHechuraAlhajaResponse[] = [];
   sucursalId = 1;
@@ -127,14 +127,49 @@ export class PlazosPeriodosComponent implements OnInit {
     this.cargarParametros();
   }
 
-  cambiarTab(tab: 'parametros' | 'alhajas'): void {
+  // =========================================================================
+  // Tabs dinámicas por tipo de prenda
+  // =========================================================================
+
+  get detalleTabs(): Array<{ id: string; label: string; isAlhajas: boolean }> {
+    const tipos = this.selectedPlazo?.tiposPrenda ?? [];
+    return tipos.map(t => ({
+      id: this.normalizarNombreTipoPrenda(t),
+      label: t.tipo,
+      isAlhajas: this.esTipoAlhaja(t)
+    }));
+  }
+
+  isAlhajasTab(tabId: string): boolean {
+    return this.detalleTabs.some(t => t.id === tabId && t.isAlhajas);
+  }
+
+  private esTipoAlhaja(tipo: { tipo?: string } | null | undefined): boolean {
+    const n = (tipo?.tipo ?? '').trim().toLowerCase();
+    return n === 'alhajas' || n === 'alhaja' || n === 'joyeria' || n === 'joyería';
+  }
+
+  private normalizarNombreTipoPrenda(tipo: { tipo?: string } | null | undefined): string {
+    return (tipo?.tipo ?? '')
+      .trim()
+      .toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '') // quitar acentos
+      .replace(/[^a-z0-9]+/g, '-')                      // espacios y / a guiones
+      .replace(/^-+|-+$/g, '');                          // trim guiones
+  }
+
+  cambiarTab(tab: string): void {
     this.activeTab = tab;
     this.tabError = '';
     if (tab === 'parametros') {
       this.cargarParametros();
-    } else {
-      this.cargarAlhajas();
+      return;
     }
+    if (this.isAlhajasTab(tab)) {
+      this.cargarAlhajas();
+      return;
+    }
+    // Tab no-alhajas (Plata, Varios, Autos/Motos...): sin carga por ahora.
   }
 
   cargarParametros(): void {
@@ -494,5 +529,9 @@ export class PlazosPeriodosComponent implements OnInit {
 
   trackByParam(_index: number, item: PlazoParametroResponse): number {
     return item.tipoPrendaId;
+  }
+
+  trackByTabId(_index: number, tab: { id: string }): string {
+    return tab.id;
   }
 }
