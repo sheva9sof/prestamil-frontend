@@ -81,6 +81,9 @@ export class PlazosPeriodosComponent implements OnInit {
   paramSaveError: { [tipoPrendaId: number]: string } = {};
   paramSaveSuccess: { [tipoPrendaId: number]: boolean } = {};
 
+  // Preview de avalúo en vivo (Tab 1 Parámetros)
+  readonly PREVIEW_PRESTAMO = 1000;
+
   // Task 4 — Agregar/inicializar alhajas
   nuevaAlhaja: Partial<PlazoHechuraAlhajaRequest> = { kilataje: 14, hechura: 'N', precioBase: 0, porcAumento: 0 };
   isAgregandoAlhaja = false;
@@ -201,7 +204,7 @@ export class PlazosPeriodosComponent implements OnInit {
               numMaxRefrendos: 0,
               porcPrestamoSAvaluo: 0,
               usaAvaluoReal: false,
-              porcPrestamoSAvaluoReal: 0,
+              porcIncrementoAvaluo: 0,
               diasGraciaSinInteres: 0,
               diasAntesPaseVenta: 0,
               importeMinPrestamo: 0
@@ -540,5 +543,24 @@ export class PlazosPeriodosComponent implements OnInit {
 
   trackByTabId(_index: number, tab: { id: string }): string {
     return tab.id;
+  }
+
+  /**
+   * Calcula el avalúo de contrato de muestra para el preview en vivo de Tab 1.
+   * Usa un préstamo de referencia de $1,000 (configurable vía PREVIEW_PRESTAMO).
+   * Fórmula: avaluo = prestamo × (1 + porc / 100). Si usaAvaluoReal=false o porc=0,
+   * el avalúo es igual al préstamo.
+   *
+   * @param tipoPrendaId id del tipo de prenda (clave de parametrosForm)
+   * @returns objeto { prestamo, avaluo } con valores numéricos en pesos
+   */
+  avaluoPreview(tipoPrendaId: number): { prestamo: number; avaluo: number } {
+    const prestamo = this.PREVIEW_PRESTAMO;
+    const form = this.parametrosForm[tipoPrendaId];
+    if (!form || !form.usaAvaluoReal) return { prestamo, avaluo: prestamo };
+    const porc = Number(form.porcIncrementoAvaluo ?? 0);
+    if (!porc || isNaN(porc)) return { prestamo, avaluo: prestamo };
+    const avaluo = prestamo * (1 + porc / 100);
+    return { prestamo, avaluo };
   }
 }

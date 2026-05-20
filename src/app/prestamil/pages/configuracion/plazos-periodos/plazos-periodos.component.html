@@ -140,9 +140,14 @@
 
                       <div class="row g-2 mb-2">
                         <div class="col-md-4">
-                          <label class="form-label small mb-0">% Préstamo s/Avalúo Real</label>
+                          <label class="form-label small mb-0">% Incremento sobre Avalúo</label>
                           <input type="number" class="form-control form-control-sm" step="0.0001"
-                            [(ngModel)]="parametrosForm[t.id].porcPrestamoSAvaluoReal" [ngModelOptions]="{ standalone: true }" />
+                            [(ngModel)]="parametrosForm[t.id].porcIncrementoAvaluo" [ngModelOptions]="{ standalone: true }"
+                            title="Porcentaje de incremento sobre el préstamo para determinar el valor de referencia que aparece en el contrato. Varía por zona/sucursal." />
+                          <small class="form-text text-muted">
+                            Si el préstamo es ${{ avaluoPreview(t.id).prestamo | number:'1.2-2' }}
+                            → avalúo en contrato: ${{ avaluoPreview(t.id).avaluo | number:'1.2-2' }}
+                          </small>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
                           <div class="form-check">
