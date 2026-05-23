@@ -1,15 +1,31 @@
-<div class="row page-header align-items-center">
+<!-- ─────────────────────────────────────────────── Page header ── -->
+<div class="row page-header align-items-center mb-3">
   <div class="col-md-8">
-    <h5 class="mb-1">Avaluos Prendarios - Mock Visual</h5>
-    <p class="text-muted mb-0">Pantalla de demo para validacion con cliente.</p>
+    <h5 class="mb-1">Avaluos Prendarios</h5>
+    <p class="text-muted mb-0">Registro de operación de empeño.</p>
   </div>
   <div class="col-md-4 text-md-right mt-2 mt-md-0">
     <span class="badge" [ngClass]="operacionAbierta ? 'badge-success' : 'badge-danger'">
-      {{ operacionAbierta ? 'Operacion ABIERTA' : 'Operacion CERRADA' }}
+      {{ operacionAbierta ? 'Operación ABIERTA' : 'Operación CERRADA' }}
     </span>
   </div>
 </div>
 
+<!-- ──────────────────────────────────────────── Mensajes globales ── -->
+<div class="row mb-2" *ngIf="successMessage || errorMessage">
+  <div class="col-12">
+    <div class="alert alert-success alert-dismissible fade show" role="alert" *ngIf="successMessage">
+      {{ successMessage }}
+      <button type="button" class="btn-close" (click)="successMessage = ''"></button>
+    </div>
+    <div class="alert alert-danger alert-dismissible fade show" role="alert" *ngIf="errorMessage">
+      {{ errorMessage }}
+      <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
+    </div>
+  </div>
+</div>
+
+<!-- ──────────────────────────────────── 0) Datos de encabezado ── -->
 <div class="row mb-3">
   <div class="col-12">
     <app-card>
@@ -17,162 +33,554 @@
         <div><strong>Sucursal:</strong> {{ sucursal }}</div>
         <div><strong>Usuario:</strong> {{ usuario }}</div>
         <div><strong>Rol:</strong> {{ rol }}</div>
-        <div><strong>Fecha abierta:</strong> {{ fechaAbierta }}</div>
+        <div><strong>Fecha:</strong> {{ fechaAbierta }}</div>
       </div>
     </app-card>
   </div>
 </div>
 
+<!-- ──────────────────────────── 1) Cliente / Pignorante + Resumen ── -->
 <div class="row mb-3">
-  <div class="col-12">
-    <div class="alert" [ngClass]="operacionAbierta ? 'alert-info' : 'alert-danger'" role="alert">
-      {{ mensajeFlujo }}
-    </div>
-  </div>
-</div>
-
-<div class="row">
   <div class="col-lg-8">
-    <app-card cardTitle="1) Datos de cliente/pignorante">
-      <div class="form-row">
-        <div class="form-group col-md-4">
-          <label>Buscar cliente</label>
-          <input class="form-control" value="CLI-000245" />
-        </div>
-        <div class="form-group col-md-4">
-          <label>Identificacion</label>
-          <input class="form-control" [value]="clienteDemo.identificacion" />
-        </div>
-        <div class="form-group col-md-4">
-          <label>Folio cliente</label>
-          <input class="form-control" [value]="clienteDemo.folio" />
+    <app-card cardTitle="1) Cliente / Pignorante">
+
+      <!-- Buscador de cliente -->
+      <div class="form-row mb-2">
+        <div class="col-12">
+          <label class="form-label">Buscar cliente</label>
+          <div class="input-group">
+            <input
+              class="form-control"
+              type="text"
+              [value]="clienteSeleccionado ? clienteSeleccionado.nombre : ''"
+              placeholder="Sin cliente seleccionado"
+              readonly
+            />
+            <button class="btn btn-outline-secondary" type="button" (click)="abrirBuscarCliente()">
+              <i class="feather icon-search"></i>
+            </button>
+          </div>
         </div>
       </div>
 
-      <div class="form-row">
-        <div class="form-group col-md-6">
-          <label>Nombre</label>
-          <input class="form-control" [value]="clienteDemo.nombre" />
+      <div class="form-row" *ngIf="clienteSeleccionado">
+        <div class="form-group col-md-4">
+          <label class="form-label">Folio</label>
+          <input class="form-control form-control-sm" [value]="clienteSeleccionado.folio" readonly />
         </div>
-        <div class="form-group col-md-6">
-          <label>Beneficiario</label>
-          <input class="form-control" [value]="clienteDemo.beneficiario" />
+        <div class="form-group col-md-4">
+          <label class="form-label">Tipo de identificación</label>
+          <select class="form-control form-control-sm" [(ngModel)]="identificacionSeleccionada">
+            <option *ngFor="let id of tiposIdentificacion" [value]="id">{{ id }}</option>
+          </select>
+        </div>
+        <div class="form-group col-md-4">
+          <label class="form-label">Préstamo acumulado</label>
+          <input
+            class="form-control form-control-sm"
+            [value]="'$' + (clienteSeleccionado.prestamoAcumulado | number: '1.0-0')"
+            readonly
+          />
         </div>
       </div>
 
-      <div>
-        <strong>Prestamo acumulado:</strong>
-        <span>${{ clienteDemo.prestamoAcumulado | number: '1.0-0' }}</span>
+      <div class="form-row" *ngIf="clienteSeleccionado">
+        <div class="form-group col-md-6">
+          <label class="form-label">Beneficiario <small class="text-muted">(opcional)</small></label>
+          <input class="form-control form-control-sm" [(ngModel)]="beneficiario" placeholder="Nombre del beneficiario" />
+        </div>
       </div>
+
     </app-card>
   </div>
 
   <div class="col-lg-4">
-    <app-card cardTitle="2) Resumen rapido">
+    <app-card cardTitle="Resumen rápido">
       <ul class="summary-list">
         <li><span>Partidas:</span><strong>{{ totalPartidas }}</strong></li>
         <li><span>Peso total:</span><strong>{{ pesoTotal | number: '1.1-1' }} gr</strong></li>
-        <li><span>Avaluo total:</span><strong>${{ avaluoTotal | number: '1.0-0' }}</strong></li>
-        <li><span>Prestamo total:</span><strong>${{ prestamoTotal | number: '1.0-0' }}</strong></li>
+        <li><span>Avalúo real:</span><strong>${{ avaluoTotal | number: '1.2-2' }}</strong></li>
+        <li><span>Avalúo contrato:</span><strong>${{ avaluoContratoTotal | number: '1.2-2' }}</strong></li>
+        <li><span>Préstamo total:</span><strong>${{ prestamoTotal | number: '1.2-2' }}</strong></li>
       </ul>
+      <hr />
+      <div class="d-grid gap-2">
+        <button class="btn btn-success btn-sm" (click)="generarContrato()" [disabled]="partidas.length === 0">
+          Generar contrato
+        </button>
+        <button class="btn btn-outline-info btn-sm" (click)="verVencimientos()" [disabled]="!clienteSeleccionado">
+          Ver vencimientos
+        </button>
+      </div>
     </app-card>
   </div>
 </div>
 
-<div class="row">
-  <div class="col-lg-8">
-    <app-card cardTitle="3) Captura de prenda (mock por tipo)">
-      <div class="btn-group mb-3" role="group" aria-label="Tipos de prenda">
+<!-- ─────────────────────────── 2) Plazo + Captura de prenda ── -->
+<div class="row mb-3">
+  <div class="col-12">
+    <app-card cardTitle="2) Captura de prenda">
+
+      <!-- Plazo + tipo de prenda -->
+      <div class="form-row mb-3">
+        <div class="form-group col-md-5">
+          <label class="form-label">Plazo</label>
+          <select class="form-control form-control-sm" [(ngModel)]="plazoSeleccionado" (ngModelChange)="onPlazoChange($event)">
+            <option [ngValue]="null" disabled>Selecciona un plazo...</option>
+            <option *ngFor="let p of plazos" [ngValue]="p">{{ labelPlazo(p) }}</option>
+          </select>
+        </div>
+        <div class="form-group col-md-7">
+          <label class="form-label">Tipo de prenda</label>
+          <div class="btn-group w-100" role="group">
+            <button
+              type="button"
+              class="btn btn-sm"
+              *ngFor="let tipo of tiposPrenda"
+              [ngClass]="tipoSeleccionado === tipo ? 'btn-primary' : 'btn-outline-primary'"
+              (click)="seleccionarTipo(tipo)"
+            >{{ tipo }}</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Tab: Alhajas / Plata ─── -->
+      <ng-container *ngIf="tipoSeleccionado === 'Alhajas' || tipoSeleccionado === 'Plata'">
+        <div class="form-row">
+          <div class="form-group col-md-5">
+            <label class="form-label">Prenda</label>
+            <div class="input-group">
+              <input
+                class="form-control form-control-sm"
+                [(ngModel)]="captura.descripcion"
+                placeholder="Descripción de la prenda"
+              />
+              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="abrirBuscarPrenda()">
+                <i class="feather icon-search"></i>
+              </button>
+            </div>
+            <small class="text-muted" *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</small>
+          </div>
+          <div class="form-group col-md-2">
+            <label class="form-label">Hechura</label>
+            <select class="form-control form-control-sm" [(ngModel)]="captura.hechura">
+              <option *ngFor="let h of hechuras" [value]="h">{{ h }}</option>
+            </select>
+          </div>
+          <div class="form-group col-md-2">
+            <label class="form-label">Kilataje</label>
+            <select class="form-control form-control-sm" [(ngModel)]="captura.kilataje" (change)="recalcularAlhajas()">
+              <option *ngFor="let k of kilatajes" [value]="k">{{ k }}K</option>
+            </select>
+          </div>
+          <div class="form-group col-md-1">
+            <label class="form-label">Cantidad</label>
+            <input class="form-control form-control-sm" type="number" min="1" [(ngModel)]="captura.cantidad" />
+          </div>
+          <div class="form-group col-md-2">
+            <label class="form-label">Peso (g)</label>
+            <input
+              class="form-control form-control-sm"
+              type="number"
+              min="0"
+              step="0.01"
+              [(ngModel)]="captura.peso"
+              (input)="recalcularAlhajas()"
+            />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group col-md-3">
+            <label class="form-label">Color <small class="text-muted">(opc.)</small></label>
+            <input class="form-control form-control-sm" [(ngModel)]="captura.color" placeholder="Ej. Amarillo" />
+          </div>
+          <div class="form-group col-md-3">
+            <label class="form-label">Claridad <small class="text-muted">(opc.)</small></label>
+            <input class="form-control form-control-sm" [(ngModel)]="captura.claridad" placeholder="Solo brillantes" />
+          </div>
+          <div class="form-group col-md-2">
+            <label class="form-label">Precio x gramo</label>
+            <input class="form-control form-control-sm text-right" [value]="captura.precioXGramo | number: '1.2-2'" readonly />
+          </div>
+          <div class="form-group col-md-2">
+            <label class="form-label">Avalúo real</label>
+            <input class="form-control form-control-sm text-right bg-light" [value]="captura.avaluoReal | number: '1.2-2'" readonly />
+          </div>
+          <div class="form-group col-md-2">
+            <label class="form-label">Préstamo</label>
+            <input class="form-control form-control-sm text-right bg-light" [value]="captura.prestamo | number: '1.2-2'" readonly />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="col-md-4 offset-md-8 text-right">
+            <label class="form-label">Avalúo contrato</label>
+            <input class="form-control form-control-sm text-right fw-bold bg-warning-subtle" [value]="captura.avaluoContrato | number: '1.2-2'" readonly />
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- ─── Tab: Varios ─── -->
+      <ng-container *ngIf="tipoSeleccionado === 'Varios'">
+        <p class="text-muted small mb-2">
+          El avalúo se calcula automáticamente sobre el monto del préstamo capturado.
+        </p>
+        <div class="form-row">
+          <div class="form-group col-md-3">
+            <label class="form-label">Subtipo</label>
+            <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.subtipo">
+              <option *ngFor="let s of subtiposVarios" [value]="s">{{ s }}</option>
+            </select>
+          </div>
+          <div class="form-group col-md-3">
+            <label class="form-label">Marca</label>
+            <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.marca" placeholder="Marca" />
+          </div>
+          <div class="form-group col-md-3">
+            <label class="form-label">Modelo</label>
+            <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.modelo" placeholder="Modelo" />
+          </div>
+          <div class="form-group col-md-3">
+            <label class="form-label">Serie / IMEI</label>
+            <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.serie" placeholder="Serie o IMEI" />
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group col-md-3">
+            <label class="form-label">Estado</label>
+            <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.estado">
+              <option *ngFor="let e of estadosVarios" [value]="e">{{ e }}</option>
+            </select>
+          </div>
+          <div class="form-group col-md-3">
+            <label class="form-label">Préstamo</label>
+            <input
+              class="form-control form-control-sm"
+              type="number"
+              min="0"
+              step="1"
+              [(ngModel)]="capturaVarios.prestamo"
+              (input)="recalcularVarios()"
+            />
+          </div>
+          <div class="form-group col-md-3">
+            <label class="form-label">Avalúo contrato (50%)</label>
+            <input
+              class="form-control form-control-sm text-right fw-bold bg-warning-subtle"
+              [value]="capturaVarios.avaluoContrato | number: '1.2-2'"
+              readonly
+            />
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- ─── Tab: Autos/Motos ─── -->
+      <ng-container *ngIf="tipoSeleccionado === 'Autos/Motos'">
+        <div class="alert alert-warning mt-2" role="alert">
+          Configuración de avalúos para Autos/Motos no disponible en esta versión.
+        </div>
+      </ng-container>
+
+      <!-- Botón agregar -->
+      <div class="d-flex justify-content-end mt-3">
         <button
-          type="button"
-          class="btn btn-sm"
-          *ngFor="let tipo of tiposPrenda"
-          [ngClass]="tipoSeleccionado === tipo ? 'btn-primary' : 'btn-outline-primary'"
-          (click)="seleccionarTipo(tipo)"
+          class="btn btn-primary btn-sm"
+          (click)="agregarPartida()"
+          [disabled]="!puedeAgregarPartida"
         >
-          {{ tipo }}
+          <i class="feather icon-plus-circle me-1"></i> Agregar partida
         </button>
       </div>
 
-      <div class="form-row">
-        <div class="form-group col-md-4">
-          <label>Plazo</label>
-          <input class="form-control" value="30 dias" />
-        </div>
-        <div class="form-group col-md-4">
-          <label>Tipo de prenda</label>
-          <input class="form-control" [value]="tipoSeleccionado" />
-        </div>
-        <div class="form-group col-md-4">
-          <label>Cantidad</label>
-          <input class="form-control" value="1" />
-        </div>
-      </div>
-
-      <div [ngSwitch]="tipoSeleccionado" class="mock-fields-box">
-        <div *ngSwitchCase="'Alhajas'">
-          <strong>Campos visibles:</strong> Kilataje, Hechura, Color, Claridad, Peso total, Precio por gramo.
-        </div>
-        <div *ngSwitchCase="'Plata'">
-          <strong>Campos visibles:</strong> Estandar 720/925, Peso, Condicion.
-        </div>
-        <div *ngSwitchCase="'Varios'">
-          <strong>Campos visibles:</strong> Subtipo, Marca, Modelo, Serie, Estado.
-        </div>
-        <div *ngSwitchDefault>
-          <strong>Campos visibles:</strong> Tipo, Marca, Modelo, Anio, VIN/Serie, Condicion general.
-        </div>
-      </div>
-    </app-card>
-  </div>
-
-  <div class="col-lg-4">
-    <app-card cardTitle="4) Acciones principales">
-      <div class="action-buttons">
-        <button class="btn btn-primary btn-sm" (click)="simularAgregarPartida()">Agregar partida</button>
-        <button class="btn btn-outline-primary btn-sm" (click)="simularAccion('Recalcular avaluo')">Recalcular avaluo</button>
-        <button class="btn btn-outline-secondary btn-sm" (click)="simularAccion('Cancelar partida')">Cancelar partida</button>
-        <button class="btn btn-outline-danger btn-sm" (click)="simularAccion('Borrar partida')">Borrar partida</button>
-        <button class="btn btn-outline-info btn-sm" (click)="simularAccion('Ver vencimientos')">Ver vencimientos</button>
-        <button class="btn btn-success btn-sm" (click)="simularGenerarContrato()">Generar contrato</button>
-      </div>
     </app-card>
   </div>
 </div>
 
-<div class="row">
+<!-- ─────────────────────────── 3) Tabla de partidas ── -->
+<div class="row mb-3">
   <div class="col-12">
-    <app-card cardTitle="5) Tabla de detalle (demo)">
+    <app-card cardTitle="3) Partidas del contrato">
       <div class="table-responsive">
         <table class="table table-sm table-striped table-bordered mb-0">
-          <thead>
+          <thead class="table-dark">
             <tr>
               <th>#</th>
               <th>Tipo</th>
-              <th>Descripcion</th>
-              <th>Cantidad</th>
-              <th>Peso</th>
-              <th>Avaluo real</th>
-              <th>Prestamo</th>
+              <th>Clave</th>
+              <th>Descripción</th>
+              <th>Cant.</th>
+              <th>Peso (g)</th>
+              <th>Kil.</th>
+              <th class="text-right">Precio/g</th>
+              <th class="text-right">Avalúo real</th>
+              <th class="text-right">Avalúo contrato</th>
+              <th class="text-right">Préstamo</th>
               <th>Vencimiento</th>
               <th>Estatus</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let item of partidas">
               <td>{{ item.id }}</td>
               <td>{{ item.tipo }}</td>
+              <td><code>{{ item.clavePrenda }}</code></td>
               <td>{{ item.descripcion }}</td>
               <td>{{ item.cantidad }}</td>
               <td>{{ item.peso | number: '1.1-1' }}</td>
-              <td>${{ item.avaluoReal | number: '1.0-0' }}</td>
-              <td>${{ item.prestamo | number: '1.0-0' }}</td>
+              <td>{{ item.kilataje ? item.kilataje + 'K' : '—' }}</td>
+              <td class="text-right">${{ (item.precioXGramo ?? 0) | number: '1.2-2' }}</td>
+              <td class="text-right">${{ item.avaluoReal | number: '1.2-2' }}</td>
+              <td class="text-right fw-bold">${{ item.avaluoContrato | number: '1.2-2' }}</td>
+              <td class="text-right">${{ item.prestamo | number: '1.2-2' }}</td>
               <td>{{ item.vencimiento }}</td>
-              <td>{{ item.estatus }}</td>
+              <td><span class="badge badge-secondary">{{ item.estatus }}</span></td>
+              <td>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" (click)="eliminarPartida(item.id)">
+                  <i class="feather icon-trash-2"></i>
+                </button>
+              </td>
+            </tr>
+            <tr *ngIf="partidas.length === 0">
+              <td colspan="14" class="text-center text-muted py-3">Sin partidas capturadas</td>
             </tr>
           </tbody>
+          <tfoot *ngIf="partidas.length > 0">
+            <tr class="fw-bold">
+              <td colspan="5" class="text-right">Totales:</td>
+              <td>{{ pesoTotal | number: '1.1-1' }}</td>
+              <td></td>
+              <td></td>
+              <td class="text-right">${{ avaluoTotal | number: '1.2-2' }}</td>
+              <td class="text-right">${{ avaluoContratoTotal | number: '1.2-2' }}</td>
+              <td class="text-right">${{ prestamoTotal | number: '1.2-2' }}</td>
+              <td colspan="3"></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </app-card>
   </div>
 </div>
+
+<!-- ─────────────────────── 4) Pendientes (solo dev) ── -->
+<div class="row mb-3" *ngIf="!environment.production">
+  <div class="col-12">
+    <app-card>
+      <div class="d-flex justify-content-between align-items-center" (click)="togglePendientes()" style="cursor:pointer;">
+        <span class="fw-bold text-warning">⚠ Pendiente de confirmar con cliente</span>
+        <i class="feather" [ngClass]="pendientesAbiertas ? 'icon-chevron-up' : 'icon-chevron-down'"></i>
+      </div>
+      <div [ngbCollapse]="!pendientesAbiertas">
+        <ul class="mt-3 mb-0">
+          <li>¿El campo "Libre avalúo" permite al valuador sobreescribir el precio calculado por el sistema?</li>
+          <li>¿Un contrato puede tener prendas de distintos tipos (ej: una alhaja + un celular en el mismo contrato)?</li>
+          <li>¿El campo Beneficiario es obligatorio o siempre opcional?</li>
+          <li>¿Refrendos y Finiquitos entran por esta misma pantalla o por una pantalla separada?</li>
+          <li>¿Existe catálogo de precios de referencia para electrónicos o el valuador decide a criterio propio?</li>
+        </ul>
+      </div>
+    </app-card>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════ MODALES (ng-template) ══════════════════════════════ -->
+
+<!-- Modal: Buscar cliente -->
+<ng-template #modalCliente let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Buscar cliente / pignorante</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <div class="input-group mb-3">
+      <input
+        class="form-control"
+        type="text"
+        [(ngModel)]="filtroCliente"
+        placeholder="Nombre, teléfono o CURP..."
+        (keyup.enter)="buscarClientes()"
+        autofocus
+      />
+      <button class="btn btn-outline-primary" type="button" (click)="buscarClientes()" [disabled]="isSearchingCliente">
+        <span *ngIf="isSearchingCliente" class="spinner-border spinner-border-sm me-1"></span>
+        <i *ngIf="!isSearchingCliente" class="feather icon-search"></i>
+        Buscar
+      </button>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover">
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Nombre</th>
+            <th>Teléfono</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let c of clientesBusqueda">
+            <td><code>{{ c.folio }}</code></td>
+            <td>{{ c.nombre }}</td>
+            <td>{{ c.telefono }}</td>
+            <td>
+              <button class="btn btn-sm btn-primary py-0" (click)="seleccionarCliente(c, modal)">
+                Seleccionar
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="clientesBusqueda.length === 0 && !isSearchingCliente">
+            <td colspan="4" class="text-center text-muted">Ingresa un término y pulsa Buscar</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cancelar</button>
+  </div>
+</ng-template>
+
+<!-- Modal: Buscar prenda (catálogo) -->
+<ng-template #modalPrenda let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Catálogo de prendas</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <div class="mb-3">
+      <input
+        class="form-control"
+        type="text"
+        [(ngModel)]="filtroPrenda"
+        placeholder="Buscar por clave o descripción..."
+        autofocus
+      />
+    </div>
+    <div *ngIf="isLoadingPrendas" class="text-center py-3">
+      <div class="spinner-border spinner-border-sm text-primary"></div>
+      <span class="ms-2 text-muted">Cargando catálogo...</span>
+    </div>
+    <div class="table-responsive" *ngIf="!isLoadingPrendas">
+      <table class="table table-sm table-hover">
+        <thead>
+          <tr>
+            <th>Clave</th>
+            <th>Descripción</th>
+            <th>Kilataje</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let p of prendasFiltradas">
+            <td><code>{{ p.clave }}</code></td>
+            <td>{{ p.descripcion }}</td>
+            <td>{{ p.kilataje > 0 ? p.kilataje + 'K' : '—' }}</td>
+            <td>
+              <button class="btn btn-sm btn-primary py-0" (click)="seleccionarPrenda(p, modal)">
+                Seleccionar
+              </button>
+            </td>
+          </tr>
+          <tr *ngIf="prendasFiltradas.length === 0">
+            <td colspan="4" class="text-center text-muted">Sin resultados en catálogo</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cancelar</button>
+  </div>
+</ng-template>
+
+<!-- Modal: Confirmación de contrato -->
+<ng-template #modalContrato let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Confirmar generación de contrato</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <table class="table table-sm table-borderless">
+      <tbody>
+        <tr>
+          <th>Cliente:</th>
+          <td>{{ clienteSeleccionado?.nombre }}</td>
+        </tr>
+        <tr>
+          <th>Plazo:</th>
+          <td>{{ plazoSeleccionado ? labelPlazo(plazoSeleccionado) : '—' }}</td>
+        </tr>
+        <tr>
+          <th>Partidas:</th>
+          <td>{{ totalPartidas }}</td>
+        </tr>
+        <tr>
+          <th>Préstamo total:</th>
+          <td class="fw-bold">${{ prestamoTotal | number: '1.2-2' }}</td>
+        </tr>
+        <tr>
+          <th>Avalúo contrato:</th>
+          <td class="fw-bold text-warning">${{ avaluoContratoTotal | number: '1.2-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert alert-info small mb-0">
+      Se registrará el contrato en el sistema. El PDF se generará en la siguiente fase.
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()" [disabled]="isGuardando">Cancelar</button>
+    <button class="btn btn-success btn-sm" (click)="modal.close('confirm')" [disabled]="isGuardando">
+      <span *ngIf="isGuardando" class="spinner-border spinner-border-sm me-1"></span>
+      Confirmar y generar
+    </button>
+  </div>
+</ng-template>
+
+<!-- Modal: Ver vencimientos -->
+<ng-template #modalVencimientos let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Vencimientos — {{ clienteSeleccionado?.nombre }}</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <div *ngIf="isLoadingContratos" class="text-center py-3">
+      <div class="spinner-border spinner-border-sm text-primary"></div>
+      <span class="ms-2 text-muted">Cargando contratos...</span>
+    </div>
+    <div class="table-responsive" *ngIf="!isLoadingContratos">
+      <table class="table table-sm table-striped table-bordered">
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Apertura</th>
+            <th>Vencimiento</th>
+            <th class="text-right">Préstamo</th>
+            <th>Estatus</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let v of contratosPorCliente">
+            <td><code>{{ v.folio }}</code></td>
+            <td>{{ v.fechaApertura | date: 'dd/MM/yyyy' }}</td>
+            <td>{{ v.fechaVencimiento | date: 'dd/MM/yyyy' }}</td>
+            <td class="text-right">${{ v.montoPrestamo | number: '1.0-0' }}</td>
+            <td>
+              <span class="badge" [ngClass]="estatusContratoBadge(v.estatus)">
+                {{ v.estatus }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="contratosPorCliente.length === 0">
+            <td colspan="5" class="text-center text-muted">Sin contratos anteriores</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cerrar</button>
+  </div>
+</ng-template>
