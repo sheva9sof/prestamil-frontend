@@ -23,6 +23,7 @@ export interface LoginResponse {
   cambiarPassword: boolean;
   ultimoLogin: string;
   idRol: number;
+  rolNombre?: string;
   fechaIni: string | null;
   fechaFin: string | null;
   vigencia: boolean;

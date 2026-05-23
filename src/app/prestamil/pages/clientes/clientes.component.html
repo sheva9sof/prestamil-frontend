@@ -32,11 +32,7 @@
               <label for="mTelefono" class="form-label">Teléfono <span class="text-danger">*</span></label>
               <input type="text" id="mTelefono" class="form-control" [(ngModel)]="formData.telefono" name="mTelefono" placeholder="10 dígitos" maxlength="10" required />
             </div>
-            <div class="col-md-8 mb-3">
-              <label for="mEmail" class="form-label">Email</label>
-              <input type="email" id="mEmail" class="form-control" [(ngModel)]="formData.email" name="mEmail" placeholder="correo@ejemplo.com" />
             </div>
-          </div>
           <div class="row">
             <div class="col-md-6 mb-3">
               <label for="mCurp" class="form-label">CURP <span class="text-danger">*</span></label>
@@ -65,9 +61,9 @@
             <div class="col-md-3 mb-3">
               <label for="mTipoDireccion" class="form-label">Tipo</label>
               <select id="mTipoDireccion" class="form-control" [(ngModel)]="formData.tipoDireccion" name="mTipoDireccion">
-                <option value="Casa">Casa</option>
-                <option value="Trabajo">Trabajo</option>
-                <option value="Otro">Otro</option>
+                <option value="Particular">Particular</option>
+                <option value="Fiscal">Fiscal</option>
+                <option value="Laboral">Laboral</option>
               </select>
             </div>
             <div class="col-md-9 mb-3">
@@ -137,21 +133,27 @@
 
     <app-card cardTitle="Clientes" [hidHeader]="true">
 
+      <!-- Mensajes -->
+      <div class="alert alert-success alert-dismissible fade show mb-2" role="alert" *ngIf="successMessage">
+        {{ successMessage }}
+        <button type="button" class="btn-close" (click)="successMessage = ''"></button>
+      </div>
+      <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert" *ngIf="errorMessage">
+        {{ errorMessage }}
+        <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
+      </div>
+
       <!-- Filtros de búsqueda -->
       <div class="row mb-2 align-items-end">
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label for="filtroNombre" class="form-label">Nombre completo</label>
           <input type="text" id="filtroNombre" class="form-control" placeholder="Buscar por nombre..." [(ngModel)]="filtroNombre" />
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label for="filtroTelefono" class="form-label">Teléfono</label>
           <input type="text" id="filtroTelefono" class="form-control" placeholder="Buscar por teléfono..." [(ngModel)]="filtroTelefono" />
         </div>
-        <div class="col-md-3">
-          <label for="filtroEmail" class="form-label">Email</label>
-          <input type="text" id="filtroEmail" class="form-control" placeholder="Buscar por email..." [(ngModel)]="filtroEmail" />
-        </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <label for="filtroEstatus" class="form-label">Estatus</label>
           <select id="filtroEstatus" class="form-control" [(ngModel)]="filtroSoloActivos">
             <option [ngValue]="false">Todos</option>
@@ -181,14 +183,19 @@
         </span>
       </div>
 
+      <!-- Spinner -->
+      <div *ngIf="isLoading" class="text-center py-4">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="text-muted mt-2 mb-0">Cargando clientes...</p>
+      </div>
+
       <!-- Tabla -->
-      <div class="table-responsive">
+      <div class="table-responsive" *ngIf="!isLoading">
         <table class="table table-hover table-bordered clientes-table">
           <thead>
             <tr>
               <th>Nombre completo</th>
               <th class="text-center">Teléfono</th>
-              <th>Email</th>
               <th class="text-center">CURP</th>
               <th class="text-center">RFC</th>
               <th class="text-center">Activo</th>
@@ -199,7 +206,6 @@
             <tr *ngFor="let c of clientesPaginados; trackBy: trackById">
               <td>{{ c.nombreCompleto }}</td>
               <td class="text-center">{{ c.telefono }}</td>
-              <td>{{ c.email }}</td>
               <td class="text-center text-uppercase">{{ c.curp }}</td>
               <td class="text-center text-uppercase">{{ c.rfc }}</td>
               <td class="text-center">

@@ -81,6 +81,9 @@ export class PlazosPeriodosComponent implements OnInit {
   paramSaveError: { [tipoPrendaId: number]: string } = {};
   paramSaveSuccess: { [tipoPrendaId: number]: boolean } = {};
 
+  // Preview de avalúo en vivo (Tab 1 Parámetros)
+  readonly PREVIEW_PRESTAMO = 1000;
+
   // Task 4 — Agregar/inicializar alhajas
   nuevaAlhaja: Partial<PlazoHechuraAlhajaRequest> = { kilataje: 14, hechura: 'N', precioBase: 0, porcAumento: 0 };
   isAgregandoAlhaja = false;
@@ -125,8 +128,10 @@ export class PlazosPeriodosComponent implements OnInit {
   seleccionarPlazo(plazo: PlazoResponse): void {
     this.selectedPlazo = plazo;
     this.tabError = '';
-    this.activeTab = 'parametros';
     this.cargarParametros();
+    const primeraTab = this.detalleTabs[0];
+    this.activeTab = primeraTab ? primeraTab.id : '';
+    if (primeraTab?.isAlhajas) this.cargarAlhajas();
     this.detalleModalRef = this.modalService.open(this.detalleModalTemplate, {
       size: 'xl',
       centered: true,
@@ -136,27 +141,95 @@ export class PlazosPeriodosComponent implements OnInit {
   }
 
   // =========================================================================
+  // Tipos de período (Addendum 2)
+  // =========================================================================
+
+  readonly TIPOS_PERIODO = [
+    { dias: 1,  label: 'Diario' },
+    { dias: 7,  label: 'Semanal' },
+    { dias: 15, label: 'Quincenal' },
+    { dias: 30, label: 'Mensual' }
+  ];
+
+  getLabelPeriodo(dias: number | null | undefined): string {
+    const d = Number(dias);
+    const found = this.TIPOS_PERIODO.find(p => p.dias === d);
+    return found?.label ?? (d ? `${d} días` : '—');
+  }
+
+  /** "Plazo Semanal de 12 periodos = 84 días máx." */
+  getLabelPlazoCompleto(dias: number | null | undefined, periodos: number | null | undefined): string {
+    const d = Number(dias) || 0;
+    const n = Number(periodos) || 0;
+    const periodoLabel = this.getLabelPeriodo(d);
+    const total = d * n;
+    return `Plazo ${periodoLabel} de ${n} periodos = ${total} días máx.`;
+  }
+
+  // =========================================================================
   // Tabs dinámicas por tipo de prenda
   // =========================================================================
 
-  get detalleTabs(): Array<{ id: string; label: string; isAlhajas: boolean }> {
-    return (this.selectedPlazo?.tiposPrenda ?? []).map(t => ({
-      id: this.normalizarNombreTipoPrenda(t),
-      label: t.tipo,
-      isAlhajas: this.esTipoAlhaja(t)
-    }));
+  get detalleTabs(): Array<{ id: string; label: string; kind: 'alhaja' | 'plata' | 'varios' | 'otro'; isAlhajas: boolean }> {
+    return (this.selectedPlazo?.tiposPrenda ?? [])
+      .filter(t => !this.esTipoAutoMoto(t))
+      .map(t => {
+        const kind = this.tipoPrendaKind(t);
+        return {
+          id: this.normalizarNombreTipoPrenda(t),
+          label: t.tipo,
+          kind: kind === 'auto-moto' ? 'otro' : kind, // defensivo: ya filtramos arriba
+          isAlhajas: kind === 'alhaja' || kind === 'plata' // ambos usan tabla kilataje/hechura
+        };
+      });
   }
 
   isAlhajasTab(tabId: string): boolean {
     return this.detalleTabs.some(t => t.id === tabId && t.isAlhajas);
   }
 
-  private esTipoAlhaja(tipo: { tipo?: string } | null | undefined): boolean {
+  esTipoAlhaja(tipo: { tipo?: string } | null | undefined): boolean {
     const n = (tipo?.tipo ?? '').trim().toLowerCase();
     return n === 'alhajas' || n === 'alhaja' || n === 'joyeria' || n === 'joyería';
   }
 
-  private normalizarNombreTipoPrenda(tipo: { tipo?: string } | null | undefined): string {
+  esTipoPlata(tipo: { tipo?: string } | null | undefined): boolean {
+    const n = (tipo?.tipo ?? '')
+      .trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return n === 'plata';
+  }
+
+  esTipoVarios(tipo: { tipo?: string } | null | undefined): boolean {
+    const n = (tipo?.tipo ?? '')
+      .trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return n === 'varios' || n.startsWith('vario');
+  }
+
+  esTipoAutoMoto(tipo: { tipo?: string } | null | undefined): boolean {
+    const n = (tipo?.tipo ?? '')
+      .trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '');
+    return ['autos', 'auto', 'motos', 'moto', 'automoviles', 'vehiculos'].includes(n);
+  }
+
+  tipoPrendaKind(t: { tipo?: string } | null | undefined): 'alhaja' | 'plata' | 'varios' | 'auto-moto' | 'otro' {
+    if (this.esTipoAlhaja(t))   return 'alhaja';
+    if (this.esTipoPlata(t))    return 'plata';
+    if (this.esTipoVarios(t))   return 'varios';
+    if (this.esTipoAutoMoto(t)) return 'auto-moto';
+    return 'otro';
+  }
+
+  getTipoIdFromTab(tabId: string): number {
+    if (!this.selectedPlazo) return 0;
+    const found = (this.selectedPlazo.tiposPrenda ?? [])
+      .find(t => this.normalizarNombreTipoPrenda(t) === tabId);
+    return found?.id ?? 0;
+  }
+
+  normalizarNombreTipoPrenda(tipo: { tipo?: string } | null | undefined): string {
     return (tipo?.tipo ?? '')
       .trim()
       .toLowerCase()
@@ -168,10 +241,6 @@ export class PlazosPeriodosComponent implements OnInit {
   cambiarTab(tab: string): void {
     this.activeTab = tab;
     this.tabError = '';
-    if (tab === 'parametros') {
-      this.cargarParametros();
-      return;
-    }
     if (this.isAlhajasTab(tab)) {
       this.cargarAlhajas();
     }
@@ -185,15 +254,16 @@ export class PlazosPeriodosComponent implements OnInit {
     this.plazoService.getParametrosBySucursal(this.selectedPlazo.id, this.sucursalId).subscribe({
       next: (data) => {
         this.parametros = data;
-        this.isLoadingTab = false;
-        // Pre-popular parametrosForm: una entrada por cada tipo de prenda asociado al plazo
+        // Pre-popular parametrosForm ANTES de bajar isLoadingTab para que el template
+        // nunca vea parametrosForm[t.id] === undefined cuando !isLoadingTab sea true.
         const tipos = this.selectedPlazo?.tiposPrenda ?? [];
+        const nuevoForm: { [tipoPrendaId: number]: Partial<PlazoParametroRequest> } = {};
         tipos.forEach(t => {
           const existing = this.parametros.find(p => p.tipoPrendaId === t.id);
           if (existing) {
-            this.parametrosForm[t.id] = { ...existing } as Partial<PlazoParametroRequest>;
+            nuevoForm[t.id] = { ...existing } as Partial<PlazoParametroRequest>;
           } else {
-            this.parametrosForm[t.id] = {
+            nuevoForm[t.id] = {
               porcInteres: 0,
               porcAlmacen: 0,
               porcGastosAdmin: 0,
@@ -201,13 +271,16 @@ export class PlazosPeriodosComponent implements OnInit {
               numMaxRefrendos: 0,
               porcPrestamoSAvaluo: 0,
               usaAvaluoReal: false,
-              porcPrestamoSAvaluoReal: 0,
+              porcIncrementoAvaluo: 0,
               diasGraciaSinInteres: 0,
               diasAntesPaseVenta: 0,
               importeMinPrestamo: 0
             };
           }
         });
+        // Asignar como nueva referencia y bajar el flag en una sola microtarea
+        this.parametrosForm = nuevoForm;
+        this.isLoadingTab = false;
       },
       error: (err) => {
         this.isLoadingTab = false;
@@ -251,7 +324,8 @@ export class PlazosPeriodosComponent implements OnInit {
   }
 
   iniciarEdicionPrecio(alhaja: PlazoHechuraAlhajaResponse): void {
-    this.editandoPrecioBase[this.getAlhajaKey(alhaja)] = alhaja.precioBase;
+    // Crear nueva referencia de objeto para garantizar que Angular detecte el cambio
+    this.editandoPrecioBase = { ...this.editandoPrecioBase, [this.getAlhajaKey(alhaja)]: alhaja.precioBase };
   }
 
   guardarPrecioBase(alhaja: PlazoHechuraAlhajaResponse): void {
@@ -259,7 +333,8 @@ export class PlazosPeriodosComponent implements OnInit {
     const key = this.getAlhajaKey(alhaja);
     const nuevoPrecio = this.editandoPrecioBase[key];
     if (nuevoPrecio === null || nuevoPrecio === undefined || isNaN(Number(nuevoPrecio))) {
-      delete this.editandoPrecioBase[key];
+      const { [key]: _, ...resto } = this.editandoPrecioBase;
+      this.editandoPrecioBase = resto;
       return;
     }
     this.plazoService.actualizarPrecioBase(
@@ -271,20 +346,30 @@ export class PlazosPeriodosComponent implements OnInit {
     ).subscribe({
       next: (updated) => {
         const idx = this.alhajas.findIndex(a => a.kilataje === alhaja.kilataje && a.hechura === alhaja.hechura);
-        if (idx >= 0) this.alhajas[idx] = updated;
-        delete this.editandoPrecioBase[key];
+        if (idx >= 0) {
+          this.alhajas = [
+            ...this.alhajas.slice(0, idx),
+            updated,
+            ...this.alhajas.slice(idx + 1)
+          ];
+        }
+        const { [key]: _, ...resto } = this.editandoPrecioBase;
+        this.editandoPrecioBase = resto;
         this.successMessage = 'Precio actualizado correctamente.';
         this.autoHideSuccessMessage();
       },
       error: (err) => {
         this.tabError = 'Error al actualizar precio: ' + (err?.error?.message ?? err.message ?? 'Error desconocido');
-        delete this.editandoPrecioBase[key];
+        const { [key]: _, ...resto } = this.editandoPrecioBase;
+        this.editandoPrecioBase = resto;
       }
     });
   }
 
   cancelarEdicionPrecio(alhaja: PlazoHechuraAlhajaResponse): void {
-    delete this.editandoPrecioBase[this.getAlhajaKey(alhaja)];
+    const key = this.getAlhajaKey(alhaja);
+    const { [key]: _, ...resto } = this.editandoPrecioBase;
+    this.editandoPrecioBase = resto;
   }
 
   recalcularTodo(): void {
@@ -534,11 +619,34 @@ export class PlazosPeriodosComponent implements OnInit {
     return `${item.kilataje}-${item.hechura}`;
   }
 
+  trackByHechura(_index: number, grupo: { hechura: string }): string {
+    return grupo.hechura;
+  }
+
   trackByParam(_index: number, item: PlazoParametroResponse): number {
     return item.tipoPrendaId;
   }
 
   trackByTabId(_index: number, tab: { id: string }): string {
     return tab.id;
+  }
+
+  /**
+   * Calcula el avalúo de contrato de muestra para el preview en vivo de Tab 1.
+   * Usa un préstamo de referencia de $1,000 (configurable vía PREVIEW_PRESTAMO).
+   * Fórmula: avaluo = prestamo × (1 + porc / 100). Si usaAvaluoReal=false o porc=0,
+   * el avalúo es igual al préstamo.
+   *
+   * @param tipoPrendaId id del tipo de prenda (clave de parametrosForm)
+   * @returns objeto { prestamo, avaluo } con valores numéricos en pesos
+   */
+  avaluoPreview(tipoPrendaId: number): { prestamo: number; avaluo: number } {
+    const prestamo = this.PREVIEW_PRESTAMO;
+    const form = this.parametrosForm[tipoPrendaId];
+    if (!form || !form.usaAvaluoReal) return { prestamo, avaluo: prestamo };
+    const porc = Number(form.porcIncrementoAvaluo ?? 0);
+    if (!porc || isNaN(porc)) return { prestamo, avaluo: prestamo };
+    const avaluo = prestamo * (1 + porc / 100);
+    return { prestamo, avaluo };
   }
 }
