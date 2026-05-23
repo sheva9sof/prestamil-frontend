@@ -1,3 +1,18 @@
+export interface DireccionResponse {
+  id?: number;
+  tipoDireccion: 'Fiscal' | 'Particular' | 'Laboral';
+  calle: string;
+  numeroExterior: string;
+  numeroInterior?: string;
+  colonia: string;
+  ciudad: string;
+  estado: string;
+  codigoPostal: string;
+  referencias?: string;
+  esVerificada: boolean;
+  fechaRegistro?: string;
+}
+
 export interface ClienteResponse {
   id: number;
   nombre: string;
@@ -7,6 +22,8 @@ export interface ClienteResponse {
   curp?: string;
   rfc?: string;
   activo: boolean;
+  nombreCompleto: string;
+  direccion?: DireccionResponse;
 }
 
 export interface CatSubtipoPrendaResponse {

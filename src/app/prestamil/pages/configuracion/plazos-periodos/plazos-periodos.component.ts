@@ -128,8 +128,10 @@ export class PlazosPeriodosComponent implements OnInit {
   seleccionarPlazo(plazo: PlazoResponse): void {
     this.selectedPlazo = plazo;
     this.tabError = '';
-    this.activeTab = 'parametros';
     this.cargarParametros();
+    const primeraTab = this.detalleTabs[0];
+    this.activeTab = primeraTab ? primeraTab.id : '';
+    if (primeraTab?.isAlhajas) this.cargarAlhajas();
     this.detalleModalRef = this.modalService.open(this.detalleModalTemplate, {
       size: 'xl',
       centered: true,
@@ -239,10 +241,6 @@ export class PlazosPeriodosComponent implements OnInit {
   cambiarTab(tab: string): void {
     this.activeTab = tab;
     this.tabError = '';
-    if (tab === 'parametros') {
-      this.cargarParametros();
-      return;
-    }
     if (this.isAlhajasTab(tab)) {
       this.cargarAlhajas();
     }

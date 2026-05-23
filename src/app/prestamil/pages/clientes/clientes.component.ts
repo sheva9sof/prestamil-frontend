@@ -1,95 +1,10 @@
-// angular import
-import { Component, OnInit, ViewChild, TemplateRef } from '@angular/core';
+import { Component, OnInit, ViewChild, TemplateRef, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
-
-// project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
-
-interface DireccionResponse {
-  id?: number;
-  tipoDireccion: string;
-  calle: string;
-  numeroExterior: string;
-  numeroInterior: string;
-  colonia: string;
-  ciudad: string;
-  estado: string;
-  codigoPostal: string;
-  referencias: string;
-  esVerificada: boolean;
-  fechaRegistro?: string;
-}
-
-interface ClienteResponse {
-  id: number;
-  nombre: string;
-  apellidoPaterno: string;
-  apellidoMaterno: string;
-  telefono: string;
-  email: string;
-  curp: string;
-  nombreCompleto: string;
-  rfc: string;
-  activo: boolean;
-  direccion: DireccionResponse;
-}
-
-const MOCK_CLIENTES: ClienteResponse[] = [
-  {
-    id: 1,
-    nombre: 'Juan Carlos',
-    apellidoPaterno: 'García',
-    apellidoMaterno: 'Ortiz',
-    telefono: '5512345678',
-    email: 'juan.garcia@email.com',
-    curp: 'GAOJ850315HDFRCN05',
-    rfc: 'GAOJ850315AB3',
-    nombreCompleto: 'Juan Carlos García Ortiz',
-    activo: true,
-    direccion: {
-      id: 1,
-      tipoDireccion: 'Casa',
-      calle: 'Av. Insurgentes Sur',
-      numeroExterior: '123',
-      numeroInterior: 'A',
-      colonia: 'Del Valle',
-      ciudad: 'Ciudad de México',
-      estado: 'CDMX',
-      codigoPostal: '03100',
-      referencias: 'Frente al parque',
-      esVerificada: true,
-      fechaRegistro: '2025-01-15'
-    }
-  },
-  {
-    id: 2,
-    nombre: 'María Elena',
-    apellidoPaterno: 'Martínez',
-    apellidoMaterno: 'Ramos',
-    telefono: '3398765432',
-    email: 'maria.martinez@email.com',
-    curp: 'MARM920820MJCRTL08',
-    rfc: 'MARM920820GH5',
-    nombreCompleto: 'María Elena Martínez Ramos',
-    activo: false,
-    direccion: {
-      id: 2,
-      tipoDireccion: 'Casa',
-      calle: 'Calle Madero',
-      numeroExterior: '45',
-      numeroInterior: '',
-      colonia: 'Centro',
-      ciudad: 'Guadalajara',
-      estado: 'Jalisco',
-      codigoPostal: '44100',
-      referencias: '',
-      esVerificada: false,
-      fechaRegistro: '2025-03-20'
-    }
-  }
-];
+import { ClienteService } from 'src/app/prestamil/core/services/cliente.service';
+import { ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
 
 @Component({
   selector: 'app-clientes',
@@ -99,37 +14,53 @@ const MOCK_CLIENTES: ClienteResponse[] = [
   styleUrls: ['./clientes.component.scss']
 })
 export class ClientesComponent implements OnInit {
+  private clienteService = inject(ClienteService);
+  private modalService = inject(NgbModal);
+
   @ViewChild('clienteModal') clienteModalTemplate!: TemplateRef<any>;
 
-  filtroNombre: string = '';
-  filtroTelefono: string = '';
-  filtroEmail: string = '';
-  filtroSoloActivos: boolean = false;
+  isLoading = false;
+  successMessage = '';
+  errorMessage = '';
 
-  clientes: ClienteResponse[] = [...MOCK_CLIENTES];
+  clientes: ClienteResponse[] = [];
   clientesFiltrados: ClienteResponse[] = [];
 
-  // Paginación
+  filtroNombre = '';
+  filtroTelefono = '';
+  filtroSoloActivos = false;
+
   paginaActual = 1;
   itemsPorPagina = 10;
   totalPaginas = 0;
+  Math = Math;
 
-  // Modal
   clienteModalRef: NgbModalRef | null = null;
   isEditingCliente = false;
   idEdicion: number | null = null;
+  direccionIdEdicion: number | undefined;
   modalError = '';
   isLoadingGuardar = false;
-  private nextId = MOCK_CLIENTES.length + 1;
 
   formData = this.emptyForm();
 
-  Math = Math;
-
-  constructor(private modalService: NgbModal) {}
-
   ngOnInit(): void {
-    this.aplicarFiltros();
+    this.cargarClientes();
+  }
+
+  cargarClientes(): void {
+    this.isLoading = true;
+    this.clienteService.getAll().subscribe({
+      next: (lista) => {
+        this.clientes = lista;
+        this.aplicarFiltros();
+        this.isLoading = false;
+      },
+      error: () => {
+        this.errorMessage = 'Error al cargar la lista de clientes.';
+        this.isLoading = false;
+      }
+    });
   }
 
   onFiltroChange(): void {
@@ -147,11 +78,6 @@ export class ClientesComponent implements OnInit {
 
     if (this.filtroTelefono.trim()) {
       filtrados = filtrados.filter(c => c.telefono.includes(this.filtroTelefono.trim()));
-    }
-
-    if (this.filtroEmail.trim()) {
-      const q = this.filtroEmail.toLowerCase().trim();
-      filtrados = filtrados.filter(c => c.email.toLowerCase().includes(q));
     }
 
     if (this.filtroSoloActivos) {
@@ -175,9 +101,7 @@ export class ClientesComponent implements OnInit {
   }
 
   cambiarPagina(pagina: number): void {
-    if (pagina >= 1 && pagina <= this.totalPaginas) {
-      this.paginaActual = pagina;
-    }
+    if (pagina >= 1 && pagina <= this.totalPaginas) this.paginaActual = pagina;
   }
 
   getPaginas(): number[] {
@@ -197,47 +121,40 @@ export class ClientesComponent implements OnInit {
   abrirModalNuevo(): void {
     this.isEditingCliente = false;
     this.idEdicion = null;
+    this.direccionIdEdicion = undefined;
     this.modalError = '';
     this.formData = this.emptyForm();
     this.clienteModalRef = this.modalService.open(this.clienteModalTemplate, {
-      backdrop: 'static',
-      keyboard: false,
-      centered: true,
-      size: 'xl',
-      windowClass: 'edit-modal'
+      backdrop: 'static', keyboard: false, centered: true, size: 'xl', windowClass: 'edit-modal'
     });
   }
 
   editarCliente(c: ClienteResponse): void {
     this.isEditingCliente = true;
     this.idEdicion = c.id;
+    this.direccionIdEdicion = c.direccion?.id;
     this.modalError = '';
     this.formData = {
       nombre: c.nombre,
       apellidoPaterno: c.apellidoPaterno,
       apellidoMaterno: c.apellidoMaterno,
       telefono: c.telefono,
-      email: c.email,
-      curp: c.curp,
-      rfc: c.rfc,
+      curp: c.curp ?? '',
+      rfc: c.rfc ?? '',
       activo: c.activo,
-      tipoDireccion: c.direccion.tipoDireccion,
-      calle: c.direccion.calle,
-      numeroExterior: c.direccion.numeroExterior,
-      numeroInterior: c.direccion.numeroInterior,
-      colonia: c.direccion.colonia,
-      ciudad: c.direccion.ciudad,
-      estado: c.direccion.estado,
-      codigoPostal: c.direccion.codigoPostal,
-      referencias: c.direccion.referencias,
-      esVerificada: c.direccion.esVerificada
+      tipoDireccion: (c.direccion?.tipoDireccion ?? 'Particular') as 'Fiscal' | 'Particular' | 'Laboral',
+      calle: c.direccion?.calle ?? '',
+      numeroExterior: c.direccion?.numeroExterior ?? '',
+      numeroInterior: c.direccion?.numeroInterior ?? '',
+      colonia: c.direccion?.colonia ?? '',
+      ciudad: c.direccion?.ciudad ?? '',
+      estado: c.direccion?.estado ?? '',
+      codigoPostal: c.direccion?.codigoPostal ?? '',
+      referencias: c.direccion?.referencias ?? '',
+      esVerificada: c.direccion?.esVerificada ?? false
     };
     this.clienteModalRef = this.modalService.open(this.clienteModalTemplate, {
-      backdrop: 'static',
-      keyboard: false,
-      centered: true,
-      size: 'xl',
-      windowClass: 'edit-modal'
+      backdrop: 'static', keyboard: false, centered: true, size: 'xl', windowClass: 'edit-modal'
     });
   }
 
@@ -249,10 +166,10 @@ export class ClientesComponent implements OnInit {
   }
 
   guardarCliente(): void {
-    const { nombre, apellidoPaterno, apellidoMaterno, telefono, email, curp, rfc, calle, colonia, ciudad, estado, codigoPostal } = this.formData;
+    const { nombre, apellidoPaterno, telefono, calle, colonia, ciudad, estado, codigoPostal } = this.formData;
 
-    if (!nombre.trim() || !apellidoPaterno.trim() || !telefono.trim() || !curp.trim() || !rfc.trim()) {
-      this.modalError = 'Por favor complete los campos obligatorios de datos personales.';
+    if (!nombre.trim() || !apellidoPaterno.trim() || !telefono.trim()) {
+      this.modalError = 'Nombre, apellido paterno y teléfono son obligatorios.';
       return;
     }
     if (!calle.trim() || !colonia.trim() || !ciudad.trim() || !estado.trim() || !codigoPostal.trim()) {
@@ -260,60 +177,59 @@ export class ClientesComponent implements OnInit {
       return;
     }
 
-    const nombreCompleto = `${nombre.trim()} ${apellidoPaterno.trim()} ${apellidoMaterno.trim()}`.trim();
-
-    const direccion: DireccionResponse = {
-      tipoDireccion: this.formData.tipoDireccion,
-      calle: calle.trim(),
-      numeroExterior: this.formData.numeroExterior.trim(),
-      numeroInterior: this.formData.numeroInterior.trim(),
-      colonia: colonia.trim(),
-      ciudad: ciudad.trim(),
-      estado: estado.trim(),
-      codigoPostal: codigoPostal.trim(),
-      referencias: this.formData.referencias.trim(),
-      esVerificada: this.formData.esVerificada
+    const body = {
+      nombre: nombre.trim(),
+      apellidoPaterno: apellidoPaterno.trim(),
+      apellidoMaterno: this.formData.apellidoMaterno.trim(),
+      telefono: telefono.trim(),
+      curp: this.formData.curp.trim().toUpperCase() || null,
+      rfc: this.formData.rfc.trim().toUpperCase() || null,
+      activo: this.formData.activo,
+      direccion: {
+        id: this.isEditingCliente ? this.direccionIdEdicion : undefined,
+        tipoDireccion: this.formData.tipoDireccion,
+        calle: calle.trim(),
+        numeroExterior: this.formData.numeroExterior.trim(),
+        numeroInterior: this.formData.numeroInterior.trim() || null,
+        colonia: colonia.trim(),
+        ciudad: ciudad.trim(),
+        estado: estado.trim(),
+        codigoPostal: codigoPostal.trim(),
+        referencias: this.formData.referencias.trim() || null,
+        esVerificada: this.formData.esVerificada
+      }
     };
 
-    if (this.isEditingCliente && this.idEdicion !== null) {
-      const idx = this.clientes.findIndex(c => c.id === this.idEdicion);
-      if (idx !== -1) {
-        this.clientes[idx] = {
-          ...this.clientes[idx],
-          nombre: nombre.trim(),
-          apellidoPaterno: apellidoPaterno.trim(),
-          apellidoMaterno: apellidoMaterno.trim(),
-          telefono: telefono.trim(),
-          email: email.trim(),
-          curp: curp.trim().toUpperCase(),
-          rfc: rfc.trim().toUpperCase(),
-          nombreCompleto,
-          activo: this.formData.activo,
-          direccion: { ...this.clientes[idx].direccion, ...direccion }
-        };
-      }
-    } else {
-      this.clientes.push({
-        id: this.nextId++,
-        nombre: nombre.trim(),
-        apellidoPaterno: apellidoPaterno.trim(),
-        apellidoMaterno: apellidoMaterno.trim(),
-        telefono: telefono.trim(),
-        email: email.trim(),
-        curp: curp.trim().toUpperCase(),
-        rfc: rfc.trim().toUpperCase(),
-        nombreCompleto,
-        activo: this.formData.activo,
-        direccion: { ...direccion, fechaRegistro: new Date().toISOString().split('T')[0] }
-      });
-    }
+    this.isLoadingGuardar = true;
+    this.modalError = '';
 
-    this.aplicarFiltros();
-    this.closeModal();
+    const label = this.isEditingCliente ? 'Cliente actualizado.' : 'Cliente registrado.';
+    const op = this.isEditingCliente
+      ? this.clienteService.actualizar(this.idEdicion!, body)
+      : this.clienteService.crear(body);
+
+    op.subscribe({
+      next: () => {
+        this.isLoadingGuardar = false;
+        this.closeModal();
+        this.cargarClientes();
+        this.mostrarExito(label);
+      },
+      error: (err) => {
+        this.isLoadingGuardar = false;
+        this.modalError = err?.error?.message ?? err?.error?.error ?? 'Error al guardar el cliente.';
+      }
+    });
   }
 
   trackById(_: number, item: ClienteResponse): number {
     return item.id;
+  }
+
+  private mostrarExito(msg: string): void {
+    this.successMessage = msg;
+    this.errorMessage = '';
+    setTimeout(() => (this.successMessage = ''), 4000);
   }
 
   private emptyForm() {
@@ -322,11 +238,10 @@ export class ClientesComponent implements OnInit {
       apellidoPaterno: '',
       apellidoMaterno: '',
       telefono: '',
-      email: '',
       curp: '',
       rfc: '',
       activo: true,
-      tipoDireccion: 'Casa',
+      tipoDireccion: 'Particular' as 'Fiscal' | 'Particular' | 'Laboral',
       calle: '',
       numeroExterior: '',
       numeroInterior: '',

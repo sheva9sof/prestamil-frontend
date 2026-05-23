@@ -1,6 +1,40 @@
 import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
 import { OpcionMenu } from '../models/auth-response.model';
 
+function normalizeMenuUrl(url: string): string {
+  const normalizedUrl = url.replace('/default', '').replace(/\/$/, '');
+  return normalizedUrl === '/avaluos/mock' ? '/avaluos' : normalizedUrl;
+}
+
+function normalizeNavigationItem(item: NavigationItem): NavigationItem {
+  const children = item.children?.map(child => normalizeNavigationItem(child));
+  const normalizedItem: NavigationItem = {
+    ...item,
+    title: item.url === '/avaluos' ? 'Avaluos' : item.title,
+    children
+  };
+
+  if (!children) {
+    return normalizedItem;
+  }
+
+  const hasAvaluos = new Set<string>();
+  normalizedItem.children = children.filter(child => {
+    if (child.url !== '/avaluos') {
+      return true;
+    }
+
+    if (hasAvaluos.has(child.url)) {
+      return false;
+    }
+
+    hasAvaluos.add(child.url);
+    return true;
+  });
+
+  return normalizedItem;
+}
+
 /**
  * Transforma una opción del backend a NavigationItem
  */
@@ -21,7 +55,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   let url: string | undefined = undefined;
   if (opcion.url) {
     // Normalizar URLs (remover /default si existe, limpiar barras finales)
-    url = opcion.url.replace('/default', '').replace(/\/$/, '') || undefined;
+    url = normalizeMenuUrl(opcion.url) || undefined;
     // Si la URL está vacía después de normalizar, usar undefined
     if (url === '') {
       url = undefined;
@@ -37,8 +71,8 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
-      'Avaluos': '/avaluos/mock',
-      'Avaluos Prendarios': '/avaluos/mock',
+      'Avaluos': '/avaluos',
+      'Avaluos Prendarios': '/avaluos',
       'Prendas': '/catalogos/prendas',
       'Descuentos': '/catalogos/descuentos',
       'Sucursal': '/configuracion/sucursal',
@@ -60,7 +94,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   
   return {
     id: opcion.id.toString(),
-    title: opcion.opcion,
+    title: url === '/avaluos' ? 'Avaluos' : opcion.opcion,
     type: type,
     icon: icon,
     url: url,
@@ -78,17 +112,17 @@ export function transformOpcionesToNavigationItems(opciones: OpcionMenu[]): Navi
   }
   
   // Transformar cada opción
-  const items = opciones.map(opcion => transformOpcion(opcion));
+  const items = opciones.map(opcion => normalizeNavigationItem(transformOpcion(opcion)));
   
   // Agrupar todas las opciones en un grupo principal
   return [
-    {
+    normalizeNavigationItem({
       id: 'main-menu',
       title: '',
       type: 'group',
       icon: 'icon-navigation',
       children: items
-    }
+    })
   ];
 }
 

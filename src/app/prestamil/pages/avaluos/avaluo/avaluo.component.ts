@@ -17,7 +17,7 @@ import { environment } from 'src/environments/environment';
 // Interfaces locales
 // ---------------------------------------------------------------------------
 
-interface PartidaMock {
+interface PartidaAvaluo {
   id: number;
   idTipoPrenda: number;
   idValorPrenda?: number;
@@ -59,7 +59,7 @@ interface PrendaCatalogo {
   tipo: string;
 }
 
-interface PlazoMock {
+interface PlazoAvaluo {
   id: number;
   nombre: string;
   diasPorPeriodo: number;
@@ -71,12 +71,12 @@ interface PlazoMock {
 // ---------------------------------------------------------------------------
 
 @Component({
-  selector: 'app-avaluo-mock',
+  selector: 'app-avaluo',
   imports: [CommonModule, FormsModule, SharedModule],
-  templateUrl: './avaluo-mock.component.html',
-  styleUrls: ['./avaluo-mock.component.scss']
+  templateUrl: './avaluo.component.html',
+  styleUrls: ['./avaluo.component.scss']
 })
-export class AvaluoMockComponent implements OnInit {
+export class AvaluoComponent implements OnInit {
 
   // -------------------------------------------------------------------------
   // Services
@@ -93,7 +93,7 @@ export class AvaluoMockComponent implements OnInit {
   // -------------------------------------------------------------------------
   readonly sucursal = 'Sucursal Centro';
   usuario = this.authService.getUser()?.nombre ?? 'Sin sesión';
-  rol = this.authService.getUser()?.idRol ? `Rol ${this.authService.getUser().idRol}` : '';
+  rol = this.authService.getUser()?.rolNombre ?? '';
   sucursalId = 1;
   readonly fechaAbierta = new Date().toLocaleDateString('es-MX');
   operacionAbierta = true;
@@ -141,10 +141,10 @@ export class AvaluoMockComponent implements OnInit {
   // -------------------------------------------------------------------------
   // Plazos
   // -------------------------------------------------------------------------
-  plazos: PlazoMock[] = [];
-  plazoSeleccionado: PlazoMock | null = null;
+  plazos: PlazoAvaluo[] = [];
+  plazoSeleccionado: PlazoAvaluo | null = null;
 
-  private readonly plazosDemo: PlazoMock[] = [
+  private readonly plazosDemo: PlazoAvaluo[] = [
     { id: 1, nombre: 'ALHAJAS - 12 SEMANAS', diasPorPeriodo: 7,  numeroPeriodos: 12 },
     { id: 2, nombre: 'ALHAJAS - 10 SEMANAS', diasPorPeriodo: 7,  numeroPeriodos: 10 },
     { id: 3, nombre: 'QUINCENAL',            diasPorPeriodo: 15, numeroPeriodos: 6  },
@@ -152,7 +152,7 @@ export class AvaluoMockComponent implements OnInit {
   ];
 
   // Precios fallback mientras no haya tabla cargada (última tabla real o demo)
-  private readonly preciosMockOro: Record<number, number> = {
+  private readonly preciosOro: Record<number, number> = {
     6: 118.84, 8: 384.65, 10: 488.26, 12: 591.38,
     14: 695.74, 18: 900.01, 21: 1052.50, 24: 0
   };
@@ -161,8 +161,12 @@ export class AvaluoMockComponent implements OnInit {
   // Datos de plazo (cargados cuando se selecciona un plazo)
   // -------------------------------------------------------------------------
   tablaAlhajas: PlazoHechuraAlhajaResponse[] = [];
-  paramsAlhaja: PlazoParametroResponse | null = null;
-  paramsVarios: PlazoParametroResponse | null = null;
+  // Params indexados por tipo_prenda_id — cargados todos de una vez al seleccionar plazo
+  private paramsMap: Record<number, PlazoParametroResponse> = {};
+
+  private getParams(tipoPrendaId: number): PlazoParametroResponse | null {
+    return this.paramsMap[tipoPrendaId] ?? null;
+  }
 
   ngOnInit(): void {
     this.plazoService.getAll().subscribe({
@@ -179,26 +183,27 @@ export class AvaluoMockComponent implements OnInit {
     });
   }
 
-  onPlazoChange(plazo: PlazoMock | null): void {
+  onPlazoChange(plazo: PlazoAvaluo | null): void {
     this.tablaAlhajas = [];
-    this.paramsAlhaja = null;
-    this.paramsVarios = null;
+    this.paramsMap = {};
     if (!plazo) return;
 
     this.plazoService.getTablaAlhajas(plazo.id, this.sucursalId).subscribe({
       next: (tabla) => { this.tablaAlhajas = tabla; this.recalcularAlhajas(); }
     });
 
-    this.plazoService.getParametro(plazo.id, 1, this.sucursalId).subscribe({
-      next: (p) => { this.paramsAlhaja = p; this.recalcularAlhajas(); }
-    });
-
-    this.plazoService.getParametro(plazo.id, 3, this.sucursalId).subscribe({
-      next: (p) => { this.paramsVarios = p; this.recalcularVarios(); }
+    // Carga todos los parámetros del plazo en un solo request y los indexa por tipo
+    this.plazoService.getParametrosBySucursal(plazo.id, this.sucursalId).subscribe({
+      next: (lista) => {
+        this.paramsMap = {};
+        (lista ?? []).forEach(p => { this.paramsMap[p.tipoPrendaId] = p; });
+        this.recalcularAlhajas();
+        this.recalcularVarios();
+      }
     });
   }
 
-  labelPlazo(p: PlazoMock): string {
+  labelPlazo(p: PlazoAvaluo): string {
     return `${p.nombre} - ${p.diasPorPeriodo * p.numeroPeriodos} días`;
   }
 
@@ -282,25 +287,33 @@ export class AvaluoMockComponent implements OnInit {
       this.captura.prestamo = +(row.precioPrestamo * this.captura.peso).toFixed(2);
     } else {
       // Fallback a precios demo mientras no haya tabla real
-      const precioBase = this.preciosMockOro[kilataje] ?? 0;
+      const precioBase = this.preciosOro[kilataje] ?? 0;
       this.captura.precioXGramo = precioBase;
       this.captura.prestamo = +(precioBase * this.captura.peso * 1.03).toFixed(2);
     }
 
     this.captura.avaluoReal = this.captura.prestamo;
-    const porcInc = this.paramsAlhaja?.porcIncrementoAvaluo ?? 50;
+    const tipoPrendaId = this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1;
+    const params = this.getParams(tipoPrendaId);
+    const porcInc = params?.porcIncrementoAvaluo ?? 0;
     this.captura.avaluoContrato = +(this.captura.prestamo * (1 + porcInc / 100)).toFixed(2);
   }
 
   recalcularVarios(): void {
-    const porcInc = this.paramsVarios?.porcIncrementoAvaluo ?? 50;
+    const params = this.getParams(this.TIPO_PRENDA_ID['Varios']);
+    const porcInc = params?.porcIncrementoAvaluo ?? 0;
     this.capturaVarios.avaluoContrato = +(this.capturaVarios.prestamo * (1 + porcInc / 100)).toFixed(2);
+  }
+
+  get porcIncrementoVarios(): number {
+    const params = this.getParams(this.TIPO_PRENDA_ID['Varios']);
+    return params?.porcIncrementoAvaluo ?? 0;
   }
 
   // -------------------------------------------------------------------------
   // Partidas
   // -------------------------------------------------------------------------
-  partidas: PartidaMock[] = [];
+  partidas: PartidaAvaluo[] = [];
 
   get totalPartidas(): number       { return this.partidas.length; }
   get pesoTotal(): number           { return this.partidas.reduce((a, i) => a + i.peso, 0); }
@@ -314,6 +327,7 @@ export class AvaluoMockComponent implements OnInit {
   seleccionarTipo(tipo: string): void {
     this.tipoSeleccionado = tipo;
     this.puedeAgregarPartida = tipo !== 'Autos/Motos';
+    this.prendasCatalogo = [];
   }
 
   agregarPartida(): void {
@@ -335,7 +349,7 @@ export class AvaluoMockComponent implements OnInit {
         this.mostrarError('Captura un peso mayor a 0');
         return;
       }
-      const nueva: PartidaMock = {
+      const nueva: PartidaAvaluo = {
         id: this.partidas.length + 1,
         idTipoPrenda: this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1,
         idValorPrenda: this.captura.idValorPrenda,
@@ -361,7 +375,7 @@ export class AvaluoMockComponent implements OnInit {
         this.mostrarError('Captura un préstamo mayor a 0');
         return;
       }
-      const nueva: PartidaMock = {
+      const nueva: PartidaAvaluo = {
         id: this.partidas.length + 1,
         idTipoPrenda: 3,
         tipo: 'Varios',

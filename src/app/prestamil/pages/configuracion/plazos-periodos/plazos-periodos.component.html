@@ -91,13 +91,8 @@
       </div>
       <div class="modal-body">
 
-        <!-- Nav tabs — sólo navegación, sin ngbNavContent/NgbNavOutlet para evitar el boundary OnPush -->
+        <!-- Nav tabs -->
         <ul ngbNav #detalleNav="ngbNav" [(activeId)]="activeTab" class="nav-tabs" (activeIdChange)="cambiarTab($any($event))">
-          <li [ngbNavItem]="'parametros'">
-            <button ngbNavLink>
-              <i class="feather icon-sliders"></i> Parámetros
-            </button>
-          </li>
           <li *ngFor="let tab of detalleTabs; trackBy: trackByTabId" [ngbNavItem]="tab.id">
             <button ngbNavLink>
               <i class="feather" [ngClass]="tab.isAlhajas ? 'icon-dollar-sign' : 'icon-tag'"></i>
@@ -106,195 +101,46 @@
           </li>
         </ul>
 
-        <!-- Contenido de tabs renderizado directamente en la vista del modal (siempre chequeada por Angular CD) -->
+        <!-- Contenido de tabs -->
         <div class="tab-content">
-
-          <!-- Tab Parámetros -->
-          <div class="tab-pane" [class.active]="activeTab === 'parametros'" *ngIf="activeTab === 'parametros'">
-            <div class="pt-3">
-              <div *ngIf="isLoadingTab" class="text-center py-3">
-                <i class="feather icon-loader spin-icon"></i>
-              </div>
-              <div *ngIf="tabError && !isLoadingTab" class="alert alert-danger small">{{ tabError }}</div>
-
-              <ng-container *ngIf="!isLoadingTab && selectedPlazo">
-                <div *ngIf="(selectedPlazo.tiposPrenda?.length ?? 0) === 0" class="alert alert-info">
-                  Asigne un tipo de prenda al plazo primero.
-                </div>
-
-                <ng-container *ngFor="let t of (selectedPlazo.tiposPrenda ?? []); let isLast = last">
-                  <div class="mb-3" *ngIf="parametrosForm[t.id]">
-                    <h6 class="mb-2">{{ t.tipo }}</h6>
-
-                    <div class="row g-2 mb-2">
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">% Interés</label>
-                        <input type="number" class="form-control form-control-sm" step="0.0001"
-                          [(ngModel)]="parametrosForm[t.id].porcInteres" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">% Almacén</label>
-                        <input type="number" class="form-control form-control-sm" step="0.0001"
-                          [(ngModel)]="parametrosForm[t.id].porcAlmacen" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">% G. Admin</label>
-                        <input type="number" class="form-control form-control-sm" step="0.0001"
-                          [(ngModel)]="parametrosForm[t.id].porcGastosAdmin" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">% Préstamo s/Avalúo</label>
-                        <input type="number" class="form-control form-control-sm" step="0.0001"
-                          [(ngModel)]="parametrosForm[t.id].porcPrestamoSAvaluo" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">CAT</label>
-                        <input type="number" class="form-control form-control-sm" step="0.0001"
-                          [(ngModel)]="parametrosForm[t.id].cat" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">Max Refrendos</label>
-                        <input type="number" class="form-control form-control-sm"
-                          [(ngModel)]="parametrosForm[t.id].numMaxRefrendos" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">% Incremento sobre Avalúo</label>
-                        <input type="number" class="form-control form-control-sm" step="0.0001"
-                          [(ngModel)]="parametrosForm[t.id].porcIncrementoAvaluo" [ngModelOptions]="{ standalone: true }"
-                          title="Porcentaje de incremento sobre el préstamo para determinar el valor de referencia que aparece en el contrato. Varía por zona/sucursal." />
-                        <small class="form-text text-muted">
-                          Si el préstamo es ${{ avaluoPreview(t.id).prestamo | number:'1.2-2' }}
-                          → avalúo en contrato: ${{ avaluoPreview(t.id).avaluo | number:'1.2-2' }}
-                        </small>
-                      </div>
-                      <div class="col-md-4 d-flex align-items-end">
-                        <div class="form-check">
-                          <input type="checkbox" class="form-check-input"
-                            [id]="'usa-real-' + t.id"
-                            [(ngModel)]="parametrosForm[t.id].usaAvaluoReal" [ngModelOptions]="{ standalone: true }" />
-                          <label class="form-check-label" [for]="'usa-real-' + t.id">Usa Avalúo Real</label>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div class="row g-2 mb-2">
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">Días gracia sin interés</label>
-                        <input type="number" class="form-control form-control-sm"
-                          [(ngModel)]="parametrosForm[t.id].diasGraciaSinInteres" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">Días antes pase a venta</label>
-                        <input type="number" class="form-control form-control-sm"
-                          [(ngModel)]="parametrosForm[t.id].diasAntesPaseVenta" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                      <div class="col-md-4">
-                        <label class="form-label small mb-0">Importe mínimo préstamo</label>
-                        <input type="number" class="form-control form-control-sm" step="0.01"
-                          [(ngModel)]="parametrosForm[t.id].importeMinPrestamo" [ngModelOptions]="{ standalone: true }" />
-                      </div>
-                    </div>
-
-                    <div class="d-flex align-items-center gap-2">
-                      <button class="btn btn-sm btn-primary" (click)="guardarParametro(t.id)" [disabled]="savingParam[t.id]">
-                        <span *ngIf="savingParam[t.id]" class="spinner-border spinner-border-sm me-1"></span>
-                        Guardar {{ t.tipo }}
-                      </button>
-                      <span *ngIf="paramSaveSuccess[t.id]" class="text-success small">
-                        <i class="feather icon-check"></i> Guardado
-                      </span>
-                      <span *ngIf="paramSaveError[t.id]" class="text-danger small">
-                        {{ paramSaveError[t.id] }}
-                      </span>
-                    </div>
-                  </div>
-                  <hr *ngIf="!isLast" />
-                </ng-container>
-              </ng-container>
-            </div>
-          </div>
-
-          <!-- Tabs dinámicas por tipo de prenda -->
           <ng-container *ngFor="let tab of detalleTabs; trackBy: trackByTabId">
             <div class="tab-pane" [class.active]="activeTab === tab.id" *ngIf="activeTab === tab.id">
               <div class="pt-3">
-
                 <div [ngSwitch]="tab.kind">
 
-                  <!-- ALHAJA o PLATA → tabla kilataje/hechura/precio -->
+                  <!-- ALHAJA o PLATA → parámetros + tabla kilataje/hechura/precio -->
                   <ng-container *ngSwitchCase="'alhaja'">
+                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
+                    <hr class="my-3" />
                     <ng-container *ngTemplateOutlet="tablaKilatajeTpl; context: { $implicit: tab }"></ng-container>
                   </ng-container>
                   <ng-container *ngSwitchCase="'plata'">
+                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
+                    <hr class="my-3" />
                     <ng-container *ngTemplateOutlet="tablaKilatajeTpl; context: { $implicit: tab }"></ng-container>
                   </ng-container>
 
-                  <!-- VARIOS → sólo usaAvaluoReal + porcIncrementoAvaluo + mensaje -->
+                  <!-- VARIOS → parámetros completos -->
                   <ng-container *ngSwitchCase="'varios'">
                     <div class="alert alert-info small mb-3" role="alert">
                       <i class="feather icon-info me-1"></i>
-                      Para electrónicos el valuador captura el préstamo manualmente. Este porcentaje determina el avalúo que aparece en el contrato.
+                      Para electrónicos el valuador captura el préstamo manualmente. El % de incremento determina el avalúo en el contrato.
                     </div>
-
-                    <ng-container *ngIf="parametrosForm[getTipoIdFromTab(tab.id)] as form; else variosLoading">
-                      <div class="row g-2 mb-2">
-                        <div class="col-md-4 d-flex align-items-end">
-                          <div class="form-check">
-                            <input type="checkbox" class="form-check-input"
-                              [id]="'usa-real-varios-' + tab.id"
-                              [(ngModel)]="form.usaAvaluoReal" [ngModelOptions]="{ standalone: true }" />
-                            <label class="form-check-label" [for]="'usa-real-varios-' + tab.id">Usa Avalúo Real</label>
-                          </div>
-                        </div>
-                        <div class="col-md-4">
-                          <label class="form-label small mb-0">% Incremento avalúo</label>
-                          <input type="number" class="form-control form-control-sm" step="0.0001"
-                            [(ngModel)]="form.porcIncrementoAvaluo" [ngModelOptions]="{ standalone: true }" />
-                          <small class="form-text text-muted">
-                            Si el préstamo es ${{ avaluoPreview(getTipoIdFromTab(tab.id)).prestamo | number:'1.2-2' }}
-                            → avalúo en contrato: ${{ avaluoPreview(getTipoIdFromTab(tab.id)).avaluo | number:'1.2-2' }}
-                          </small>
-                        </div>
-                        <div class="col-md-4 d-flex align-items-end">
-                          <button class="btn btn-sm btn-primary" (click)="guardarParametro(getTipoIdFromTab(tab.id))"
-                            [disabled]="savingParam[getTipoIdFromTab(tab.id)]">
-                            <span *ngIf="savingParam[getTipoIdFromTab(tab.id)]" class="spinner-border spinner-border-sm me-1"></span>
-                            Guardar {{ tab.label }}
-                          </button>
-                        </div>
-                      </div>
-                      <span *ngIf="paramSaveSuccess[getTipoIdFromTab(tab.id)]" class="text-success small">
-                        <i class="feather icon-check"></i> Guardado
-                      </span>
-                      <span *ngIf="paramSaveError[getTipoIdFromTab(tab.id)]" class="text-danger small">
-                        {{ paramSaveError[getTipoIdFromTab(tab.id)] }}
-                      </span>
-                    </ng-container>
-                    <ng-template #variosLoading>
-                      <div class="text-muted small">Cargando parámetros...</div>
-                    </ng-template>
+                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
                   </ng-container>
 
-                  <!-- AUTO-MOTO / OTRO → mensaje defensivo -->
+                  <!-- OTRO → mensaje defensivo -->
                   <ng-container *ngSwitchDefault>
                     <div class="alert alert-warning small mb-0" role="alert">
                       <i class="feather icon-alert-triangle me-1"></i>
-                      Configuración de tabla de precios para {{ tab.label }} no disponible en esta versión.
+                      Configuración para {{ tab.label }} no disponible en esta versión.
                     </div>
                   </ng-container>
 
                 </div>
-
               </div>
             </div>
           </ng-container>
-
         </div>
 
       </div>
@@ -366,6 +212,106 @@
 
   </div>
 </div>
+
+<!-- Template reutilizable: formulario de parámetros por tipo de prenda -->
+<ng-template #paramsTpl let-tipoId="tipoId" let-label="label">
+  <div *ngIf="isLoadingTab" class="text-center py-3">
+    <i class="feather icon-loader spin-icon"></i>
+  </div>
+  <div *ngIf="tabError && !isLoadingTab" class="alert alert-danger small">{{ tabError }}</div>
+
+  <ng-container *ngIf="!isLoadingTab">
+    <div *ngIf="!parametrosForm[tipoId]" class="text-muted small">Cargando parámetros...</div>
+
+    <ng-container *ngIf="parametrosForm[tipoId]">
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">% Interés</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].porcInteres" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">% Almacén</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].porcAlmacen" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">% G. Admin</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].porcGastosAdmin" [ngModelOptions]="{ standalone: true }" />
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">% Préstamo s/Avalúo</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].porcPrestamoSAvaluo" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">CAT</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].cat" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">Max Refrendos</label>
+          <input type="number" class="form-control form-control-sm"
+            [(ngModel)]="parametrosForm[tipoId].numMaxRefrendos" [ngModelOptions]="{ standalone: true }" />
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">% Incremento sobre Avalúo</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].porcIncrementoAvaluo" [ngModelOptions]="{ standalone: true }"
+            title="Porcentaje de incremento sobre el préstamo para el avalúo del contrato." />
+          <small class="form-text text-muted">
+            Si el préstamo es ${{ avaluoPreview(tipoId).prestamo | number:'1.2-2' }}
+            → avalúo en contrato: ${{ avaluoPreview(tipoId).avaluo | number:'1.2-2' }}
+          </small>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input"
+              [id]="'usa-real-' + tipoId"
+              [(ngModel)]="parametrosForm[tipoId].usaAvaluoReal" [ngModelOptions]="{ standalone: true }" />
+            <label class="form-check-label" [for]="'usa-real-' + tipoId">Usa Avalúo Real</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">Días gracia sin interés</label>
+          <input type="number" class="form-control form-control-sm"
+            [(ngModel)]="parametrosForm[tipoId].diasGraciaSinInteres" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">Días antes pase a venta</label>
+          <input type="number" class="form-control form-control-sm"
+            [(ngModel)]="parametrosForm[tipoId].diasAntesPaseVenta" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">Importe mínimo préstamo</label>
+          <input type="number" class="form-control form-control-sm" step="0.01"
+            [(ngModel)]="parametrosForm[tipoId].importeMinPrestamo" [ngModelOptions]="{ standalone: true }" />
+        </div>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 mt-2">
+        <button class="btn btn-sm btn-primary" (click)="guardarParametro(tipoId)" [disabled]="savingParam[tipoId]">
+          <span *ngIf="savingParam[tipoId]" class="spinner-border spinner-border-sm me-1"></span>
+          Guardar {{ label }}
+        </button>
+        <span *ngIf="paramSaveSuccess[tipoId]" class="text-success small">
+          <i class="feather icon-check"></i> Guardado
+        </span>
+        <span *ngIf="paramSaveError[tipoId]" class="text-danger small">{{ paramSaveError[tipoId] }}</span>
+      </div>
+    </ng-container>
+  </ng-container>
+</ng-template>
 
 <!-- Template reutilizable: tabla kilataje/hechura/precio (Alhajas y Plata) -->
 <ng-template #tablaKilatajeTpl let-tab>

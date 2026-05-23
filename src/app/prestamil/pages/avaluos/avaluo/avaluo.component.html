@@ -28,8 +28,8 @@
 <!-- ──────────────────────────────────── 0) Datos de encabezado ── -->
 <div class="row mb-3">
   <div class="col-12">
-    <app-card>
-      <div class="mock-header-grid">
+    <app-card [hidHeader]="true">
+      <div class="avaluo-header-grid">
         <div><strong>Sucursal:</strong> {{ sucursal }}</div>
         <div><strong>Usuario:</strong> {{ usuario }}</div>
         <div><strong>Rol:</strong> {{ rol }}</div>
@@ -265,7 +265,7 @@
             />
           </div>
           <div class="form-group col-md-3">
-            <label class="form-label">Avalúo contrato (50%)</label>
+            <label class="form-label">Avalúo contrato (+{{ porcIncrementoVarios }}%)</label>
             <input
               class="form-control form-control-sm text-right fw-bold bg-warning-subtle"
               [value]="capturaVarios.avaluoContrato | number: '1.2-2'"
