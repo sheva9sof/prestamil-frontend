@@ -6,10 +6,12 @@ export interface PartidaContratoRequest {
   cantidad?: number;
   pesoGramos?: number;
   kilataje?: number;
+  ley?: number;
   hechura?: string;
   precioXGramo?: number;
   avaluoReal: number;
-  avaluoContrato: number;
+  /** Opcional: el servidor lo recalcula cuando el plazo usa avalúo real. */
+  avaluoContrato?: number;
   montoPrestamo: number;
   subtipo?: string;
   marca?: string;
@@ -39,6 +41,7 @@ export interface PartidaContratoResponse {
   cantidad: number;
   pesoGramos?: number;
   kilataje?: number;
+  ley?: number;
   hechura?: string;
   precioXGramo?: number;
   avaluoReal: number;
@@ -69,4 +72,48 @@ export interface ContratoResponse {
   numRefrendos: number;
   creadoEn?: string;
   partidas?: PartidaContratoResponse[];
+}
+
+// ============================================================
+// Amortización (tabla de vencimientos calculada al vuelo)
+// ============================================================
+
+export interface VencimientoResponse {
+  periodo: number;
+  fecha: string;
+  interes: number;
+  total: number;
+}
+
+// ============================================================
+// Movimientos (refrendos, finiquitos, reposición)
+// ============================================================
+
+export type TipoMovimiento =
+  | 'REFRENDO'
+  | 'REFRENDO_EXTEMPORANEO'
+  | 'FINIQUITO'
+  | 'FINIQUITO_EXTEMPORANEO'
+  | 'ABONO'
+  | 'REPOSICION_CONTRATO';
+
+export interface RefrendoRequest {
+  idContrato: number;
+  abonoCapital?: number;
+  observaciones?: string;
+}
+
+export interface MovimientoResponse {
+  id: number;
+  idContrato: number;
+  folioContrato: string;
+  tipo: TipoMovimiento;
+  monto: number;
+  interes: number;
+  sancion: number;
+  semanasVencidas: number;
+  fecha: string;
+  observaciones?: string;
+  numRefrendos: number;
+  nuevaFechaVencimiento?: string;
 }

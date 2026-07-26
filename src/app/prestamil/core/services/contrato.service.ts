@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { ContratoRequest, ContratoResponse } from '../models/contrato.model';
+import { ContratoRequest, ContratoResponse, VencimientoResponse } from '../models/contrato.model';
 
 @Injectable({ providedIn: 'root' })
 export class ContratoService {
@@ -27,5 +27,10 @@ export class ContratoService {
 
   getVencidos(): Observable<ContratoResponse[]> {
     return this.http.get<ContratoResponse[]>(`${this.API_URL}/vencidos`);
+  }
+
+  /** Tabla de amortización (vencimientos por periodo) calculada al vuelo. */
+  getAmortizacion(id: number): Observable<VencimientoResponse[]> {
+    return this.http.get<VencimientoResponse[]>(`${this.API_URL}/${id}/amortizacion`);
   }
 }

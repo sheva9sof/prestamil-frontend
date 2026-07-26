@@ -8,13 +8,16 @@ import {
   PlazoParametroRequest,
   PlazoParametroResponse,
   PlazoHechuraAlhajaRequest,
-  PlazoHechuraAlhajaResponse
+  PlazoHechuraAlhajaResponse,
+  PrecioOroResponse,
+  PrecioOroRequest
 } from '../models/plazo.model';
 
 @Injectable({ providedIn: 'root' })
 export class PlazoService {
   private readonly http = inject(HttpClient);
   private readonly API_URL = `${environment.apiUrl}/api/plazos`;
+  private readonly PRECIO_ORO_URL = `${environment.apiUrl}/api/precio-oro`;
 
   // === Plazos CRUD ===
 
@@ -106,6 +109,24 @@ export class PlazoService {
     return this.http.put<PlazoHechuraAlhajaResponse[]>(
       `${this.API_URL}/${plazoId}/alhajas/precio-oro`,
       { precioBaseOro },
+      { params: { sucursalId: String(sucursalId) } }
+    );
+  }
+
+  // === Precio del Oro GLOBAL ===
+  // Control único, fuera de los registros de cada plazo. Al guardar el precio del
+  // gramo de 24K se recalculan automáticamente TODAS las tablas de la sucursal.
+
+  getPrecioOro(sucursalId: number = 1): Observable<PrecioOroResponse> {
+    return this.http.get<PrecioOroResponse>(this.PRECIO_ORO_URL, {
+      params: { sucursalId: String(sucursalId) }
+    });
+  }
+
+  actualizarPrecioOroGlobal(request: PrecioOroRequest, sucursalId: number = 1): Observable<PrecioOroResponse> {
+    return this.http.put<PrecioOroResponse>(
+      this.PRECIO_ORO_URL,
+      request,
       { params: { sucursalId: String(sucursalId) } }
     );
   }
