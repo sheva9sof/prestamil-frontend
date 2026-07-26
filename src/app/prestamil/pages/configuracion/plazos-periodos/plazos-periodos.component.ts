@@ -68,7 +68,7 @@ export class PlazosPeriodosComponent implements OnInit {
   isLoadingTab = false;
   tabError = '';
 
-  // Input para recálculo masivo del precio del oro
+  // Input para recálculo masivo del precio del oro (legacy por-plazo)
   precioBaseOroInput: number | null = null;
   isRecalculando = false;
 
@@ -292,7 +292,7 @@ export class PlazosPeriodosComponent implements OnInit {
   get alhajasPorHechura(): Array<{ label: string; hechura: string; items: PlazoHechuraAlhajaResponse[] }> {
     // Soporta códigos legacy 'HF'/'HN'/'HE' y nuevos 'F'/'N'/'E'
     return [
-      { label: 'Fina',     hechura: 'F', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('F')) },
+      { label: 'Fundir',   hechura: 'F', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('F')) },
       { label: 'Normal',   hechura: 'N', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('N')) },
       { label: 'Especial', hechura: 'E', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('E')) }
     ];

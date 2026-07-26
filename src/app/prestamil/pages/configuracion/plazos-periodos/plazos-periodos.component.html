@@ -315,33 +315,6 @@
 
 <!-- Template reutilizable: tabla kilataje/hechura/precio (Alhajas y Plata) -->
 <ng-template #tablaKilatajeTpl let-tab>
-  <!-- Recálculo masivo -->
-  <div class="row g-2 mb-3 align-items-end">
-    <div class="col-md-5">
-      <label class="form-label small mb-1">Precio del oro 24K ($/gramo MXN)</label>
-      <input
-        type="number"
-        class="form-control form-control-sm"
-        [(ngModel)]="precioBaseOroInput"
-        [ngModelOptions]="{ standalone: true }"
-        min="0"
-        step="0.01"
-        placeholder="Ej. 60000"
-      />
-    </div>
-    <div class="col-md-auto">
-      <button
-        type="button"
-        class="btn btn-sm btn-warning"
-        (click)="recalcularTodo()"
-        [disabled]="isRecalculando || !precioBaseOroInput || precioBaseOroInput <= 0"
-      >
-        <i class="feather icon-refresh-cw"></i>
-        {{ isRecalculando ? 'Recalculando...' : 'Recalcular todos' }}
-      </button>
-    </div>
-  </div>
-
   <!-- Spinner -->
   <div *ngIf="isLoadingTab" class="text-center py-3">
     <i class="feather icon-loader spin-icon"></i>

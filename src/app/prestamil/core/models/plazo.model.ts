@@ -26,6 +26,10 @@ export interface PlazoParametroRequest {
   montoReposicion?: number;
   comisionPorVentaPrenda?: number;
   aplicarSancionPorPeriodo?: boolean;
+  porcSancionSemanal?: number;
+  ley925?: number;
+  ley725?: number;
+  precioGramoPlata?: number;
   diasGraciaSinInteres?: number;
   diasAntesPaseVenta?: number;
   importeMinPrestamo?: number;
@@ -78,11 +82,35 @@ export interface PlazoParametroResponse {
   montoReposicion: number;
   comisionPorVentaPrenda: number;
   aplicarSancionPorPeriodo: boolean;
+  porcSancionSemanal: number;
+  ley925: number;
+  ley725: number;
+  precioGramoPlata: number;
   diasGraciaSinInteres: number;
   diasAntesPaseVenta: number;
   importeMinPrestamo: number;
   creadoEn?: string;
   actualizadoEn?: string;
+}
+
+// ============================================================
+// Precio del Oro (control global, fuera de los registros de cada plazo)
+// ============================================================
+
+export interface PrecioOroRequest {
+  precioGramoBase: number;
+  baseKilataje?: number;
+  calcularSobre?: string;
+}
+
+export interface PrecioOroResponse {
+  id: number;
+  sucursalId: number;
+  precioGramo24k: number;
+  calcularSobre: string;
+  baseKilataje: number;
+  actualizadoEn?: string;
+  actualizadoPor?: string;
 }
 
 export interface PlazoHechuraAlhajaResponse {
