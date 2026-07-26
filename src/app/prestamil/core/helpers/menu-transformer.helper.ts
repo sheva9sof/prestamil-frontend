@@ -83,6 +83,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Parametros Generales': '/configuracion/parametros-generales',
       'Parámetros Generales': '/configuracion/parametros-generales',
       'Plazos y Periodos': '/configuracion/plazos-periodos',
+      'Configuración del Oro': '/configuracion/configuracion-oro',
       // Agregar más mapeos según sea necesario
     };
     

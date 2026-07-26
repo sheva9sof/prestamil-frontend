@@ -95,6 +95,10 @@ const routes: Routes = [
             loadComponent: () => import('./prestamil/pages/configuracion/plazos-periodos/plazos-periodos.component').then((c) => c.PlazosPeriodosComponent)
           },
           {
+            path: 'configuracion-oro',
+            loadComponent: () => import('./prestamil/pages/configuracion/configuracion-oro/configuracion-oro.component').then((c) => c.ConfiguracionOroComponent)
+          },
+          {
             path: 'actualizar-password',
             loadComponent: () => import('./prestamil/pages/configuracion/actualizar-password/actualizar-password.component').then((c) => c.ActualizarPasswordComponent)
           }
