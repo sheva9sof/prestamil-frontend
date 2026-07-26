@@ -57,7 +57,10 @@
               <div *ngIf="isLoading" class="text-center py-3">
                 <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
               </div>
-              <table *ngIf="!isLoading" class="table table-bordered align-middle mb-0">
+              <div *ngIf="!isLoading && celdasDeHechura(h.code).length === 0" class="alert alert-warning mb-0">
+                No hay valores de oro configurados para esta sucursal.
+              </div>
+              <table *ngIf="!isLoading && celdasDeHechura(h.code).length > 0" class="table table-bordered align-middle mb-0">
                 <thead>
                   <tr>
                     <th>Kilataje</th>

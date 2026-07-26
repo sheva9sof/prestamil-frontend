@@ -159,7 +159,7 @@ export class ConfiguracionOroComponent implements OnInit {
   }
 
   trackByCelda(_index: number, c: OroCeldaResponse): string {
-    return this.keyCelda(c);
+    return `${c.kilataje}-${c.hechura}`;
   }
 
   private autoHideSuccessMessage(): void {
