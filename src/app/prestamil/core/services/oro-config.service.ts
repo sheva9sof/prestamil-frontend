@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { OroCeldaResponse, PrecioGramoResponse } from '../models/oro-config.model';
+import { OroCeldaResponse, PrecioGramoRequest, PrecioGramoResponse } from '../models/oro-config.model';
 
 @Injectable({ providedIn: 'root' })
 export class OroConfigService {
@@ -50,15 +50,17 @@ export class OroConfigService {
   }
 
   /**
-   * Guarda un nuevo precio del gramo de oro 24K y recalcula todas las tablas de la sucursal.
-   * @param precioGramoBase nuevo precio del gramo de oro 24K
+   * Guarda un nuevo precio del gramo de oro 24K y los factores de ajuste por hechura
+   * (Fundir/Normal/Especial), y recalcula todas las tablas de la sucursal. Los factores
+   * son opcionales: si no se envían, el servidor conserva los valores vigentes.
+   * @param body precio del gramo base y factores por hechura
    * @param sucursalId id de la sucursal (default 1)
    * @returns Observable con el precio actualizado
    */
-  actualizarPrecioGramo(precioGramoBase: number, sucursalId = 1): Observable<PrecioGramoResponse> {
+  actualizarPrecioGramo(body: PrecioGramoRequest, sucursalId = 1): Observable<PrecioGramoResponse> {
     return this.http.put<PrecioGramoResponse>(
       this.API_PRECIO,
-      { precioGramoBase },
+      body,
       { params: { sucursalId: String(sucursalId) } }
     );
   }

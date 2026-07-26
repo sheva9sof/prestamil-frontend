@@ -6,13 +6,16 @@ import { NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { OroConfigService } from '../../../core/services/oro-config.service';
-import { OroCeldaResponse } from '../../../core/models/oro-config.model';
+import { OroCeldaResponse, PrecioGramoRequest } from '../../../core/models/oro-config.model';
 
 /**
  * Pantalla "Configuración del Oro": 3 pestañas (Fundir/Normal/Especial), cada una con
  * una tabla de 8 kilates (6,8,10,12,14,18,21,24K). Permite editar el %Prestamo de las
  * 24 celdas (ORO-05); la fila 24K se muestra como referencia no editable (ORO-07).
- * Incluye el campo de precio del gramo de oro 24K (movido desde /plazos-periodos, D-16).
+ * Incluye el campo de precio del gramo de oro 24K (movido desde /plazos-periodos, D-16)
+ * y los 3 factores de ajuste por hechura (Fundir/Normal/Especial), reinstaurados como
+ * multiplicador adicional configurable por sucursal sobre el precio de préstamo, que
+ * también afecta el monto real ofrecido en contratos nuevos (ORO-09).
  */
 @Component({
   selector: 'app-configuracion-oro',
@@ -27,6 +30,7 @@ export class ConfiguracionOroComponent implements OnInit {
   sucursalId = 1;
   celdas: OroCeldaResponse[] = [];
   precioGramo: number | null = null;
+  factores: { F: number | null; N: number | null; E: number | null } = { F: null, N: null, E: null };
   activeTab = 'F';
   isLoading = false;
   isSavingGramo = false;
@@ -66,12 +70,23 @@ export class ConfiguracionOroComponent implements OnInit {
   }
 
   /**
-   * Carga el precio del gramo de oro 24K vigente; tolera error si aún no hay precio configurado.
+   * Carga el precio del gramo de oro 24K y los factores por hechura vigentes;
+   * tolera error si aún no hay precio configurado (deja los factores en neutro).
    */
   cargarPrecioGramo(): void {
     this.oroConfigService.getPrecioGramo(this.sucursalId).subscribe({
-      next: (data) => { this.precioGramo = data?.precioGramo24k ?? null; },
-      error: () => { this.precioGramo = null; }
+      next: (data) => {
+        this.precioGramo = data?.precioGramo24k ?? null;
+        this.factores = {
+          F: data?.factorFundir ?? 100,
+          N: data?.factorNormal ?? 100,
+          E: data?.factorEspecial ?? 100
+        };
+      },
+      error: () => {
+        this.precioGramo = null;
+        this.factores = { F: 100, N: 100, E: 100 };
+      }
     });
   }
 
@@ -138,16 +153,29 @@ export class ConfiguracionOroComponent implements OnInit {
   }
 
   /**
-   * Guarda el nuevo precio del gramo de oro 24K y recalcula todas las tablas de la sucursal.
+   * Guarda el nuevo precio del gramo de oro 24K y los 3 factores de ajuste por hechura,
+   * y recalcula todas las tablas de la sucursal.
    */
   guardarPrecioGramo(): void {
     if (!this.precioGramo || this.precioGramo <= 0) return;
+    const { F, N, E } = this.factores;
+    const factoresInvalidos = [F, N, E].some((f) => f === null || f === undefined || isNaN(Number(f)) || Number(f) < 0);
+    if (factoresInvalidos) {
+      this.errorMessage = 'Los factores por hechura deben ser mayores o iguales a cero';
+      return;
+    }
     this.isSavingGramo = true;
     this.errorMessage = '';
-    this.oroConfigService.actualizarPrecioGramo(this.precioGramo, this.sucursalId).subscribe({
+    const body: PrecioGramoRequest = {
+      precioGramoBase: this.precioGramo,
+      factorFundir: F ?? undefined,
+      factorNormal: N ?? undefined,
+      factorEspecial: E ?? undefined
+    };
+    this.oroConfigService.actualizarPrecioGramo(body, this.sucursalId).subscribe({
       next: () => {
         this.isSavingGramo = false;
-        this.successMessage = 'Precio del gramo guardado. Todas las tablas fueron recalculadas.';
+        this.successMessage = 'Precio del gramo y factores por hechura guardados. Tablas recalculadas.';
         this.autoHideSuccessMessage();
         this.cargarTabla();
       },

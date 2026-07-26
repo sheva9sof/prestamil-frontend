@@ -24,10 +24,16 @@ export interface PrecioGramoResponse {
   precioGramo24k: number;
   calcularSobre: string;
   baseKilataje: number;
+  factorFundir: number;
+  factorNormal: number;
+  factorEspecial: number;
   actualizadoEn?: string;
   actualizadoPor?: string;
 }
 
 export interface PrecioGramoRequest {
   precioGramoBase: number;
+  factorFundir?: number;
+  factorNormal?: number;
+  factorEspecial?: number;
 }

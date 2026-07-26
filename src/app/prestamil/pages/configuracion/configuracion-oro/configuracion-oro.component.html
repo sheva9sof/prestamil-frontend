@@ -32,6 +32,45 @@
               step="0.01"
             />
           </div>
+          <div>
+            <label class="form-label mb-1" for="factorFundirInput">Factor Fundir (%)</label>
+            <input
+              id="factorFundirInput"
+              type="number"
+              class="form-control"
+              style="max-width: 130px"
+              [(ngModel)]="factores.F"
+              [ngModelOptions]="{ standalone: true }"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div>
+            <label class="form-label mb-1" for="factorNormalInput">Factor Normal (%)</label>
+            <input
+              id="factorNormalInput"
+              type="number"
+              class="form-control"
+              style="max-width: 130px"
+              [(ngModel)]="factores.N"
+              [ngModelOptions]="{ standalone: true }"
+              min="0"
+              step="0.01"
+            />
+          </div>
+          <div>
+            <label class="form-label mb-1" for="factorEspecialInput">Factor Especial (%)</label>
+            <input
+              id="factorEspecialInput"
+              type="number"
+              class="form-control"
+              style="max-width: 130px"
+              [(ngModel)]="factores.E"
+              [ngModelOptions]="{ standalone: true }"
+              min="0"
+              step="0.01"
+            />
+          </div>
           <button
             type="button"
             class="btn btn-primary"
@@ -42,6 +81,10 @@
             {{ isSavingGramo ? 'Guardando...' : 'Guardar y recalcular' }}
           </button>
         </div>
+        <small class="text-muted d-block mt-2">
+          Multiplicador adicional aplicado al precio de prestamo de cada hechura. 100% = sin ajuste.
+          Afecta tambien el monto de contratos nuevos.
+        </small>
       </div>
 
       <div *ngIf="errorMessage" class="alert alert-danger mt-3 mb-0" role="alert">{{ errorMessage }}</div>
