@@ -1,174 +1,192 @@
-<div class="row">
-  <div class="col-12">
+<div class="oro-page">
+  <div *ngIf="successMessage" class="notification-toast notification-success">
+    <div class="notification-content">
+      <i class="feather icon-check-circle"></i>
+      <span>{{ successMessage }}</span>
+      <button type="button" class="notification-close" (click)="successMessage = ''">
+        <i class="feather icon-x"></i>
+      </button>
+    </div>
+  </div>
 
-    <!-- Toast de éxito -->
-    <div *ngIf="successMessage" class="notification-toast notification-success">
-      <div class="notification-content">
-        <i class="feather icon-check-circle"></i>
-        <span>{{ successMessage }}</span>
-        <button type="button" class="notification-close" (click)="successMessage = ''">
-          <i class="feather icon-x"></i>
-        </button>
+  <section class="page-heading">
+    <div>
+      <span class="eyebrow">Configuración general</span>
+      <h3>Configuración del oro</h3>
+      <p>Administra el precio base y compara las tres hechuras en una sola vista.</p>
+    </div>
+    <button
+      type="button"
+      class="btn btn-primary save-button"
+      (click)="guardarPrecioGramo()"
+      [disabled]="isSavingGramo || !precioGramo"
+    >
+      <span *ngIf="isSavingGramo" class="spinner-border spinner-border-sm"></span>
+      <i *ngIf="!isSavingGramo" class="feather icon-save"></i>
+      {{ isSavingGramo ? 'Guardando...' : 'Guardar y recalcular' }}
+    </button>
+  </section>
+
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+    <i class="feather icon-alert-circle me-2"></i>{{ errorMessage }}
+  </div>
+
+  <section class="settings-panel">
+    <div class="price-card">
+      <div class="setting-icon gold"><i class="feather icon-dollar-sign"></i></div>
+      <div class="setting-content">
+        <label for="precioGramoInput">Precio del gramo 24K</label>
+        <div class="input-with-unit">
+          <span>$</span>
+          <input
+            id="precioGramoInput"
+            type="number"
+            class="form-control"
+            [(ngModel)]="precioGramo"
+            [ngModelOptions]="{ standalone: true }"
+            min="0"
+            step="0.01"
+          />
+          <small>MXN/g</small>
+        </div>
       </div>
     </div>
 
-    <!-- Encabezado + precio del gramo de oro 24K -->
-    <app-card [hidHeader]="true">
-      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div class="factor-section">
+      <div class="factor-heading">
         <div>
-          <h5 class="mb-1">Configuración del Oro</h5>
-          <small class="text-muted">Tabla de préstamo de 24 celdas (8 kilates x 3 hechuras), global por sucursal.</small>
+          <strong>Factores por hechura</strong>
+          <span>100% mantiene el precio sin ajuste</span>
         </div>
-        <div class="d-flex align-items-end gap-2 flex-wrap">
-          <div>
-            <label class="form-label mb-1" for="precioGramoInput">Precio del gramo de oro 24K ($/gramo MXN)</label>
-            <input
-              id="precioGramoInput"
-              type="number"
-              class="form-control"
-              [(ngModel)]="precioGramo"
-              [ngModelOptions]="{ standalone: true }"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label class="form-label mb-1" for="factorFundirInput">Factor Fundir (%)</label>
-            <input
-              id="factorFundirInput"
-              type="number"
-              class="form-control"
-              style="max-width: 130px"
-              [(ngModel)]="factores.F"
-              [ngModelOptions]="{ standalone: true }"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label class="form-label mb-1" for="factorNormalInput">Factor Normal (%)</label>
-            <input
-              id="factorNormalInput"
-              type="number"
-              class="form-control"
-              style="max-width: 130px"
-              [(ngModel)]="factores.N"
-              [ngModelOptions]="{ standalone: true }"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <div>
-            <label class="form-label mb-1" for="factorEspecialInput">Factor Especial (%)</label>
-            <input
-              id="factorEspecialInput"
-              type="number"
-              class="form-control"
-              style="max-width: 130px"
-              [(ngModel)]="factores.E"
-              [ngModelOptions]="{ standalone: true }"
-              min="0"
-              step="0.01"
-            />
-          </div>
-          <button
-            type="button"
-            class="btn btn-primary"
-            (click)="guardarPrecioGramo()"
-            [disabled]="isSavingGramo || !precioGramo"
-          >
-            <i class="feather icon-save"></i>
-            {{ isSavingGramo ? 'Guardando...' : 'Guardar y recalcular' }}
-          </button>
-        </div>
-        <small class="text-muted d-block mt-2">
-          Multiplicador adicional aplicado al precio de prestamo de cada hechura. 100% = sin ajuste.
-          Afecta tambien el monto de contratos nuevos.
-        </small>
+        <span class="live-badge"><i class="feather icon-eye"></i> Vista previa inmediata</span>
       </div>
-
-      <div *ngIf="errorMessage" class="alert alert-danger mt-3 mb-0" role="alert">{{ errorMessage }}</div>
-    </app-card>
-
-    <!-- Tabla de 24 celdas por pestaña de hechura -->
-    <app-card [hidHeader]="true">
-      <ul ngbNav #oroNav="ngbNav" [(activeId)]="activeTab" class="nav-tabs">
-        <li *ngFor="let h of HECHURAS" [ngbNavItem]="h.code">
-          <button ngbNavLink>{{ h.label }}</button>
-          <ng-template ngbNavContent>
-            <div class="pt-3">
-              <div *ngIf="isLoading" class="text-center py-3">
-                <span class="spinner-border spinner-border-sm me-2"></span>Cargando...
-              </div>
-              <div *ngIf="!isLoading && celdasDeHechura(h.code).length === 0" class="alert alert-warning mb-0">
-                No hay valores de oro configurados para esta sucursal.
-              </div>
-              <table *ngIf="!isLoading && celdasDeHechura(h.code).length > 0" class="table table-bordered align-middle mb-0">
-                <thead>
-                  <tr>
-                    <th>Kilataje</th>
-                    <th>Precio Avalúo</th>
-                    <th>% Prestamo</th>
-                    <th>Precio Prestamo (referencia)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    *ngFor="let c of celdasDeHechura(h.code); trackBy: trackByCelda"
-                    [class.text-muted]="!c.editable"
-                  >
-                    <td>
-                      {{ c.kilataje }}K
-                      <span *ngIf="!c.editable" class="badge bg-secondary ms-1">Referencia (no prendable)</span>
-                    </td>
-                    <td>{{ c.precioAvaluo | number: '1.2-2' }}</td>
-                    <td>
-                      <ng-container *ngIf="editando[keyCelda(c)] !== undefined; else verPorcentaje">
-                        <div class="d-flex align-items-center gap-1">
-                          <input
-                            type="number"
-                            class="form-control form-control-sm"
-                            style="max-width: 100px"
-                            [(ngModel)]="editando[keyCelda(c)]"
-                            [ngModelOptions]="{ standalone: true }"
-                            [disabled]="!c.editable"
-                          />
-                          <button
-                            type="button"
-                            class="btn btn-sm btn-success"
-                            (click)="guardarCelda(c)"
-                            [disabled]="savingCelda[keyCelda(c)]"
-                          >
-                            <i class="feather icon-check"></i>
-                          </button>
-                          <button type="button" class="btn btn-sm btn-secondary" (click)="cancelarEdicion(c)">
-                            <i class="feather icon-x"></i>
-                          </button>
-                        </div>
-                      </ng-container>
-                      <ng-template #verPorcentaje>
-                        <span>{{ c.porcPrestamo }}%</span>
-                        <button
-                          type="button"
-                          class="btn btn-sm btn-link"
-                          (click)="iniciarEdicion(c)"
-                          [disabled]="!c.editable"
-                        >
-                          <i class="feather icon-edit-2"></i>
-                          Editar
-                        </button>
-                      </ng-template>
-                    </td>
-                    <td>{{ c.precioPrestamo | number: '1.2-2' }}</td>
-                  </tr>
-                </tbody>
-              </table>
+      <div class="factor-grid">
+        <div *ngFor="let h of HECHURAS" class="factor-card" [attr.data-hechura]="h.code">
+          <div class="setting-icon"><i [class]="h.icon"></i></div>
+          <div class="setting-content">
+            <label [for]="'factor' + h.code">{{ h.label }}</label>
+            <div class="factor-input">
+              <input
+                [id]="'factor' + h.code"
+                type="number"
+                class="form-control"
+                [(ngModel)]="factores[h.code]"
+                [ngModelOptions]="{ standalone: true }"
+                min="0"
+                step="0.01"
+              />
+              <span>%</span>
             </div>
-          </ng-template>
-        </li>
-      </ul>
-      <div [ngbNavOutlet]="oroNav"></div>
-    </app-card>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  </div>
+  <section class="comparison-card">
+    <div class="table-heading">
+      <div>
+        <h5>Tabla comparativa</h5>
+        <p>Valores por gramo para cada kilataje y tipo de hechura.</p>
+      </div>
+      <div class="legend">
+        <span><i class="dot appraisal"></i>Avalúo</span>
+        <span><i class="dot loan"></i>Préstamo</span>
+      </div>
+    </div>
+
+    <div *ngIf="isLoading" class="loading-state">
+      <span class="spinner-border text-warning"></span>
+      <span>Cargando configuración...</span>
+    </div>
+
+    <div *ngIf="!isLoading && celdas.length === 0" class="empty-state">
+      <i class="feather icon-inbox"></i>
+      <span>No hay valores de oro configurados para esta sucursal.</span>
+    </div>
+
+    <div *ngIf="!isLoading && celdas.length > 0" class="table-responsive">
+      <table class="table oro-table">
+        <thead>
+          <tr class="group-row">
+            <th rowspan="2" class="karat-header">Kilataje</th>
+            <th *ngFor="let h of HECHURAS" colspan="3" class="hechura-header" [attr.data-hechura]="h.code">
+              <i [class]="h.icon"></i>{{ h.label }}
+            </th>
+          </tr>
+          <tr class="column-row">
+            <ng-container *ngFor="let h of HECHURAS">
+              <th>Avalúo</th>
+              <th>% préstamo</th>
+              <th>Préstamo</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let kilataje of KILATES; trackBy: trackByKilataje" [class.reference-row]="kilataje === 24">
+            <td class="karat-cell">
+              <span>{{ kilataje }}</span><small>K</small>
+              <em *ngIf="kilataje === 24">Referencia</em>
+            </td>
+
+            <ng-container *ngFor="let h of HECHURAS">
+              <ng-container *ngIf="obtenerCelda(kilataje, h.code) as c; else sinCelda">
+                <td class="money-cell appraisal-value">${{ precioAvaluoConFactor(c) | number: '1.2-2' }}</td>
+                <td class="percentage-cell">
+                  <ng-container *ngIf="editando[keyCelda(c)] !== undefined; else verPorcentaje">
+                    <div class="percentage-editor">
+                      <div class="compact-input">
+                        <input
+                          type="number"
+                          class="form-control form-control-sm"
+                          [(ngModel)]="editando[keyCelda(c)]"
+                          [ngModelOptions]="{ standalone: true }"
+                          [disabled]="!c.editable"
+                        />
+                        <span>%</span>
+                      </div>
+                      <button
+                        type="button"
+                        class="icon-button confirm"
+                        title="Guardar"
+                        (click)="guardarCelda(c)"
+                        [disabled]="savingCelda[keyCelda(c)]"
+                      >
+                        <span *ngIf="savingCelda[keyCelda(c)]" class="spinner-border spinner-border-sm"></span>
+                        <i *ngIf="!savingCelda[keyCelda(c)]" class="feather icon-check"></i>
+                      </button>
+                      <button type="button" class="icon-button cancel" title="Cancelar" (click)="cancelarEdicion(c)">
+                        <i class="feather icon-x"></i>
+                      </button>
+                    </div>
+                  </ng-container>
+                  <ng-template #verPorcentaje>
+                    <button
+                      type="button"
+                      class="percentage-button"
+                      title="Editar porcentaje"
+                      (click)="iniciarEdicion(c)"
+                      [disabled]="!c.editable"
+                    >
+                      {{ c.porcPrestamo | number: '1.0-2' }}%
+                      <i *ngIf="c.editable" class="feather icon-edit-2"></i>
+                    </button>
+                  </ng-template>
+                </td>
+                <td class="money-cell loan-value">${{ c.precioPrestamo | number: '1.2-2' }}</td>
+              </ng-container>
+              <ng-template #sinCelda>
+                <td colspan="3" class="missing-cell">Sin datos</td>
+              </ng-template>
+            </ng-container>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-note">
+      <i class="feather icon-info"></i>
+      El avalúo refleja al instante el factor capturado. Guarda los cambios para aplicarlos a contratos nuevos.
+    </div>
+  </section>
 </div>

@@ -1,12 +1,13 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { OroConfigService } from '../../../core/services/oro-config.service';
 import { OroCeldaResponse, PrecioGramoRequest } from '../../../core/models/oro-config.model';
+
+type HechuraCode = 'F' | 'N' | 'E';
 
 /**
  * Pantalla "Configuración del Oro": 3 pestañas (Fundir/Normal/Especial), cada una con
@@ -20,7 +21,7 @@ import { OroCeldaResponse, PrecioGramoRequest } from '../../../core/models/oro-c
 @Component({
   selector: 'app-configuracion-oro',
   standalone: true,
-  imports: [CommonModule, SharedModule, FormsModule, NgbNavModule],
+  imports: [CommonModule, SharedModule, FormsModule],
   templateUrl: './configuracion-oro.component.html',
   styleUrls: ['./configuracion-oro.component.scss']
 })
@@ -30,8 +31,7 @@ export class ConfiguracionOroComponent implements OnInit {
   sucursalId = 1;
   celdas: OroCeldaResponse[] = [];
   precioGramo: number | null = null;
-  factores: { F: number | null; N: number | null; E: number | null } = { F: null, N: null, E: null };
-  activeTab = 'F';
+  factores: Record<HechuraCode, number | null> = { F: null, N: null, E: null };
   isLoading = false;
   isSavingGramo = false;
   successMessage = '';
@@ -40,10 +40,10 @@ export class ConfiguracionOroComponent implements OnInit {
   savingCelda: { [key: string]: boolean } = {};
 
   readonly KILATES = [6, 8, 10, 12, 14, 18, 21, 24];
-  readonly HECHURAS = [
-    { code: 'F', label: 'Fundir' },
-    { code: 'N', label: 'Normal' },
-    { code: 'E', label: 'Especial' }
+  readonly HECHURAS: { code: HechuraCode; label: string; icon: string }[] = [
+    { code: 'F', label: 'Fundir', icon: 'feather icon-zap' },
+    { code: 'N', label: 'Normal', icon: 'feather icon-circle' },
+    { code: 'E', label: 'Especial', icon: 'feather icon-star' }
   ];
 
   ngOnInit(): void {
@@ -103,6 +103,25 @@ export class ConfiguracionOroComponent implements OnInit {
 
   keyCelda(c: OroCeldaResponse): string {
     return `${c.kilataje}-${c.hechura}`;
+  }
+
+  obtenerCelda(kilataje: number, hechura: HechuraCode): OroCeldaResponse | undefined {
+    return this.celdas.find((c) => c.kilataje === kilataje && c.hechura === hechura);
+  }
+
+  /**
+   * Muestra el avalúo de referencia con el factor de la hechura capturado en el
+   * formulario, incluso antes de guardar y recalcular en el servidor.
+   */
+  precioAvaluoConFactor(c: OroCeldaResponse): number {
+    const factor = this.factores[c.hechura as keyof typeof this.factores];
+    const factorNumerico = Number(factor);
+
+    if (factor === null || factor === undefined || !Number.isFinite(factorNumerico) || factorNumerico < 0) {
+      return c.precioAvaluo;
+    }
+
+    return c.precioAvaluo * (factorNumerico / 100);
   }
 
   /**
@@ -188,6 +207,10 @@ export class ConfiguracionOroComponent implements OnInit {
 
   trackByCelda(_index: number, c: OroCeldaResponse): string {
     return `${c.kilataje}-${c.hechura}`;
+  }
+
+  trackByKilataje(_index: number, kilataje: number): number {
+    return kilataje;
   }
 
   private autoHideSuccessMessage(): void {
