@@ -32,7 +32,12 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
 
   @ViewChild('usuarioModal') usuarioModal!: TemplateRef<any>;
   @ViewChild('loadingModal') loadingModalTemplate!: TemplateRef<any>;
+  @ViewChild('eliminarUsuarioModal') eliminarUsuarioModal!: TemplateRef<any>;
   private loadingModalRef: NgbModalRef | null = null;
+  private eliminarModalRef: NgbModalRef | null = null;
+  usuarioAEliminar: Usuario | null = null;
+  isDeleting = false;
+  deleteError = '';
 
   constructor(private usuarioService: UsuarioService, private modalService: NgbModal, private fb: FormBuilder, private rolService: RolService) {
     this.form = this.fb.group({
@@ -101,7 +106,11 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
           const anyU = u as any;
           // intentar obtener un id de rol de diferentes formatos que pueda devolver el backend
           const candidateId = u.idRol ?? anyU.rol?.id ?? anyU.rolId ?? anyU.idRol ?? null;
-          const idNum = candidateId != null ? Number(candidateId) : null;
+          const rolPorNombre = this.roles.find(r => r.nombre === u.rolNombre);
+          const idNum = candidateId != null ? Number(candidateId) : (rolPorNombre?.id ?? null);
+          if (idNum != null && !isNaN(idNum)) {
+            u.idRol = idNum;
+          }
           if (!u.rolNombre && idNum != null && !isNaN(idNum)) {
             const found = this.roles.find(r => r.id === idNum);
             if (found) u.rolNombre = found.nombre;
@@ -159,7 +168,7 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
     }
     // Por defecto no seleccionar ningún rol (dejar la opción "Seleccione un rol" activa)
     this.form.reset({ estatus: true, idRol: null });
-    this.modalService.open(this.usuarioModal, { size: 'lg' });
+    this.modalService.open(this.usuarioModal, { size: 'lg', centered: true, windowClass: 'usuario-edit-modal' });
   }
 
   openEdit(u: Usuario) {
@@ -172,15 +181,18 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
       pwdCtrl.updateValueAndValidity();
     }
 
-    this.form.patchValue({
+    const anyU = u as any;
+    const rolPorNombre = this.roles.find(r => r.nombre === u.rolNombre);
+    const rolId = u.idRol ?? anyU.rol?.id ?? anyU.rolId ?? rolPorNombre?.id ?? null;
+    this.form.reset({
       nombre: u.nombre,
       apellidos: u.apellidos || '',
       nombreUsuario: u.nombreUsuario,
       estatus: u.estatus ?? true,
       password: '',
-      idRol: u.idRol ?? null
+      idRol: rolId != null ? Number(rolId) : null
     });
-    this.modalService.open(this.usuarioModal, { size: 'lg' });
+    this.modalService.open(this.usuarioModal, { size: 'lg', centered: true, windowClass: 'usuario-edit-modal' });
   }
 
   save(modalRef: any) {
@@ -242,8 +254,43 @@ export class UsuariosComponent implements OnInit, AfterViewInit {
 
   confirmDelete(u: Usuario) {
     if (!u.id) return;
-    if (!confirm(`Eliminar usuario "${u.nombreUsuario}" ?`)) return;
-    this.usuarioService.delete(u.id).subscribe({ next: () => this.loadUsuarios() });
+    this.usuarioAEliminar = u;
+    this.deleteError = '';
+    this.eliminarModalRef = this.modalService.open(this.eliminarUsuarioModal, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      windowClass: 'delete-usuario-modal'
+    });
+  }
+
+  cerrarEliminarModal() {
+    if (this.isDeleting) return;
+    this.eliminarModalRef?.dismiss();
+    this.eliminarModalRef = null;
+    this.usuarioAEliminar = null;
+    this.deleteError = '';
+  }
+
+  eliminarUsuarioConfirmado() {
+    const id = this.usuarioAEliminar?.id;
+    if (!id || this.isDeleting) return;
+
+    this.isDeleting = true;
+    this.deleteError = '';
+    this.usuarioService.delete(id).subscribe({
+      next: () => {
+        this.isDeleting = false;
+        this.eliminarModalRef?.close();
+        this.eliminarModalRef = null;
+        this.usuarioAEliminar = null;
+        this.loadUsuarios();
+      },
+      error: (err) => {
+        this.isDeleting = false;
+        this.deleteError = err?.error?.message || 'No fue posible eliminar el usuario. Intenta nuevamente.';
+      }
+    });
   }
 
   rolDisplay(u: Usuario): string {

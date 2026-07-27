@@ -37,6 +37,10 @@ export class PlazoService {
     return this.http.put<PlazoResponse>(`${this.API_URL}/${id}`, request);
   }
 
+  delete(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.API_URL}/${id}`);
+  }
+
   // === Parámetros multi-sucursal ===
 
   getParametrosBySucursal(plazoId: number, sucursalId: number = 1): Observable<PlazoParametroResponse[]> {
@@ -97,6 +101,20 @@ export class PlazoService {
     return this.http.post<PlazoHechuraAlhajaResponse>(
       `${this.API_URL}/${plazoId}/alhajas`,
       request,
+      { params: { sucursalId: String(sucursalId) } }
+    );
+  }
+
+  actualizarPorcAumento(
+    plazoId: number,
+    kilataje: number,
+    hechura: string,
+    porcAumento: number,
+    sucursalId: number = 1
+  ): Observable<PlazoHechuraAlhajaResponse> {
+    return this.http.put<PlazoHechuraAlhajaResponse>(
+      `${this.API_URL}/${plazoId}/alhajas/${kilataje}/${hechura}/porcentaje-aumento`,
+      { porcAumento },
       { params: { sucursalId: String(sucursalId) } }
     );
   }

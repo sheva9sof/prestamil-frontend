@@ -91,7 +91,7 @@
       </div>
       <div class="legend">
         <span><i class="dot appraisal"></i>Avalúo</span>
-        <span><i class="dot loan"></i>Préstamo</span>
+        <span><i class="dot loan"></i>Precio base</span>
       </div>
     </div>
 
@@ -118,7 +118,7 @@
             <ng-container *ngFor="let h of HECHURAS">
               <th>Avalúo</th>
               <th>% préstamo</th>
-              <th>Préstamo</th>
+              <th>Precio base</th>
             </ng-container>
           </tr>
         </thead>
@@ -133,47 +133,27 @@
               <ng-container *ngIf="obtenerCelda(kilataje, h.code) as c; else sinCelda">
                 <td class="money-cell appraisal-value">${{ precioAvaluoConFactor(c) | number: '1.2-2' }}</td>
                 <td class="percentage-cell">
-                  <ng-container *ngIf="editando[keyCelda(c)] !== undefined; else verPorcentaje">
-                    <div class="percentage-editor">
-                      <div class="compact-input">
-                        <input
-                          type="number"
-                          class="form-control form-control-sm"
-                          [(ngModel)]="editando[keyCelda(c)]"
-                          [ngModelOptions]="{ standalone: true }"
-                          [disabled]="!c.editable"
-                        />
-                        <span>%</span>
-                      </div>
-                      <button
-                        type="button"
-                        class="icon-button confirm"
-                        title="Guardar"
-                        (click)="guardarCelda(c)"
-                        [disabled]="savingCelda[keyCelda(c)]"
-                      >
-                        <span *ngIf="savingCelda[keyCelda(c)]" class="spinner-border spinner-border-sm"></span>
-                        <i *ngIf="!savingCelda[keyCelda(c)]" class="feather icon-check"></i>
-                      </button>
-                      <button type="button" class="icon-button cancel" title="Cancelar" (click)="cancelarEdicion(c)">
-                        <i class="feather icon-x"></i>
-                      </button>
-                    </div>
-                  </ng-container>
-                  <ng-template #verPorcentaje>
-                    <button
-                      type="button"
-                      class="percentage-button"
-                      title="Editar porcentaje"
-                      (click)="iniciarEdicion(c)"
-                      [disabled]="!c.editable"
-                    >
-                      {{ c.porcPrestamo | number: '1.0-2' }}%
-                      <i *ngIf="c.editable" class="feather icon-edit-2"></i>
-                    </button>
-                  </ng-template>
+                  <div class="input-group input-group-sm mx-auto percentage-quick-input">
+                    <input
+                      type="number"
+                      class="form-control text-end"
+                      [(ngModel)]="c.porcPrestamo"
+                      [ngModelOptions]="{ standalone: true }"
+                      min="0"
+                      step="0.01"
+                      title="Se guarda automáticamente al salir"
+                      [disabled]="!c.editable || savingCelda[keyCelda(c)]"
+                      (focus)="recordarPorcPrestamo(c)"
+                      (blur)="guardarPorcPrestamoRapido(c)"
+                      (keydown.enter)="$any($event.target).blur()"
+                    />
+                    <span class="input-group-text">
+                      <span *ngIf="savingCelda[keyCelda(c)]" class="spinner-border spinner-border-sm"></span>
+                      <span *ngIf="!savingCelda[keyCelda(c)]">%</span>
+                    </span>
+                  </div>
                 </td>
-                <td class="money-cell loan-value">${{ c.precioPrestamo | number: '1.2-2' }}</td>
+                <td class="money-cell loan-value">${{ precioPrestamoVista(c) | number: '1.2-2' }}</td>
               </ng-container>
               <ng-template #sinCelda>
                 <td colspan="3" class="missing-cell">Sin datos</td>
@@ -186,7 +166,7 @@
 
     <div class="table-note">
       <i class="feather icon-info"></i>
-      El avalúo refleja al instante el factor capturado. Guarda los cambios para aplicarlos a contratos nuevos.
+      El precio base se replica en todas las tablas de plazos. Al guardar cambios, se actualiza en cascada.
     </div>
   </section>
 </div>

@@ -44,6 +44,27 @@ export class ClientesComponent implements OnInit {
 
   formData = this.emptyForm();
 
+  get camposObligatoriosFaltantes(): string[] {
+    const campos: Array<[string, string]> = [
+      ['nombre', this.formData.nombre],
+      ['apellido paterno', this.formData.apellidoPaterno],
+      ['teléfono', this.formData.telefono],
+      ['CURP', this.formData.curp],
+      ['RFC', this.formData.rfc],
+      ['calle', this.formData.calle],
+      ['número exterior', this.formData.numeroExterior],
+      ['colonia', this.formData.colonia],
+      ['ciudad', this.formData.ciudad],
+      ['estado', this.formData.estado],
+      ['código postal', this.formData.codigoPostal]
+    ];
+    return campos.filter(([, valor]) => !valor?.trim()).map(([nombre]) => nombre);
+  }
+
+  get formularioClienteValido(): boolean {
+    return this.camposObligatoriosFaltantes.length === 0;
+  }
+
   ngOnInit(): void {
     this.cargarClientes();
   }
@@ -168,12 +189,8 @@ export class ClientesComponent implements OnInit {
   guardarCliente(): void {
     const { nombre, apellidoPaterno, telefono, calle, colonia, ciudad, estado, codigoPostal } = this.formData;
 
-    if (!nombre.trim() || !apellidoPaterno.trim() || !telefono.trim()) {
-      this.modalError = 'Nombre, apellido paterno y teléfono son obligatorios.';
-      return;
-    }
-    if (!calle.trim() || !colonia.trim() || !ciudad.trim() || !estado.trim() || !codigoPostal.trim()) {
-      this.modalError = 'Por favor complete los campos obligatorios de dirección.';
+    if (!this.formularioClienteValido) {
+      this.modalError = `Completa los campos obligatorios: ${this.camposObligatoriosFaltantes.join(', ')}.`;
       return;
     }
 

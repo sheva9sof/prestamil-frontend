@@ -34,6 +34,7 @@ interface TipoPrendaRef {
 export class PlazosPeriodosComponent implements OnInit {
   @ViewChild('plazoModal') plazoModalTemplate!: TemplateRef<unknown>;
   @ViewChild('detalleModal') detalleModalTemplate!: TemplateRef<unknown>;
+  @ViewChild('eliminarModal') eliminarModalTemplate!: TemplateRef<unknown>;
 
   private readonly plazoService = inject(PlazoService);
   private readonly modalService = inject(NgbModal);
@@ -46,6 +47,7 @@ export class PlazosPeriodosComponent implements OnInit {
   isLoadingData = false;
   isLoadingTipos = false;
   isSaving = false;
+  deletingPlazo: { [id: number]: boolean } = {};
   successMessage = '';
   errorMessage = '';
   modalError = '';
@@ -56,6 +58,8 @@ export class PlazosPeriodosComponent implements OnInit {
   formData: Partial<PlazoRequest & { id?: number; tiposPrendaRefs?: TipoPrendaRef[] }> = {};
   plazoModalRef: NgbModalRef | null = null;
   detalleModalRef: NgbModalRef | null = null;
+  eliminarModalRef: NgbModalRef | null = null;
+  plazoAEliminar: PlazoResponse | null = null;
   tiposPrendaSeleccionados: number[] = [];
   tiposPrendaOriginalesModal: TipoPrendaRef[] = [];
 
@@ -73,7 +77,6 @@ export class PlazosPeriodosComponent implements OnInit {
   isRecalculando = false;
 
   // Edición inline de precio base en tabla alhajas
-  editandoPrecioBase: { [key: string]: number | null } = {};
 
   // Task 3 — Tab Parámetros editable
   parametrosForm: { [tipoPrendaId: number]: Partial<PlazoParametroRequest> } = {};
@@ -85,10 +88,14 @@ export class PlazosPeriodosComponent implements OnInit {
   readonly PREVIEW_PRESTAMO = 1000;
 
   // Task 4 — Agregar/inicializar alhajas
+  readonly KILATAJES_ORO = [6, 8, 10, 12, 14, 18, 21, 24];
   nuevaAlhaja: Partial<PlazoHechuraAlhajaRequest> = { kilataje: 14, hechura: 'N', precioBase: 0, porcAumento: 0 };
   isAgregandoAlhaja = false;
   isInicializando = false;
   alhajaError = '';
+  porcAumentoOriginal: { [key: string]: number } = {};
+  savingPorcAumento: { [key: string]: boolean } = {};
+  isSavingDetalle = false;
 
   ngOnInit(): void {
     this.loadPlazos();
@@ -128,6 +135,8 @@ export class PlazosPeriodosComponent implements OnInit {
   seleccionarPlazo(plazo: PlazoResponse): void {
     this.selectedPlazo = plazo;
     this.tabError = '';
+    this.porcAumentoOriginal = {};
+    this.isSavingDetalle = false;
     this.cargarParametros();
     const primeraTab = this.detalleTabs[0];
     this.activeTab = primeraTab ? primeraTab.id : '';
@@ -291,10 +300,15 @@ export class PlazosPeriodosComponent implements OnInit {
 
   get alhajasPorHechura(): Array<{ label: string; hechura: string; items: PlazoHechuraAlhajaResponse[] }> {
     // Soporta códigos legacy 'HF'/'HN'/'HE' y nuevos 'F'/'N'/'E'
+    const porHechura = (hechura: string): PlazoHechuraAlhajaResponse[] =>
+      this.alhajas
+        .filter(a => (a.hechura ?? '').toUpperCase().endsWith(hechura))
+        .sort((a, b) => this.KILATAJES_ORO.indexOf(a.kilataje) - this.KILATAJES_ORO.indexOf(b.kilataje));
+
     return [
-      { label: 'Fundir',   hechura: 'F', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('F')) },
-      { label: 'Normal',   hechura: 'N', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('N')) },
-      { label: 'Especial', hechura: 'E', items: this.alhajas.filter(a => (a.hechura ?? '').toUpperCase().endsWith('E')) }
+      { label: 'Fundir', hechura: 'F', items: porHechura('F') },
+      { label: 'Normal', hechura: 'N', items: porHechura('N') },
+      { label: 'Especial', hechura: 'E', items: porHechura('E') }
     ];
   }
 
@@ -302,10 +316,13 @@ export class PlazosPeriodosComponent implements OnInit {
     if (!this.selectedPlazo) return;
     this.isLoadingTab = true;
     this.alhajas = [];
-    this.editandoPrecioBase = {};
     this.plazoService.getTablaAlhajas(this.selectedPlazo.id, this.sucursalId).subscribe({
       next: (data) => {
         this.alhajas = data;
+        this.porcAumentoOriginal = data.reduce((valores, alhaja) => {
+          valores[this.getAlhajaKey(alhaja)] = Number(alhaja.porcAumento);
+          return valores;
+        }, {} as { [key: string]: number });
         this.isLoadingTab = false;
       },
       error: (err) => {
@@ -323,53 +340,123 @@ export class PlazosPeriodosComponent implements OnInit {
     return `${alhaja.kilataje}-${alhaja.hechura}`;
   }
 
-  iniciarEdicionPrecio(alhaja: PlazoHechuraAlhajaResponse): void {
-    // Crear nueva referencia de objeto para garantizar que Angular detecte el cambio
-    this.editandoPrecioBase = { ...this.editandoPrecioBase, [this.getAlhajaKey(alhaja)]: alhaja.precioBase };
+  recordarPorcAumento(alhaja: PlazoHechuraAlhajaResponse): void {
+    const key = this.getAlhajaKey(alhaja);
+    this.porcAumentoOriginal = { ...this.porcAumentoOriginal, [key]: Number(alhaja.porcAumento) };
   }
 
-  guardarPrecioBase(alhaja: PlazoHechuraAlhajaResponse): void {
-    if (!this.selectedPlazo) return;
-    const key = this.getAlhajaKey(alhaja);
-    const nuevoPrecio = this.editandoPrecioBase[key];
-    if (nuevoPrecio === null || nuevoPrecio === undefined || isNaN(Number(nuevoPrecio))) {
-      const { [key]: _, ...resto } = this.editandoPrecioBase;
-      this.editandoPrecioBase = resto;
+  validarPorcAumentoTemporal(alhaja: PlazoHechuraAlhajaResponse): void {
+    const valor = Number(alhaja.porcAumento);
+    if (!Number.isFinite(valor) || valor < 0) {
+      this.alhajaError = 'El porcentaje de aumento debe ser mayor o igual a cero.';
       return;
     }
-    this.plazoService.actualizarPrecioBase(
-      this.selectedPlazo.id,
-      alhaja.kilataje,
-      alhaja.hechura,
-      Number(nuevoPrecio),
-      this.sucursalId
-    ).subscribe({
-      next: (updated) => {
-        const idx = this.alhajas.findIndex(a => a.kilataje === alhaja.kilataje && a.hechura === alhaja.hechura);
-        if (idx >= 0) {
-          this.alhajas = [
-            ...this.alhajas.slice(0, idx),
-            updated,
-            ...this.alhajas.slice(idx + 1)
-          ];
-        }
-        const { [key]: _, ...resto } = this.editandoPrecioBase;
-        this.editandoPrecioBase = resto;
-        this.successMessage = 'Precio actualizado correctamente.';
+
+    this.alhajaError = '';
+    // Vista previa local: coincide con la fórmula del backend y no persiste hasta confirmar.
+    alhaja.precioPrestamo = Math.round(
+      Number(alhaja.precioBase) * (1 + valor / 100) * 10000
+    ) / 10000;
+  }
+
+  cancelarCambiosDetalle(): void {
+    if (this.isSavingDetalle) return;
+    this.alhajas = this.alhajas.map(alhaja => {
+      const original = this.porcAumentoOriginal[this.getAlhajaKey(alhaja)];
+      return original === undefined ? alhaja : {
+        ...alhaja,
+        porcAumento: original,
+        precioPrestamo: Math.round(
+          Number(alhaja.precioBase) * (1 + original / 100) * 10000
+        ) / 10000
+      };
+    });
+    this.alhajaError = '';
+    this.detalleModalRef?.dismiss();
+    this.detalleModalRef = null;
+  }
+
+  confirmarCambiosDetalle(): void {
+    if (!this.selectedPlazo || this.isSavingDetalle) return;
+
+    const tieneInvalidos = this.alhajas.some(alhaja => {
+      const valor = Number(alhaja.porcAumento);
+      return !Number.isFinite(valor) || valor < 0;
+    });
+    if (tieneInvalidos) {
+      this.alhajaError = 'Revisa los porcentajes: todos deben ser mayores o iguales a cero.';
+      return;
+    }
+
+    const cambios = this.alhajas.filter(alhaja =>
+      Number(alhaja.porcAumento) !== this.porcAumentoOriginal[this.getAlhajaKey(alhaja)]
+    );
+    if (cambios.length === 0) {
+      this.detalleModalRef?.close();
+      this.detalleModalRef = null;
+      return;
+    }
+
+    this.isSavingDetalle = true;
+    this.alhajaError = '';
+    const plazoId = this.selectedPlazo.id;
+    forkJoin(cambios.map(alhaja =>
+      this.plazoService.actualizarPorcAumento(
+        plazoId,
+        alhaja.kilataje,
+        alhaja.hechura,
+        Number(alhaja.porcAumento),
+        this.sucursalId
+      )
+    )).subscribe({
+      next: (actualizadas) => {
+        const porClave = new Map(actualizadas.map(alhaja => [this.getAlhajaKey(alhaja), alhaja]));
+        this.alhajas = this.alhajas.map(alhaja => porClave.get(this.getAlhajaKey(alhaja)) ?? alhaja);
+        this.isSavingDetalle = false;
+        this.detalleModalRef?.close();
+        this.detalleModalRef = null;
+        this.successMessage = 'Cambios del plazo guardados correctamente.';
         this.autoHideSuccessMessage();
       },
       error: (err) => {
-        this.tabError = 'Error al actualizar precio: ' + (err?.error?.message ?? err.message ?? 'Error desconocido');
-        const { [key]: _, ...resto } = this.editandoPrecioBase;
-        this.editandoPrecioBase = resto;
+        this.isSavingDetalle = false;
+        this.alhajaError = err?.error?.message ?? 'No fue posible guardar los cambios.';
       }
     });
   }
 
-  cancelarEdicionPrecio(alhaja: PlazoHechuraAlhajaResponse): void {
+  guardarPorcAumentoRapido(alhaja: PlazoHechuraAlhajaResponse): void {
+    if (!this.selectedPlazo) return;
     const key = this.getAlhajaKey(alhaja);
-    const { [key]: _, ...resto } = this.editandoPrecioBase;
-    this.editandoPrecioBase = resto;
+    const valor = Number(alhaja.porcAumento);
+    const original = this.porcAumentoOriginal[key];
+    if (original !== undefined && valor === original) return;
+    if (!Number.isFinite(valor) || valor < 0) {
+      this.alhajaError = 'El porcentaje de aumento debe ser mayor o igual a cero.';
+      if (original !== undefined) alhaja.porcAumento = original;
+      return;
+    }
+
+    this.savingPorcAumento = { ...this.savingPorcAumento, [key]: true };
+    this.alhajaError = '';
+    this.plazoService.actualizarPorcAumento(
+      this.selectedPlazo.id, alhaja.kilataje, alhaja.hechura, valor, this.sucursalId
+    ).subscribe({
+      next: (updated) => {
+        this.alhajas = this.alhajas.map((a) =>
+          a.kilataje === updated.kilataje && a.hechura === updated.hechura ? updated : a
+        );
+        const { [key]: _saving, ...restoSaving } = this.savingPorcAumento;
+        this.savingPorcAumento = restoSaving;
+        this.porcAumentoOriginal = { ...this.porcAumentoOriginal, [key]: Number(updated.porcAumento) };
+      },
+      error: (err) => {
+        const { [key]: _, ...resto } = this.savingPorcAumento;
+        this.savingPorcAumento = resto;
+        if (original !== undefined) alhaja.porcAumento = original;
+        this.alhajaError = err?.error?.message ?? 'No fue posible actualizar el porcentaje.';
+      }
+    });
   }
 
   recalcularTodo(): void {
@@ -444,17 +531,27 @@ export class PlazosPeriodosComponent implements OnInit {
     if (!this.selectedPlazo) return;
     this.isInicializando = true;
     this.alhajaError = '';
-    const kilatajes = [10, 14, 18, 24];
     const hechuras: Array<'F' | 'N' | 'E'> = ['F', 'N', 'E'];
-    const requests = kilatajes.flatMap(k => hechuras.map(h =>
+    const existentes = new Set(this.alhajas.map((a) => `${a.kilataje}-${a.hechura}`));
+    const requests = this.KILATAJES_ORO.flatMap(k => hechuras
+      .filter(h => !existentes.has(`${k}-${h}`))
+      .map(h =>
       this.plazoService.crearAlhaja(this.selectedPlazo!.id, {
         kilataje: k, hechura: h, precioBase: 0, porcAumento: 0
       }, this.sucursalId)
     ));
+
+    if (requests.length === 0) {
+      this.isInicializando = false;
+      return;
+    }
+
     forkJoin(requests).subscribe({
       next: (results) => {
         this.isInicializando = false;
-        this.alhajas = results;
+        this.alhajas = [...this.alhajas, ...results].sort(
+          (a, b) => a.kilataje - b.kilataje || a.hechura.localeCompare(b.hechura)
+        );
       },
       error: (err) => {
         this.isInicializando = false;
@@ -593,6 +690,54 @@ export class PlazosPeriodosComponent implements OnInit {
         }
       });
     }
+  }
+
+  eliminarPlazo(plazo: PlazoResponse): void {
+    this.plazoAEliminar = plazo;
+    this.eliminarModalRef = this.modalService.open(this.eliminarModalTemplate, {
+      centered: true,
+      backdrop: 'static',
+      keyboard: false,
+      windowClass: 'delete-plazo-modal'
+    });
+  }
+
+  cerrarEliminarModal(): void {
+    this.eliminarModalRef?.dismiss();
+    this.eliminarModalRef = null;
+    this.plazoAEliminar = null;
+  }
+
+  confirmarEliminacionPlazo(): void {
+    const plazo = this.plazoAEliminar;
+    if (!plazo) return;
+    this.deletingPlazo = { ...this.deletingPlazo, [plazo.id]: true };
+    this.errorMessage = '';
+    this.plazoService.delete(plazo.id).subscribe({
+      next: () => {
+        const { [plazo.id]: _, ...resto } = this.deletingPlazo;
+        this.deletingPlazo = resto;
+        this.eliminarModalRef?.close();
+        this.eliminarModalRef = null;
+        this.plazoAEliminar = null;
+        this.plazos = this.plazos.filter((p) => p.id !== plazo.id);
+        if (this.selectedPlazo?.id === plazo.id) {
+          this.selectedPlazo = null;
+          this.parametros = [];
+          this.alhajas = [];
+        }
+        this.successMessage = 'Plazo eliminado correctamente.';
+        this.autoHideSuccessMessage();
+      },
+      error: (err) => {
+        const { [plazo.id]: _, ...resto } = this.deletingPlazo;
+        this.deletingPlazo = resto;
+        this.errorMessage = err?.error?.message ?? 'No fue posible eliminar el plazo.';
+        this.eliminarModalRef?.dismiss();
+        this.eliminarModalRef = null;
+        this.plazoAEliminar = null;
+      }
+    });
   }
 
   // =========================================================================

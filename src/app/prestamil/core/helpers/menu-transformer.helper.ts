@@ -7,7 +7,9 @@ function normalizeMenuUrl(url: string): string {
 }
 
 function normalizeNavigationItem(item: NavigationItem): NavigationItem {
-  const children = item.children?.map(child => normalizeNavigationItem(child));
+  const children = item.children
+    ?.filter(child => !['Parametros prestamo', 'Parámetros Préstamo'].includes(child.title ?? ''))
+    .map(child => normalizeNavigationItem(child));
   const normalizedItem: NavigationItem = {
     ...item,
     title: item.url === '/avaluos' ? 'Avaluos' : item.title,
@@ -78,8 +80,6 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',
       'Empresa': '/configuracion/empresas',
-      'Parametros prestamo': '/configuracion/parametros-prestamo',
-      'Parámetros Préstamo': '/configuracion/parametros-prestamo',
       'Parametros Generales': '/configuracion/parametros-generales',
       'Parámetros Generales': '/configuracion/parametros-generales',
       'Plazos y Periodos': '/configuracion/plazos-periodos',

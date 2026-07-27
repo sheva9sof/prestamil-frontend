@@ -1,4 +1,4 @@
-<div class="row">
+<div class="row usuarios-page">
   <div class="col-12">
     <!-- Modal de carga -->
     <ng-template #loadingModal let-modal>
@@ -11,14 +11,53 @@
       </div>
     </ng-template>
 
-    <app-card cardTitle="Usuarios">
-      <div class="d-flex justify-content-between mb-3">
-        <div>
-          <button class="btn btn-primary" (click)="openNew()">Nuevo usuario</button>
+    <ng-template #eliminarUsuarioModal>
+      <div class="delete-modal-body">
+        <button
+          type="button"
+          class="btn-close delete-modal-close"
+          aria-label="Cerrar"
+          (click)="cerrarEliminarModal()"
+          [disabled]="isDeleting"
+        ></button>
+        <div class="delete-icon">
+          <i class="feather icon-user-x"></i>
+        </div>
+        <h4>¿Eliminar usuario?</h4>
+        <p>
+          El usuario <strong>{{ usuarioAEliminar?.nombreUsuario }}</strong> se eliminará permanentemente del sistema.
+        </p>
+        <div class="delete-warning">
+          <i class="feather icon-alert-triangle"></i>
+          Esta acción no se puede deshacer.
+        </div>
+        <div *ngIf="deleteError" class="alert alert-danger py-2 mb-3" role="alert">{{ deleteError }}</div>
+        <div class="delete-modal-actions">
+          <button type="button" class="btn btn-outline-secondary" (click)="cerrarEliminarModal()" [disabled]="isDeleting">
+            Cancelar
+          </button>
+          <button type="button" class="btn btn-danger" (click)="eliminarUsuarioConfirmado()" [disabled]="isDeleting">
+            <span *ngIf="isDeleting" class="spinner-border spinner-border-sm me-1"></span>
+            <i *ngIf="!isDeleting" class="feather icon-trash-2 me-1"></i>
+            {{ isDeleting ? 'Eliminando...' : 'Sí, eliminar' }}
+          </button>
         </div>
       </div>
+    </ng-template>
 
-      <div class="row mb-3">
+    <app-card cardTitle="Usuarios" [hidHeader]="true">
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">Administración</span>
+          <h2>Usuarios</h2>
+          <p>Gestiona accesos, roles y estatus del personal.</p>
+        </div>
+        <button class="btn btn-primary" (click)="openNew()">
+          <i class="feather icon-user-plus"></i> Nuevo usuario
+        </button>
+      </div>
+
+      <div class="row mb-3 filter-panel">
         <div class="col-md-4">
           <label class="form-label">Filtrar por Rol</label>
           <select class="form-select" [(ngModel)]="filtroRol" (ngModelChange)="aplicarFiltros()">
@@ -40,7 +79,8 @@
       </div>
 
       <div *ngIf="loading">Cargando usuarios...</div>
-      <table class="table table-sm table-striped" *ngIf="!loading">
+      <div class="table-responsive" *ngIf="!loading">
+      <table class="table usuarios-table">
         <thead>
           <tr>
             <th>ID</th>
@@ -67,59 +107,101 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <ng-template #usuarioModal let-modal>
-        <div class="modal-header">
-          <h5 class="modal-title">{{ editId ? 'Editar usuario' : 'Nuevo usuario' }}</h5>
+        <div class="modal-header entity-modal-header">
+          <div class="edit-modal-title">
+            <span class="edit-modal-icon"><i class="feather" [ngClass]="editId ? 'icon-edit-2' : 'icon-user-plus'"></i></span>
+            <div>
+              <span class="eyebrow">{{ editId ? 'Administración de cuenta' : 'Alta de personal' }}</span>
+              <h5 class="modal-title">{{ editId ? 'Editar usuario' : 'Nuevo usuario' }}</h5>
+              <small>{{ editId ? 'Actualiza los datos, permisos y disponibilidad de la cuenta.' : 'Captura los datos para crear una nueva cuenta.' }}</small>
+            </div>
+          </div>
           <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
         </div>
-        <div class="modal-body">
+        <div class="modal-body entity-modal-body">
           <div *ngIf="errorMessage" class="alert alert-danger alert-dismissible fade show" role="alert">
             {{ errorMessage }}
             <button type="button" class="btn-close" aria-label="Close" (click)="errorMessage = null"></button>
           </div>
           <form [formGroup]="form">
-            <div class="mb-2">
-              <label class="form-label">Nombre</label>
-              <input class="form-control" formControlName="nombre" />
-            </div>
-
-            <div class="mb-2">
-              <label class="form-label">Apellidos</label>
-              <input class="form-control" formControlName="apellidos" />
-            </div>
-
-            <div class="mb-2">
-              <label class="form-label">Usuario</label>
-              <input class="form-control" formControlName="nombreUsuario" />
-            </div>
-            <div class="mb-2">
-              <label class="form-label">Rol</label>
-              <select class="form-select" formControlName="idRol">
-                <option [ngValue]="null">Seleccione un rol</option>
-                <option *ngFor="let r of roles" [ngValue]="r.id">{{ r.nombre }}</option>
-              </select>
-            </div>
-
-            <div class="mb-2">
-              <label class="form-label">Contraseña</label>
-              <input type="password" class="form-control" formControlName="password" [class.is-invalid]="form.get('password')?.invalid && (form.get('password')?.touched || form.get('password')?.dirty)" />
-              <small *ngIf="editId" class="text-muted">Dejar en blanco para mantener la contraseña actual.</small>
-              <div *ngIf="form.get('password')?.invalid && (form.get('password')?.touched || form.get('password')?.dirty)" class="text-danger small">
-                <div *ngIf="form.get('password')?.hasError('required')">La contraseña es obligatoria.</div>
-                <div *ngIf="form.get('password')?.hasError('minlength')">La contraseña debe tener al menos 5 caracteres.</div>
+            <div class="form-section">
+              <div class="form-section-title">
+                <i class="feather icon-user"></i>
+                <span>Información personal</span>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Nombre</label>
+                  <input class="form-control" formControlName="nombre" placeholder="Nombre del usuario" [class.is-invalid]="form.get('nombre')?.invalid && form.get('nombre')?.touched" />
+                  <div class="invalid-feedback">El nombre es obligatorio.</div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Apellidos</label>
+                  <input class="form-control" formControlName="apellidos" placeholder="Apellidos" />
+                </div>
               </div>
             </div>
 
-            <div class="form-check mb-2">
+            <div class="form-section">
+              <div class="form-section-title">
+                <i class="feather icon-shield"></i>
+                <span>Acceso y permisos</span>
+              </div>
+              <div class="row">
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Nombre de usuario</label>
+                  <input class="form-control" formControlName="nombreUsuario" placeholder="Usuario para iniciar sesión" [class.is-invalid]="form.get('nombreUsuario')?.invalid && form.get('nombreUsuario')?.touched" />
+                  <div class="invalid-feedback">Captura un usuario de al menos 4 caracteres.</div>
+                </div>
+                <div class="col-md-6 mb-3">
+                  <label class="form-label">Rol</label>
+                  <select class="form-select" formControlName="idRol" [class.is-invalid]="form.get('idRol')?.invalid && form.get('idRol')?.touched">
+                    <option [ngValue]="null">Seleccione un rol</option>
+                    <option *ngFor="let r of roles" [ngValue]="r.id">{{ r.nombre }}</option>
+                  </select>
+                  <div class="invalid-feedback">Selecciona un rol.</div>
+                </div>
+                <div class="col-12 mb-2">
+                  <label class="form-label">Contraseña</label>
+                  <input type="password" class="form-control" formControlName="password" placeholder="••••••••" [class.is-invalid]="form.get('password')?.invalid && (form.get('password')?.touched || form.get('password')?.dirty)" />
+                  <small *ngIf="editId" class="text-muted">Déjala en blanco para conservar la contraseña actual.</small>
+                  <div *ngIf="form.get('password')?.invalid && (form.get('password')?.touched || form.get('password')?.dirty)" class="text-danger small mt-1">
+                    <div *ngIf="form.get('password')?.hasError('required')">La contraseña es obligatoria.</div>
+                    <div *ngIf="form.get('password')?.hasError('minlength')">La contraseña debe tener al menos 5 caracteres.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="account-status form-check form-switch">
               <input class="form-check-input" type="checkbox" formControlName="estatus" id="estatusCheck" />
-              <label class="form-check-label" for="estatusCheck">Activo</label>
+              <label class="form-check-label" for="estatusCheck">
+                <strong>{{ form.get('estatus')?.value ? 'Usuario activo' : 'Usuario inactivo' }}</strong>
+                <small>Permite que esta cuenta pueda iniciar sesión en el sistema.</small>
+              </label>
+            </div>
+
+            <div *ngIf="form.invalid" class="form-requirements">
+              <i class="feather icon-info"></i>
+              <span>
+                Para guardar completa:
+                <strong *ngIf="form.get('nombre')?.invalid"> nombre</strong>
+                <strong *ngIf="form.get('nombreUsuario')?.invalid"> nombre de usuario válido</strong>
+                <strong *ngIf="form.get('idRol')?.invalid"> rol</strong>
+                <strong *ngIf="form.get('password')?.invalid"> contraseña de al menos 5 caracteres</strong>.
+              </span>
             </div>
           </form>
         </div>
         <div class="modal-footer">
-          <button class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
-          <button class="btn btn-primary" [disabled]="form.invalid" (click)="save(modal)">Guardar</button>
+          <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancelar</button>
+          <button type="button" class="btn btn-primary save-user-button" [disabled]="form.invalid" (click)="save(modal)">
+            <i class="feather icon-save me-1"></i>
+            {{ editId ? 'Guardar cambios' : 'Crear usuario' }}
+          </button>
         </div>
       </ng-template>
     </app-card>

@@ -38,6 +38,7 @@ export class ConfiguracionOroComponent implements OnInit {
   errorMessage = '';
   editando: { [key: string]: number | null } = {};
   savingCelda: { [key: string]: boolean } = {};
+  porcPrestamoOriginal: { [key: string]: number } = {};
 
   readonly KILATES = [6, 8, 10, 12, 14, 18, 21, 24];
   readonly HECHURAS: { code: HechuraCode; label: string; icon: string }[] = [
@@ -125,6 +126,18 @@ export class ConfiguracionOroComponent implements OnInit {
   }
 
   /**
+   * Vista previa proporcional de Configuración de Oro:
+   * precio base = avalúo ajustado por hechura × (% préstamo / 100).
+   */
+  precioPrestamoVista(c: OroCeldaResponse): number {
+    const porcentaje = Number(c.porcPrestamo);
+    if (!Number.isFinite(porcentaje) || porcentaje < 0) {
+      return c.precioPrestamo;
+    }
+    return this.precioAvaluoConFactor(c) * (porcentaje / 100);
+  }
+
+  /**
    * Inicia la edición inline del %Prestamo de una celda (sólo si es editable, i.e. no 24K).
    */
   iniciarEdicion(c: OroCeldaResponse): void {
@@ -169,6 +182,49 @@ export class ConfiguracionOroComponent implements OnInit {
     const key = this.keyCelda(c);
     const { [key]: _removed, ...resto } = this.editando;
     this.editando = resto;
+  }
+
+  recordarPorcPrestamo(c: OroCeldaResponse): void {
+    this.porcPrestamoOriginal = {
+      ...this.porcPrestamoOriginal,
+      [this.keyCelda(c)]: Number(c.porcPrestamo)
+    };
+  }
+
+  guardarPorcPrestamoRapido(c: OroCeldaResponse): void {
+    if (!c.editable) return;
+    const key = this.keyCelda(c);
+    const original = this.porcPrestamoOriginal[key];
+    const valor = Number(c.porcPrestamo);
+
+    if (original !== undefined && valor === original) return;
+    if (!Number.isFinite(valor) || valor < 0) {
+      if (original !== undefined) c.porcPrestamo = original;
+      this.errorMessage = 'El porcentaje de préstamo debe ser mayor o igual a cero';
+      return;
+    }
+
+    this.savingCelda = { ...this.savingCelda, [key]: true };
+    this.errorMessage = '';
+    this.oroConfigService.actualizarCelda(c.kilataje, c.hechura, valor, this.sucursalId).subscribe({
+      next: (updated) => {
+        this.celdas = this.celdas.map((item) =>
+          item.kilataje === updated.kilataje && item.hechura === updated.hechura ? updated : item
+        );
+        const { [key]: _, ...resto } = this.savingCelda;
+        this.savingCelda = resto;
+        this.porcPrestamoOriginal = {
+          ...this.porcPrestamoOriginal,
+          [key]: Number(updated.porcPrestamo)
+        };
+      },
+      error: (err) => {
+        if (original !== undefined) c.porcPrestamo = original;
+        const { [key]: _, ...resto } = this.savingCelda;
+        this.savingCelda = resto;
+        this.errorMessage = 'Error al actualizar el porcentaje: ' + (err?.error?.message ?? err.message ?? 'Error desconocido');
+      }
+    });
   }
 
   /**

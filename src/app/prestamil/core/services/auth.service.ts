@@ -97,8 +97,6 @@ export class AuthService {
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',
       'Empresa': '/configuracion/empresas',
-      'Parametros prestamo': '/configuracion/parametros-prestamo',
-      'Parámetros Préstamo': '/configuracion/parametros-prestamo',
       'Parametros Generales': '/configuracion/parametros-generales',
       'Parámetros Generales': '/configuracion/parametros-generales',
       'Plazos y Periodos': '/configuracion/plazos-periodos',
@@ -116,10 +114,14 @@ export class AuthService {
 
     const normalizeItem = (item: NavigationItem): NavigationItem => {
       const url = normalizeUrl(item.url);
+      const children = item.children
+        ?.filter(child => !['Parametros prestamo', 'Parámetros Préstamo'].includes(child.title ?? ''))
+        .map(child => normalizeItem(child));
       return {
         ...item,
         title: url === '/avaluos' ? 'Avaluos' : item.title,
-        url
+        url,
+        children
       };
     };
 

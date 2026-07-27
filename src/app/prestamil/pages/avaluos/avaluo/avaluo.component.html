@@ -1,11 +1,13 @@
 <!-- ─────────────────────────────────────────────── Page header ── -->
-<div class="row page-header align-items-center mb-3">
+<div class="row page-header align-items-center mb-4">
   <div class="col-md-8">
-    <h5 class="mb-1">Avaluos Prendarios</h5>
-    <p class="text-muted mb-0">Registro de operación de empeño.</p>
+    <span class="eyebrow">Operación prendaria</span>
+    <h2 class="mb-1">Avalúos prendarios</h2>
+    <p class="mb-0">Captura las prendas, calcula el préstamo y prepara el contrato.</p>
   </div>
   <div class="col-md-4 text-md-right mt-2 mt-md-0">
-    <span class="badge" [ngClass]="operacionAbierta ? 'badge-success' : 'badge-danger'">
+    <span class="operation-status" [ngClass]="operacionAbierta ? 'is-open' : 'is-closed'">
+      <span class="status-dot"></span>
       {{ operacionAbierta ? 'Operación ABIERTA' : 'Operación CERRADA' }}
     </span>
   </div>
@@ -28,7 +30,7 @@
 <!-- ──────────────────────────────────── 0) Datos de encabezado ── -->
 <div class="row mb-3">
   <div class="col-12">
-    <app-card [hidHeader]="true">
+    <app-card [hidHeader]="true" class="context-card">
       <div class="avaluo-header-grid">
         <div><strong>Sucursal:</strong> {{ sucursal }}</div>
         <div><strong>Usuario:</strong> {{ usuario }}</div>
@@ -41,8 +43,8 @@
 
 <!-- ──────────────────────────── 1) Cliente / Pignorante + Resumen ── -->
 <div class="row mb-3">
-  <div class="col-lg-8">
-    <app-card cardTitle="1) Cliente / Pignorante">
+  <div class="col-lg-7">
+    <app-card cardTitle="Cliente / Pignorante" class="workflow-card client-card">
 
       <!-- Buscador de cliente -->
       <div class="form-row mb-2">
@@ -94,8 +96,8 @@
     </app-card>
   </div>
 
-  <div class="col-lg-4">
-    <app-card cardTitle="Resumen rápido">
+  <div class="col-lg-5">
+    <app-card cardTitle="Resumen rápido" class="workflow-card summary-card">
       <ul class="summary-list">
         <li><span>Partidas:</span><strong>{{ totalPartidas }}</strong></li>
         <li><span>Peso total:</span><strong>{{ pesoTotal | number: '1.1-1' }} gr</strong></li>
@@ -105,7 +107,7 @@
       </ul>
       <hr />
       <div class="d-grid gap-2">
-        <button class="btn btn-success btn-sm" (click)="generarContrato()" [disabled]="partidas.length === 0">
+        <button class="btn btn-primary btn-sm contract-button" (click)="generarContrato()" [disabled]="partidas.length === 0">
           Generar contrato
         </button>
         <button class="btn btn-outline-info btn-sm" (click)="verVencimientos()" [disabled]="!clienteSeleccionado">
@@ -119,7 +121,7 @@
 <!-- ─────────────────────────── 2) Plazo + Captura de prenda ── -->
 <div class="row mb-3">
   <div class="col-12">
-    <app-card cardTitle="2) Captura de prenda">
+    <app-card cardTitle="Captura de prenda" class="workflow-card capture-card">
 
       <!-- Plazo + tipo de prenda -->
       <div class="form-row mb-3">
@@ -146,77 +148,77 @@
 
       <!-- ─── Tab: Alhajas / Plata ─── -->
       <ng-container *ngIf="tipoSeleccionado === 'Alhajas' || tipoSeleccionado === 'Plata'">
-        <div class="form-row">
-          <div class="form-group col-md-5">
-            <label class="form-label">Prenda</label>
-            <div class="input-group">
-              <input
-                class="form-control form-control-sm"
-                [(ngModel)]="captura.descripcion"
-                placeholder="Descripción de la prenda"
-              />
-              <button class="btn btn-outline-secondary btn-sm" type="button" (click)="abrirBuscarPrenda()">
-                <i class="feather icon-search"></i>
-              </button>
+        <div class="capture-workspace">
+          <div class="item-fields-panel">
+            <div class="panel-title"><i class="feather icon-tag"></i> Datos de la prenda</div>
+            <div class="form-row">
+              <div class="form-group col-md-6">
+                <label class="form-label">Prenda</label>
+                <div class="input-group">
+                  <input
+                    class="form-control form-control-sm"
+                    [(ngModel)]="captura.descripcion"
+                    placeholder="Descripción de la prenda"
+                  />
+                  <button class="btn btn-outline-secondary btn-sm" type="button" (click)="abrirBuscarPrenda()">
+                    <i class="feather icon-search"></i>
+                  </button>
+                </div>
+                <small class="text-muted" *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</small>
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Hechura</label>
+                <select class="form-control form-control-sm" [(ngModel)]="captura.hechura">
+                  <option *ngFor="let h of hechuras" [value]="h">{{ h }}</option>
+                </select>
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Kilataje</label>
+                <select class="form-control form-control-sm" [(ngModel)]="captura.kilataje" (change)="recalcularAlhajas()">
+                  <option *ngFor="let k of kilatajes" [value]="k">{{ k }}K</option>
+                </select>
+              </div>
             </div>
-            <small class="text-muted" *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</small>
+            <div class="form-row">
+              <div class="form-group col-md-3">
+                <label class="form-label">Cantidad</label>
+                <input class="form-control form-control-sm" type="number" min="1" [(ngModel)]="captura.cantidad" />
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Peso (g)</label>
+                <input class="form-control form-control-sm" type="number" min="0" step="0.01" [(ngModel)]="captura.peso" (input)="recalcularAlhajas()" />
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Color <small class="text-muted">(opc.)</small></label>
+                <input class="form-control form-control-sm" [(ngModel)]="captura.color" placeholder="Ej. Amarillo" />
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Claridad <small class="text-muted">(opc.)</small></label>
+                <input class="form-control form-control-sm" [(ngModel)]="captura.claridad" placeholder="Solo brillantes" />
+              </div>
+            </div>
           </div>
-          <div class="form-group col-md-2">
-            <label class="form-label">Hechura</label>
-            <select class="form-control form-control-sm" [(ngModel)]="captura.hechura">
-              <option *ngFor="let h of hechuras" [value]="h">{{ h }}</option>
-            </select>
-          </div>
-          <div class="form-group col-md-2">
-            <label class="form-label">Kilataje</label>
-            <select class="form-control form-control-sm" [(ngModel)]="captura.kilataje" (change)="recalcularAlhajas()">
-              <option *ngFor="let k of kilatajes" [value]="k">{{ k }}K</option>
-            </select>
-          </div>
-          <div class="form-group col-md-1">
-            <label class="form-label">Cantidad</label>
-            <input class="form-control form-control-sm" type="number" min="1" [(ngModel)]="captura.cantidad" />
-          </div>
-          <div class="form-group col-md-2">
-            <label class="form-label">Peso (g)</label>
-            <input
-              class="form-control form-control-sm"
-              type="number"
-              min="0"
-              step="0.01"
-              [(ngModel)]="captura.peso"
-              (input)="recalcularAlhajas()"
-            />
-          </div>
-        </div>
 
-        <div class="form-row">
-          <div class="form-group col-md-3">
-            <label class="form-label">Color <small class="text-muted">(opc.)</small></label>
-            <input class="form-control form-control-sm" [(ngModel)]="captura.color" placeholder="Ej. Amarillo" />
-          </div>
-          <div class="form-group col-md-3">
-            <label class="form-label">Claridad <small class="text-muted">(opc.)</small></label>
-            <input class="form-control form-control-sm" [(ngModel)]="captura.claridad" placeholder="Solo brillantes" />
-          </div>
-          <div class="form-group col-md-2">
-            <label class="form-label">Precio x gramo</label>
-            <input class="form-control form-control-sm text-right" [value]="captura.precioXGramo | number: '1.2-2'" readonly />
-          </div>
-          <div class="form-group col-md-2">
-            <label class="form-label">Avalúo real</label>
-            <input class="form-control form-control-sm text-right bg-light" [value]="captura.avaluoReal | number: '1.2-2'" readonly />
-          </div>
-          <div class="form-group col-md-2">
-            <label class="form-label">Préstamo</label>
-            <input class="form-control form-control-sm text-right bg-light" [value]="captura.prestamo | number: '1.2-2'" readonly />
-          </div>
-        </div>
-
-        <div class="form-row">
-          <div class="col-md-4 offset-md-8 text-right">
-            <label class="form-label">Avalúo contrato</label>
-            <input class="form-control form-control-sm text-right fw-bold bg-warning-subtle" [value]="captura.avaluoContrato | number: '1.2-2'" readonly />
+          <div class="calculation-panel">
+            <div class="panel-title"><i class="feather icon-dollar-sign"></i> Cálculo de la operación</div>
+            <div class="calculation-grid">
+              <div>
+                <label class="form-label">Precio x gramo</label>
+                <input class="form-control form-control-sm text-right" [value]="captura.precioXGramo | number: '1.2-2'" readonly />
+              </div>
+              <div>
+                <label class="form-label">Avalúo real</label>
+                <input class="form-control form-control-sm text-right" [value]="captura.avaluoReal | number: '1.2-2'" readonly />
+              </div>
+              <div>
+                <label class="form-label">Préstamo</label>
+                <input class="form-control form-control-sm text-right loan-preview" [value]="captura.prestamo | number: '1.2-2'" readonly />
+              </div>
+              <div>
+                <label class="form-label">Avalúo contrato</label>
+                <input class="form-control form-control-sm text-right fw-bold bg-warning-subtle" [value]="captura.avaluoContrato | number: '1.2-2'" readonly />
+              </div>
+            </div>
           </div>
         </div>
       </ng-container>
@@ -226,51 +228,48 @@
         <p class="text-muted small mb-2">
           El avalúo se calcula automáticamente sobre el monto del préstamo capturado.
         </p>
-        <div class="form-row">
-          <div class="form-group col-md-3">
-            <label class="form-label">Subtipo</label>
-            <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.subtipo">
-              <option *ngFor="let s of subtiposVarios" [value]="s">{{ s }}</option>
-            </select>
+        <div class="capture-workspace">
+          <div class="item-fields-panel">
+            <div class="panel-title"><i class="feather icon-monitor"></i> Datos del artículo</div>
+            <div class="form-row">
+              <div class="form-group col-md-3">
+                <label class="form-label">Subtipo</label>
+                <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.subtipo">
+                  <option *ngFor="let s of subtiposVarios" [value]="s">{{ s }}</option>
+                </select>
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Marca</label>
+                <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.marca" placeholder="Marca" />
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Modelo</label>
+                <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.modelo" placeholder="Modelo" />
+              </div>
+              <div class="form-group col-md-3">
+                <label class="form-label">Serie / IMEI</label>
+                <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.serie" placeholder="Serie o IMEI" />
+              </div>
+              <div class="form-group col-md-4">
+                <label class="form-label">Estado</label>
+                <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.estado">
+                  <option *ngFor="let e of estadosVarios" [value]="e">{{ e }}</option>
+                </select>
+              </div>
+            </div>
           </div>
-          <div class="form-group col-md-3">
-            <label class="form-label">Marca</label>
-            <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.marca" placeholder="Marca" />
-          </div>
-          <div class="form-group col-md-3">
-            <label class="form-label">Modelo</label>
-            <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.modelo" placeholder="Modelo" />
-          </div>
-          <div class="form-group col-md-3">
-            <label class="form-label">Serie / IMEI</label>
-            <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.serie" placeholder="Serie o IMEI" />
-          </div>
-        </div>
-        <div class="form-row">
-          <div class="form-group col-md-3">
-            <label class="form-label">Estado</label>
-            <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.estado">
-              <option *ngFor="let e of estadosVarios" [value]="e">{{ e }}</option>
-            </select>
-          </div>
-          <div class="form-group col-md-3">
-            <label class="form-label">Préstamo</label>
-            <input
-              class="form-control form-control-sm"
-              type="number"
-              min="0"
-              step="1"
-              [(ngModel)]="capturaVarios.prestamo"
-              (input)="recalcularVarios()"
-            />
-          </div>
-          <div class="form-group col-md-3">
-            <label class="form-label">Avalúo contrato (+{{ porcIncrementoVarios }}%)</label>
-            <input
-              class="form-control form-control-sm text-right fw-bold bg-warning-subtle"
-              [value]="capturaVarios.avaluoContrato | number: '1.2-2'"
-              readonly
-            />
+          <div class="calculation-panel">
+            <div class="panel-title"><i class="feather icon-dollar-sign"></i> Cálculo de la operación</div>
+            <div class="calculation-grid single-column">
+              <div>
+                <label class="form-label">Préstamo</label>
+                <input class="form-control form-control-sm" type="number" min="0" step="1" [(ngModel)]="capturaVarios.prestamo" (input)="recalcularVarios()" />
+              </div>
+              <div>
+                <label class="form-label">Avalúo contrato (+{{ porcIncrementoVarios }}%)</label>
+                <input class="form-control form-control-sm text-right fw-bold bg-warning-subtle" [value]="capturaVarios.avaluoContrato | number: '1.2-2'" readonly />
+              </div>
+            </div>
           </div>
         </div>
       </ng-container>
@@ -300,10 +299,10 @@
 <!-- ─────────────────────────── 3) Tabla de partidas ── -->
 <div class="row mb-3">
   <div class="col-12">
-    <app-card cardTitle="3) Partidas del contrato">
+    <app-card cardTitle="Partidas del contrato" class="workflow-card items-card">
       <div class="table-responsive">
-        <table class="table table-sm table-striped table-bordered mb-0">
-          <thead class="table-dark">
+        <table class="table table-sm mb-0 avaluo-table">
+          <thead>
             <tr>
               <th>#</th>
               <th>Tipo</th>

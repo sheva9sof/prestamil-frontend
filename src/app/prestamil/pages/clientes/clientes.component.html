@@ -1,13 +1,22 @@
-<div class="row">
+<div class="row clientes-page">
   <div class="col-12">
 
     <!-- Modal creación/edición -->
     <ng-template #clienteModal let-modal>
-      <div class="modal-header">
-        <h5 class="modal-title">{{ isEditingCliente ? 'Editar cliente' : 'Nuevo cliente' }}</h5>
+      <div class="modal-header entity-modal-header">
+        <div class="client-modal-title">
+          <span class="client-modal-icon">
+            <i class="feather" [ngClass]="isEditingCliente ? 'icon-edit-2' : 'icon-user-plus'"></i>
+          </span>
+          <div>
+            <span class="modal-eyebrow">{{ isEditingCliente ? 'Actualización de expediente' : 'Alta de expediente' }}</span>
+            <h5 class="modal-title">{{ isEditingCliente ? 'Editar cliente' : 'Nuevo cliente' }}</h5>
+            <small>Los campos marcados con * son obligatorios.</small>
+          </div>
+        </div>
         <button type="button" class="btn-close" aria-label="Close" (click)="closeModal()"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body entity-modal-body">
         <div *ngIf="modalError" class="alert alert-danger mb-3" role="alert">{{ modalError }}</div>
         <form>
 
@@ -73,8 +82,8 @@
           </div>
           <div class="row">
             <div class="col-md-3 mb-3">
-              <label for="mNumExt" class="form-label">Núm. exterior</label>
-              <input type="text" id="mNumExt" class="form-control" [(ngModel)]="formData.numeroExterior" name="mNumExt" placeholder="Ej. 123" />
+              <label for="mNumExt" class="form-label">Núm. exterior <span class="text-danger">*</span></label>
+              <input type="text" id="mNumExt" class="form-control" [(ngModel)]="formData.numeroExterior" name="mNumExt" placeholder="Ej. 123" required />
             </div>
             <div class="col-md-3 mb-3">
               <label for="mNumInt" class="form-label">Núm. interior</label>
@@ -113,25 +122,43 @@
             </div>
           </div>
 
+          <div *ngIf="!formularioClienteValido" class="form-requirements">
+            <i class="feather icon-info"></i>
+            <span>
+              Falta completar: <strong>{{ camposObligatoriosFaltantes.join(', ') }}</strong>.
+            </span>
+          </div>
+
         </form>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="closeModal()" [disabled]="isLoadingGuardar">
+      <div class="modal-footer client-modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeModal()" [disabled]="isLoadingGuardar">
           Cancelar
         </button>
         <button
           type="button"
-          class="btn btn-primary"
+          class="btn btn-primary save-client-button"
           (click)="guardarCliente()"
-          [disabled]="isLoadingGuardar || !formData.nombre.trim() || !formData.apellidoPaterno.trim() || !formData.telefono.trim() || !formData.curp.trim() || !formData.rfc.trim()"
+          [disabled]="isLoadingGuardar || !formularioClienteValido"
         >
-          <i class="feather icon-save"></i>
-          {{ isLoadingGuardar ? 'Guardando...' : (isEditingCliente ? 'Actualizar' : 'Guardar') }}
+          <span *ngIf="isLoadingGuardar" class="spinner-border spinner-border-sm"></span>
+          <i *ngIf="!isLoadingGuardar" class="feather icon-save"></i>
+          {{ isLoadingGuardar ? 'Guardando...' : (isEditingCliente ? 'Guardar cambios' : 'Crear cliente') }}
         </button>
       </div>
     </ng-template>
 
     <app-card cardTitle="Clientes" [hidHeader]="true">
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">Directorio</span>
+          <h2>Clientes</h2>
+          <p>Consulta y administra la información de tus clientes.</p>
+        </div>
+        <button type="button" class="btn btn-primary" (click)="abrirModalNuevo()">
+          <i class="feather icon-user-plus"></i> Agregar cliente
+        </button>
+      </div>
 
       <!-- Mensajes -->
       <div class="alert alert-success alert-dismissible fade show mb-2" role="alert" *ngIf="successMessage">
@@ -144,7 +171,7 @@
       </div>
 
       <!-- Filtros de búsqueda -->
-      <div class="row mb-2 align-items-end">
+      <div class="row mb-2 align-items-end filter-panel">
         <div class="col-md-4">
           <label for="filtroNombre" class="form-label">Nombre completo</label>
           <input type="text" id="filtroNombre" class="form-control" placeholder="Buscar por nombre..." [(ngModel)]="filtroNombre" />
@@ -165,11 +192,6 @@
         <div class="col-md-auto">
           <button type="button" class="btn btn-primary" (click)="onFiltroChange()">
             <i class="feather icon-search"></i> Buscar
-          </button>
-        </div>
-        <div class="col text-end">
-          <button type="button" class="btn btn-success" (click)="abrirModalNuevo()">
-            <i class="feather icon-plus"></i> Agregar nuevo cliente
           </button>
         </div>
       </div>

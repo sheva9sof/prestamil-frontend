@@ -1,4 +1,4 @@
-<div class="row">
+<div class="row turnos-page">
   <div class="col-12">
     <!-- Spinner de logout -->
     <div *ngIf="isLoggingOut" class="logout-spinner-overlay">
@@ -34,47 +34,111 @@
 
     <!-- Modal de confirmación personalizado -->
     <ng-template #confirmModal let-modal>
-      <div class="modal-header">
-        <h5 class="modal-title">{{ confirmTitle }}</h5>
+      <div class="modal-header confirm-modal-header">
+        <div class="confirm-modal-heading">
+          <span class="confirm-modal-icon" [class.is-danger]="turno && turno.activo">
+            <i class="feather" [ngClass]="turno && turno.activo ? 'icon-lock' : 'icon-unlock'"></i>
+          </span>
+          <div>
+            <span class="modal-eyebrow">Control operativo</span>
+            <h5 class="modal-title">{{ confirmTitle }}</h5>
+          </div>
+        </div>
         <button type="button" class="btn-close" aria-label="Close" (click)="modal.dismiss()"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body confirm-modal-body">
         <p>{{ confirmMessage }}</p>
+        <div class="confirm-note">
+          <i class="feather icon-info"></i>
+          <span>{{ turno && turno.activo ? 'Al cerrar, finalizará la operación activa de la sucursal.' : 'Al iniciar, se habilitarán las operaciones autorizadas para tu rol.' }}</span>
+        </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
-        <button type="button" class="btn btn-primary" (click)="modal.close('confirm')">Confirmar</button>
+        <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancelar</button>
+        <button type="button" class="btn" [ngClass]="turno && turno.activo ? 'btn-danger' : 'btn-primary'" (click)="modal.close('confirm')">
+          <i class="feather me-1" [ngClass]="turno && turno.activo ? 'icon-lock' : 'icon-play'"></i>
+          {{ turno && turno.activo ? 'Cerrar turno' : 'Iniciar turno' }}
+        </button>
       </div>
     </ng-template>
 
-    <app-card cardTitle="Turnos">
-      <div class="mb-3">
-        <ng-container *ngIf="turno && turno.activo; else noTurno">
-          <div class="d-flex justify-content-between align-items-center">
-            <div>
-              <strong>Estado:</strong>
-              <span class="badge bg-success">ABIERTO</span>
-              <span> - Iniciado por: {{ turno?.nombreUsuario || turno?.usuarioId }}</span>
-            </div>
-            <div>
-                <button class="btn btn-danger" *ngIf="turno && turno.activo" (click)="cerrar()">Cerrar turno</button>
-              </div>
-          </div>
-        </ng-container>
-        <ng-template #noTurno>
-          <div class="alert alert-info d-flex justify-content-between align-items-center mb-0">
-            <div><strong>No hay un turno abierto en este momento.</strong></div>
-            <div *ngIf="puedeAbrir">
-              <button class="btn btn-primary" (click)="iniciar()">Iniciar turno</button>
-            </div>
-          </div>
-        </ng-template>
+    <div class="page-heading">
+      <div>
+        <span class="eyebrow">Control operativo</span>
+        <h2>Turnos</h2>
+        <p>Administra la apertura y cierre de la jornada de la sucursal.</p>
       </div>
+      <span class="page-status" [class.is-open]="turno && turno.activo">
+        <span class="status-dot"></span>
+        {{ turno && turno.activo ? 'Turno abierto' : 'Sin turno activo' }}
+      </span>
+    </div>
 
-      <div *ngIf="turno && turno.fechaInicio">
-        <p class="mb-1"><strong>Inicio:</strong> {{ turno?.fechaInicio | date:'short' }}</p>
-        <p *ngIf="turno?.fechaFin" class="mb-0"><strong>Fin:</strong> {{ turno?.fechaFin | date:'short' }}</p>
-      </div>
+    <app-card [hidHeader]="true" class="turno-card">
+      <ng-container *ngIf="turno && turno.activo; else noTurno">
+        <div class="turno-shell active-turno">
+          <div class="turno-main">
+            <div class="turno-icon"><i class="feather icon-clock"></i></div>
+            <div>
+              <span class="state-label">Operación en curso</span>
+              <h3>Turno abierto</h3>
+              <p>La sucursal está habilitada para realizar operaciones.</p>
+            </div>
+          </div>
+
+          <div class="turno-details">
+            <div class="detail-item">
+              <span><i class="feather icon-user"></i> Responsable</span>
+              <strong>{{ turno?.nombreUsuario || turno?.usuarioId }}</strong>
+            </div>
+            <div class="detail-item">
+              <span><i class="feather icon-calendar"></i> Inicio</span>
+              <strong>{{ turno?.fechaInicio | date:'dd/MM/yyyy, HH:mm' }}</strong>
+            </div>
+            <div class="detail-item" *ngIf="turno?.fechaFin">
+              <span><i class="feather icon-check-circle"></i> Fin</span>
+              <strong>{{ turno?.fechaFin | date:'dd/MM/yyyy, HH:mm' }}</strong>
+            </div>
+          </div>
+
+          <div class="turno-actions">
+            <button class="btn btn-danger" (click)="cerrar()">
+              <i class="feather icon-lock me-1"></i> Cerrar turno
+            </button>
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #noTurno>
+        <div class="turno-shell inactive-turno">
+          <div class="turno-main">
+            <div class="turno-icon"><i class="feather icon-sunrise"></i></div>
+            <div>
+              <span class="state-label">Jornada pendiente</span>
+              <h3>No hay un turno abierto</h3>
+              <p>Inicia el turno para habilitar las operaciones de la sucursal.</p>
+            </div>
+          </div>
+
+          <div class="turno-guide">
+            <div><span>1</span> Confirma la apertura</div>
+            <div><span>2</span> Realiza las operaciones</div>
+            <div><span>3</span> Cierra al finalizar</div>
+          </div>
+
+          <div class="turno-actions" *ngIf="puedeAbrir; else sinPermiso">
+            <button class="btn btn-primary" (click)="iniciar()">
+              <i class="feather icon-play me-1"></i> Iniciar turno
+            </button>
+          </div>
+          <ng-template #sinPermiso>
+            <div class="permission-note">
+              <i class="feather icon-shield"></i>
+              Tu rol no tiene permiso para abrir turnos.
+            </div>
+          </ng-template>
+        </div>
+      </ng-template>
     </app-card>
   </div>
 </div>
