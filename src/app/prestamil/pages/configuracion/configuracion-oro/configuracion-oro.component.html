@@ -1,0 +1,172 @@
+<div class="oro-page">
+  <div *ngIf="successMessage" class="notification-toast notification-success">
+    <div class="notification-content">
+      <i class="feather icon-check-circle"></i>
+      <span>{{ successMessage }}</span>
+      <button type="button" class="notification-close" (click)="successMessage = ''">
+        <i class="feather icon-x"></i>
+      </button>
+    </div>
+  </div>
+
+  <section class="page-heading">
+    <div>
+      <span class="eyebrow">Configuración general</span>
+      <h3>Configuración del oro</h3>
+      <p>Administra el precio base y compara las tres hechuras en una sola vista.</p>
+    </div>
+    <button
+      type="button"
+      class="btn btn-primary save-button"
+      (click)="guardarPrecioGramo()"
+      [disabled]="isSavingGramo || !precioGramo"
+    >
+      <span *ngIf="isSavingGramo" class="spinner-border spinner-border-sm"></span>
+      <i *ngIf="!isSavingGramo" class="feather icon-save"></i>
+      {{ isSavingGramo ? 'Guardando...' : 'Guardar y recalcular' }}
+    </button>
+  </section>
+
+  <div *ngIf="errorMessage" class="alert alert-danger" role="alert">
+    <i class="feather icon-alert-circle me-2"></i>{{ errorMessage }}
+  </div>
+
+  <section class="settings-panel">
+    <div class="price-card">
+      <div class="setting-icon gold"><i class="feather icon-dollar-sign"></i></div>
+      <div class="setting-content">
+        <label for="precioGramoInput">Precio del gramo 24K</label>
+        <div class="input-with-unit">
+          <span>$</span>
+          <input
+            id="precioGramoInput"
+            type="number"
+            class="form-control"
+            [(ngModel)]="precioGramo"
+            [ngModelOptions]="{ standalone: true }"
+            min="0"
+            step="0.01"
+          />
+          <small>MXN/g</small>
+        </div>
+      </div>
+    </div>
+
+    <div class="factor-section">
+      <div class="factor-heading">
+        <div>
+          <strong>Factores por hechura</strong>
+          <span>100% mantiene el precio sin ajuste</span>
+        </div>
+        <span class="live-badge"><i class="feather icon-eye"></i> Vista previa inmediata</span>
+      </div>
+      <div class="factor-grid">
+        <div *ngFor="let h of HECHURAS" class="factor-card" [attr.data-hechura]="h.code">
+          <div class="setting-icon"><i [class]="h.icon"></i></div>
+          <div class="setting-content">
+            <label [for]="'factor' + h.code">{{ h.label }}</label>
+            <div class="factor-input">
+              <input
+                [id]="'factor' + h.code"
+                type="number"
+                class="form-control"
+                [(ngModel)]="factores[h.code]"
+                [ngModelOptions]="{ standalone: true }"
+                min="0"
+                step="0.01"
+              />
+              <span>%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="comparison-card">
+    <div class="table-heading">
+      <div>
+        <h5>Tabla comparativa</h5>
+        <p>Valores por gramo para cada kilataje y tipo de hechura.</p>
+      </div>
+      <div class="legend">
+        <span><i class="dot appraisal"></i>Avalúo</span>
+        <span><i class="dot loan"></i>Precio base</span>
+      </div>
+    </div>
+
+    <div *ngIf="isLoading" class="loading-state">
+      <span class="spinner-border text-warning"></span>
+      <span>Cargando configuración...</span>
+    </div>
+
+    <div *ngIf="!isLoading && celdas.length === 0" class="empty-state">
+      <i class="feather icon-inbox"></i>
+      <span>No hay valores de oro configurados para esta sucursal.</span>
+    </div>
+
+    <div *ngIf="!isLoading && celdas.length > 0" class="table-responsive">
+      <table class="table oro-table">
+        <thead>
+          <tr class="group-row">
+            <th rowspan="2" class="karat-header">Kilataje</th>
+            <th *ngFor="let h of HECHURAS" colspan="3" class="hechura-header" [attr.data-hechura]="h.code">
+              <i [class]="h.icon"></i>{{ h.label }}
+            </th>
+          </tr>
+          <tr class="column-row">
+            <ng-container *ngFor="let h of HECHURAS">
+              <th>Avalúo</th>
+              <th>% préstamo</th>
+              <th>Precio base</th>
+            </ng-container>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let kilataje of KILATES; trackBy: trackByKilataje" [class.reference-row]="kilataje === 24">
+            <td class="karat-cell">
+              <span>{{ kilataje }}</span><small>K</small>
+              <em *ngIf="kilataje === 24">Referencia</em>
+            </td>
+
+            <ng-container *ngFor="let h of HECHURAS">
+              <ng-container *ngIf="obtenerCelda(kilataje, h.code) as c; else sinCelda">
+                <td class="money-cell appraisal-value">${{ precioAvaluoConFactor(c) | number: '1.2-2' }}</td>
+                <td class="percentage-cell">
+                  <div class="input-group input-group-sm mx-auto percentage-quick-input">
+                    <input
+                      type="number"
+                      class="form-control text-end"
+                      [(ngModel)]="c.porcPrestamo"
+                      [ngModelOptions]="{ standalone: true }"
+                      min="0"
+                      step="0.01"
+                      title="Se guarda automáticamente al salir"
+                      [disabled]="!c.editable || savingCelda[keyCelda(c)]"
+                      (focus)="recordarPorcPrestamo(c)"
+                      (blur)="guardarPorcPrestamoRapido(c)"
+                      (keydown.enter)="$any($event.target).blur()"
+                    />
+                    <span class="input-group-text">
+                      <span *ngIf="savingCelda[keyCelda(c)]" class="spinner-border spinner-border-sm"></span>
+                      <span *ngIf="!savingCelda[keyCelda(c)]">%</span>
+                    </span>
+                  </div>
+                </td>
+                <td class="money-cell loan-value">${{ precioPrestamoVista(c) | number: '1.2-2' }}</td>
+              </ng-container>
+              <ng-template #sinCelda>
+                <td colspan="3" class="missing-cell">Sin datos</td>
+              </ng-template>
+            </ng-container>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-note">
+      <i class="feather icon-info"></i>
+      El precio base se replica en todas las tablas de plazos. Al guardar cambios, se actualiza en cascada.
+    </div>
+  </section>
+</div>

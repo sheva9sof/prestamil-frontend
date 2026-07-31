@@ -13,6 +13,7 @@ export interface OpcionMenu {
 }
 
 export interface LoginResponse {
+  id?: number;
   nombreUsuario?: string; // Campo esperado del backend (opcional para compatibilidad)
   username?: string; // Campo alternativo del backend (opcional para compatibilidad)
   password: string | null;
@@ -22,6 +23,7 @@ export interface LoginResponse {
   cambiarPassword: boolean;
   ultimoLogin: string;
   idRol: number;
+  rolNombre?: string;
   fechaIni: string | null;
   fechaFin: string | null;
   vigencia: boolean;
@@ -33,5 +35,7 @@ export interface LoginResponse {
   inicioSesion: string;
   opciones: OpcionMenu[];
   token: string;
+  sessionTimeoutMinutes?: number;
+  warningMinutes?: number;
 }
 

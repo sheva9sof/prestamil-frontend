@@ -11,10 +11,11 @@ import { ConfigurationComponent } from 'src/app/theme/layout/admin/configuration
 import { BreadcrumbsComponent } from '../../shared/components/breadcrumbs/breadcrumbs.component';
 import { Footer } from './footer/footer';
 import { AuthStreamService } from 'src/app/prestamil/core/services/auth-stream.service';
+import { SessionWarningModalComponent } from 'src/app/prestamil/core/components/session-warning-modal/session-warning-modal.component';
 
 @Component({
   selector: 'app-admin',
-  imports: [NavBarComponent, NavigationComponent, RouterModule, CommonModule, ConfigurationComponent, BreadcrumbsComponent, Footer],
+  imports: [NavBarComponent, NavigationComponent, RouterModule, CommonModule, ConfigurationComponent, BreadcrumbsComponent, Footer, SessionWarningModalComponent],
   templateUrl: './admin.component.html',
   styleUrls: ['./admin.component.scss']
 })

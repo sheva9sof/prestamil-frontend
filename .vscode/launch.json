@@ -1,0 +1,55 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Angular - Chrome Debug",
+            "url": "http://localhost:4200",
+            "webRoot": "${workspaceFolder}/src",
+            "sourceMaps": true,
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${webRoot}/*"
+            },
+            "skipFiles": [
+                "<node_internals>/**",
+                "node_modules/**"
+            ],
+            "runtimeArgs": [
+                "--disable-background-networking",
+                "--disable-breakpad",
+                "--disable-client-side-phishing-detection",
+                "--disable-default-apps",
+                "--disable-hang-monitor",
+                "--disable-popup-blocking",
+                "--disable-prompt-on-repost",
+                "--disable-sync",
+                "--enable-automation",
+                "--no-first-run",
+                "--password-store=basic",
+                "--use-mock-keychain"
+            ]
+        },
+        {
+            "type": "chrome",
+            "request": "attach",
+            "name": "Attach Chrome",
+            "address": "localhost",
+            "port": 9222,
+            "pathMapping": {
+                "/": "${workspaceFolder}/src/",
+                "/src/": "${workspaceFolder}/src/"
+            },
+            "sourceMaps": true,
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${webRoot}/*"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Angular + Chrome Debug",
+            "configurations": ["Angular - Chrome Debug"]
+        }
+    ]
+}

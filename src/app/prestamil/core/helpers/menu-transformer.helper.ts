@@ -1,6 +1,42 @@
 import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
 import { OpcionMenu } from '../models/auth-response.model';
 
+function normalizeMenuUrl(url: string): string {
+  const normalizedUrl = url.replace('/default', '').replace(/\/$/, '');
+  return normalizedUrl === '/avaluos/mock' ? '/avaluos' : normalizedUrl;
+}
+
+function normalizeNavigationItem(item: NavigationItem): NavigationItem {
+  const children = item.children
+    ?.filter(child => !['Parametros prestamo', 'Parámetros Préstamo'].includes(child.title ?? ''))
+    .map(child => normalizeNavigationItem(child));
+  const normalizedItem: NavigationItem = {
+    ...item,
+    title: item.url === '/avaluos' ? 'Avaluos' : item.title,
+    children
+  };
+
+  if (!children) {
+    return normalizedItem;
+  }
+
+  const hasAvaluos = new Set<string>();
+  normalizedItem.children = children.filter(child => {
+    if (child.url !== '/avaluos') {
+      return true;
+    }
+
+    if (hasAvaluos.has(child.url)) {
+      return false;
+    }
+
+    hasAvaluos.add(child.url);
+    return true;
+  });
+
+  return normalizedItem;
+}
+
 /**
  * Transforma una opción del backend a NavigationItem
  */
@@ -10,26 +46,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   // Determinar el tipo basado en si tiene submenus
   const type: 'item' | 'collapse' = hasSubmenus ? 'collapse' : 'item';
   
-  // Obtener el icono directamente del backend (ya viene en formato Feather)
-  let icon: string | undefined;
-  if (opcion.icono === 'true' && opcion.nombreIcono) {
-    icon = opcion.nombreIcono;
-  }
-  
-  // Fallback: Si no hay icono pero es una opción conocida, asignar icono por defecto
-  if (!icon && !hasSubmenus) {
-    const defaultIcons: { [key: string]: string } = {
-      'Turnos': 'icon-calendar',
-      'Usuarios': 'icon-users',
-      'Usuario': 'icon-user',
-      'Hardware': 'icon-cpu',
-      'Prendas': 'icon-package',
-      'Sucursal': 'icon-home',
-      'Empresas': 'icon-briefcase',
-      'Empresa': 'icon-briefcase',
-    };
-    icon = defaultIcons[opcion.opcion];
-  }
+  const icon: string | undefined = opcion.nombreIcono ?? undefined;
   
   // Transformar los submenus recursivamente
   const children: NavigationItem[] | undefined = hasSubmenus
@@ -40,7 +57,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   let url: string | undefined = undefined;
   if (opcion.url) {
     // Normalizar URLs (remover /default si existe, limpiar barras finales)
-    url = opcion.url.replace('/default', '').replace(/\/$/, '') || undefined;
+    url = normalizeMenuUrl(opcion.url) || undefined;
     // Si la URL está vacía después de normalizar, usar undefined
     if (url === '') {
       url = undefined;
@@ -52,20 +69,21 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
     // Mapeo de nombres de opciones a rutas
     const opcionToUrlMap: { [key: string]: string } = {
       'Turnos': '/turnos',
+      'Clientes': '/clientes',
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
-      'Avaluos': '/avaluos/mock',
-      'Avaluos Prendarios': '/avaluos/mock',
+      'Avaluos': '/avaluos',
+      'Avaluos Prendarios': '/avaluos',
       'Prendas': '/catalogos/prendas',
+      'Descuentos': '/catalogos/descuentos',
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',
       'Empresa': '/configuracion/empresas',
-      'Parametros prestamo': '/configuracion/parametros-prestamo',
-      'Parámetros Préstamo': '/configuracion/parametros-prestamo',
       'Parametros Generales': '/configuracion/parametros-generales',
       'Parámetros Generales': '/configuracion/parametros-generales',
       'Plazos y Periodos': '/configuracion/plazos-periodos',
+      'Configuración del Oro': '/configuracion/configuracion-oro',
       // Agregar más mapeos según sea necesario
     };
     
@@ -77,7 +95,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
   
   return {
     id: opcion.id.toString(),
-    title: opcion.opcion,
+    title: url === '/avaluos' ? 'Avaluos' : opcion.opcion,
     type: type,
     icon: icon,
     url: url,
@@ -95,17 +113,17 @@ export function transformOpcionesToNavigationItems(opciones: OpcionMenu[]): Navi
   }
   
   // Transformar cada opción
-  const items = opciones.map(opcion => transformOpcion(opcion));
+  const items = opciones.map(opcion => normalizeNavigationItem(transformOpcion(opcion)));
   
   // Agrupar todas las opciones en un grupo principal
   return [
-    {
+    normalizeNavigationItem({
       id: 'main-menu',
       title: '',
       type: 'group',
       icon: 'icon-navigation',
       children: items
-    }
+    })
   ];
 }
 

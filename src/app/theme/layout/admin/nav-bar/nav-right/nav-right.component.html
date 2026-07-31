@@ -1,3 +1,19 @@
+<ng-template #logoutModal let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Cerrar Sesión</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-0">¿Está seguro de que desea cerrar sesión?</p>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" (click)="modal.dismiss()">Cancelar</button>
+    <button type="button" class="btn btn-danger" (click)="modal.close('confirm')">
+      <i class="feather icon-log-out me-1"></i>Salir
+    </button>
+  </div>
+</ng-template>
+
 <span>Bienvenido, {{ fullName }}</span>
 <ul class="navbar-nav">
   <li>

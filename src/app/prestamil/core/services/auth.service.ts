@@ -8,6 +8,7 @@ import { NavigationItem } from '../../../theme/layout/admin/navigation/navigatio
 import { transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
 import { environment } from 'src/environments/environment';
 import { AuthStreamService } from './auth-stream.service';
+import { SessionWarningService } from './session-warning.service';
 
 @Injectable({
   providedIn: 'root'
@@ -16,6 +17,7 @@ export class AuthService {
   private http = inject(HttpClient);
   private router = inject(Router);
   private authStreamService = inject(AuthStreamService);
+  private sessionWarningService = inject(SessionWarningService);
   
   private isAuthenticatedSubject = new BehaviorSubject<boolean>(false);
   public isAuthenticated$ = this.isAuthenticatedSubject.asObservable();
@@ -89,48 +91,89 @@ export class AuthService {
       'Usuarios': '/usuarios',
       'Usuario': '/usuarios',
       'Hardware': '/hardware',
-      'Avaluos': '/avaluos/mock',
-      'Avaluos Prendarios': '/avaluos/mock',
+      'Avalúos': '/avaluos',
+      'Avaluos Prendarios': '/avaluos',
       'Prendas': '/catalogos/prendas',
       'Sucursal': '/configuracion/sucursal',
       'Empresas': '/configuracion/empresas',
       'Empresa': '/configuracion/empresas',
-      'Parametros prestamo': '/configuracion/parametros-prestamo',
-      'Parámetros Préstamo': '/configuracion/parametros-prestamo',
       'Parametros Generales': '/configuracion/parametros-generales',
       'Parámetros Generales': '/configuracion/parametros-generales',
       'Plazos y Periodos': '/configuracion/plazos-periodos',
     };
 
+    const normalizeUrl = (url?: string): string | undefined => {
+      if (!url) {
+        return undefined;
+      }
+
+      return url.replace('/default', '').replace(/\/$/, '') === '/avaluos/mock'
+        ? '/avaluos'
+        : url.replace('/default', '').replace(/\/$/, '');
+    };
+
+    const normalizeItem = (item: NavigationItem): NavigationItem => {
+      const url = normalizeUrl(item.url);
+      const children = item.children
+        ?.filter(child => !['Parametros prestamo', 'Parámetros Préstamo'].includes(child.title ?? ''))
+        .map(child => normalizeItem(child));
+      return {
+        ...item,
+        title: url === '/avaluos' ? 'Avaluos' : item.title,
+        url,
+        children
+      };
+    };
+
+    const dedupeAvaluos = (items: NavigationItem[]): NavigationItem[] => {
+      let hasAvaluos = false;
+      return items.filter(item => {
+        if (item.url !== '/avaluos') {
+          return true;
+        }
+
+        if (hasAvaluos) {
+          return false;
+        }
+
+        hasAvaluos = true;
+        return true;
+      });
+    };
+
     return menuItems.map(item => {
       if (item.type === 'group' && item.children) {
+        const children = item.children.map(child => {
+          const normalizedChild = normalizeItem(child);
+          if (normalizedChild.type === 'item' && !normalizedChild.url && !normalizedChild.children) {
+            const mappedUrl = opcionToUrlMap[normalizedChild.title];
+            if (mappedUrl) {
+              return normalizeItem({ ...normalizedChild, url: mappedUrl });
+            }
+          } else if (normalizedChild.type === 'collapse' && normalizedChild.children) {
+            return {
+              ...normalizedChild,
+              children: dedupeAvaluos(normalizedChild.children.map(subChild => {
+                const normalizedSubChild = normalizeItem(subChild);
+                if (normalizedSubChild.type === 'item' && !normalizedSubChild.url) {
+                  const mappedUrl = opcionToUrlMap[normalizedSubChild.title];
+                  if (mappedUrl) {
+                    return normalizeItem({ ...normalizedSubChild, url: mappedUrl });
+                  }
+                }
+                return normalizedSubChild;
+              }))
+            };
+          }
+          return normalizedChild;
+        });
+
         return {
           ...item,
-          children: item.children.map(child => {
-            if (child.type === 'item' && !child.url && !child.children) {
-              const mappedUrl = opcionToUrlMap[child.title];
-              if (mappedUrl) {
-                return { ...child, url: mappedUrl };
-              }
-            } else if (child.type === 'collapse' && child.children) {
-              return {
-                ...child,
-                children: child.children.map(subChild => {
-                  if (subChild.type === 'item' && !subChild.url) {
-                    const mappedUrl = opcionToUrlMap[subChild.title];
-                    if (mappedUrl) {
-                      return { ...subChild, url: mappedUrl };
-                    }
-                  }
-                  return subChild;
-                })
-              };
-            }
-            return child;
-          })
+          children: dedupeAvaluos(children)
         };
       }
-      return item;
+      return normalizeItem(item);
     });
   }
 
@@ -170,10 +213,12 @@ export class AuthService {
     
     // Guardar solo datos del usuario para UI (sin token)
     localStorage.setItem(this.AUTH_USER_KEY, JSON.stringify({
+      id: loginResponse.id,
       nombreUsuario: nombreUsuario,
       nombre: loginResponse.nombre,
       apellidos: loginResponse.apellidos,
-      idRol: loginResponse.idRol
+      idRol: loginResponse.idRol,
+      rolNombre: loginResponse.rolNombre
     }));
     console.debug('[AuthService] Usuario guardado en localStorage (sin token)');
     
@@ -192,6 +237,9 @@ export class AuthService {
     if (nombreUsuario) {
       console.log('[AuthService] Conectando SSE para usuario:', nombreUsuario);
       this.authStreamService.connect(nombreUsuario);
+      const timeoutMinutes = loginResponse.sessionTimeoutMinutes ?? 30;
+      const warningMinutes = loginResponse.warningMinutes ?? 3;
+      this.sessionWarningService.initialize(timeoutMinutes, warningMinutes);
     }
   }
 
@@ -239,6 +287,7 @@ export class AuthService {
    * Limpiar el estado local de autenticación.
    */
   private clearLocalSession(): void {
+    this.sessionWarningService.stop();
     this.authStreamService.disconnect();
     localStorage.removeItem(this.AUTH_USER_KEY);
     localStorage.removeItem(this.MENU_ITEMS_KEY);
@@ -323,7 +372,7 @@ export class AuthService {
       passwordNueva
     };
 
-    return this.http.post(url, body);
+    return this.http.put(url, body);
   }
 
   /**

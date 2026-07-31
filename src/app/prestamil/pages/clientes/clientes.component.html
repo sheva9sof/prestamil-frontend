@@ -1,0 +1,297 @@
+<div class="row clientes-page">
+  <div class="col-12">
+
+    <!-- Modal creación/edición -->
+    <ng-template #clienteModal let-modal>
+      <div class="modal-header entity-modal-header">
+        <div class="client-modal-title">
+          <span class="client-modal-icon">
+            <i class="feather" [ngClass]="isEditingCliente ? 'icon-edit-2' : 'icon-user-plus'"></i>
+          </span>
+          <div>
+            <span class="modal-eyebrow">{{ isEditingCliente ? 'Actualización de expediente' : 'Alta de expediente' }}</span>
+            <h5 class="modal-title">{{ isEditingCliente ? 'Editar cliente' : 'Nuevo cliente' }}</h5>
+            <small>Los campos marcados con * son obligatorios.</small>
+          </div>
+        </div>
+        <button type="button" class="btn-close" aria-label="Close" (click)="closeModal()"></button>
+      </div>
+      <div class="modal-body entity-modal-body">
+        <div *ngIf="modalError" class="alert alert-danger mb-3" role="alert">{{ modalError }}</div>
+        <form>
+
+          <!-- Datos personales -->
+          <p class="fw-semibold text-muted mb-2 section-label">Datos personales</p>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="mNombre" class="form-label">Nombre <span class="text-danger">*</span></label>
+              <input type="text" id="mNombre" class="form-control" [(ngModel)]="formData.nombre" name="mNombre" placeholder="Nombre(s)" required />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="mApPat" class="form-label">Apellido paterno <span class="text-danger">*</span></label>
+              <input type="text" id="mApPat" class="form-control" [(ngModel)]="formData.apellidoPaterno" name="mApPat" placeholder="Apellido paterno" required />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="mApMat" class="form-label">Apellido materno</label>
+              <input type="text" id="mApMat" class="form-control" [(ngModel)]="formData.apellidoMaterno" name="mApMat" placeholder="Apellido materno" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="mTelefono" class="form-label">Teléfono <span class="text-danger">*</span></label>
+              <input type="text" id="mTelefono" class="form-control" [(ngModel)]="formData.telefono" name="mTelefono" placeholder="10 dígitos" maxlength="10" required />
+            </div>
+            </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label for="mCurp" class="form-label">CURP <span class="text-danger">*</span></label>
+              <input type="text" id="mCurp" class="form-control text-uppercase" [(ngModel)]="formData.curp" name="mCurp" placeholder="18 caracteres" maxlength="18" required />
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="mRfc" class="form-label">RFC <span class="text-danger">*</span></label>
+              <input type="text" id="mRfc" class="form-control text-uppercase" [(ngModel)]="formData.rfc" name="mRfc" placeholder="12-13 caracteres" maxlength="13" required />
+            </div>
+          </div>
+          <div class="row mb-3">
+            <div class="col-md-4">
+              <label for="mActivo" class="form-label">Estatus</label>
+              <select id="mActivo" class="form-control" name="mActivo" [(ngModel)]="formData.activo">
+                <option [ngValue]="true">Activo</option>
+                <option [ngValue]="false">Inactivo</option>
+              </select>
+            </div>
+          </div>
+
+          <hr class="my-2" />
+
+          <!-- Dirección -->
+          <p class="fw-semibold text-muted mb-2 section-label">Dirección</p>
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label for="mTipoDireccion" class="form-label">Tipo</label>
+              <select id="mTipoDireccion" class="form-control" [(ngModel)]="formData.tipoDireccion" name="mTipoDireccion">
+                <option value="Particular">Particular</option>
+                <option value="Fiscal">Fiscal</option>
+                <option value="Laboral">Laboral</option>
+              </select>
+            </div>
+            <div class="col-md-9 mb-3">
+              <label for="mCalle" class="form-label">Calle <span class="text-danger">*</span></label>
+              <input type="text" id="mCalle" class="form-control" [(ngModel)]="formData.calle" name="mCalle" placeholder="Nombre de la calle" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-3 mb-3">
+              <label for="mNumExt" class="form-label">Núm. exterior <span class="text-danger">*</span></label>
+              <input type="text" id="mNumExt" class="form-control" [(ngModel)]="formData.numeroExterior" name="mNumExt" placeholder="Ej. 123" required />
+            </div>
+            <div class="col-md-3 mb-3">
+              <label for="mNumInt" class="form-label">Núm. interior</label>
+              <input type="text" id="mNumInt" class="form-control" [(ngModel)]="formData.numeroInterior" name="mNumInt" placeholder="Opcional" />
+            </div>
+            <div class="col-md-6 mb-3">
+              <label for="mColonia" class="form-label">Colonia <span class="text-danger">*</span></label>
+              <input type="text" id="mColonia" class="form-control" [(ngModel)]="formData.colonia" name="mColonia" placeholder="Colonia" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-4 mb-3">
+              <label for="mCiudad" class="form-label">Ciudad <span class="text-danger">*</span></label>
+              <input type="text" id="mCiudad" class="form-control" [(ngModel)]="formData.ciudad" name="mCiudad" placeholder="Ciudad" required />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="mEstado" class="form-label">Estado <span class="text-danger">*</span></label>
+              <input type="text" id="mEstado" class="form-control" [(ngModel)]="formData.estado" name="mEstado" placeholder="Estado" required />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="mCP" class="form-label">Código postal <span class="text-danger">*</span></label>
+              <input type="text" id="mCP" class="form-control" [(ngModel)]="formData.codigoPostal" name="mCP" placeholder="5 dígitos" maxlength="5" required />
+            </div>
+          </div>
+          <div class="row">
+            <div class="col-md-8 mb-3">
+              <label for="mReferencias" class="form-label">Referencias</label>
+              <input type="text" id="mReferencias" class="form-control" [(ngModel)]="formData.referencias" name="mReferencias" placeholder="Entre calles, puntos de referencia..." />
+            </div>
+            <div class="col-md-4 mb-3">
+              <label for="mEsVerificada" class="form-label">Dirección verificada</label>
+              <select id="mEsVerificada" class="form-control" name="mEsVerificada" [(ngModel)]="formData.esVerificada">
+                <option [ngValue]="true">Verificada</option>
+                <option [ngValue]="false">No verificada</option>
+              </select>
+            </div>
+          </div>
+
+          <div *ngIf="!formularioClienteValido" class="form-requirements">
+            <i class="feather icon-info"></i>
+            <span>
+              Falta completar: <strong>{{ camposObligatoriosFaltantes.join(', ') }}</strong>.
+            </span>
+          </div>
+
+        </form>
+      </div>
+      <div class="modal-footer client-modal-footer">
+        <button type="button" class="btn btn-outline-secondary" (click)="closeModal()" [disabled]="isLoadingGuardar">
+          Cancelar
+        </button>
+        <button
+          type="button"
+          class="btn btn-primary save-client-button"
+          (click)="guardarCliente()"
+          [disabled]="isLoadingGuardar || !formularioClienteValido"
+        >
+          <span *ngIf="isLoadingGuardar" class="spinner-border spinner-border-sm"></span>
+          <i *ngIf="!isLoadingGuardar" class="feather icon-save"></i>
+          {{ isLoadingGuardar ? 'Guardando...' : (isEditingCliente ? 'Guardar cambios' : 'Crear cliente') }}
+        </button>
+      </div>
+    </ng-template>
+
+    <app-card cardTitle="Clientes" [hidHeader]="true">
+      <div class="page-heading">
+        <div>
+          <span class="eyebrow">Directorio</span>
+          <h2>Clientes</h2>
+          <p>Consulta y administra la información de tus clientes.</p>
+        </div>
+        <button type="button" class="btn btn-primary" (click)="abrirModalNuevo()">
+          <i class="feather icon-user-plus"></i> Agregar cliente
+        </button>
+      </div>
+
+      <!-- Mensajes -->
+      <div class="alert alert-success alert-dismissible fade show mb-2" role="alert" *ngIf="successMessage">
+        {{ successMessage }}
+        <button type="button" class="btn-close" (click)="successMessage = ''"></button>
+      </div>
+      <div class="alert alert-danger alert-dismissible fade show mb-2" role="alert" *ngIf="errorMessage">
+        {{ errorMessage }}
+        <button type="button" class="btn-close" (click)="errorMessage = ''"></button>
+      </div>
+
+      <!-- Filtros de búsqueda -->
+      <div class="row mb-2 align-items-end filter-panel">
+        <div class="col-md-4">
+          <label for="filtroNombre" class="form-label">Nombre completo</label>
+          <input type="text" id="filtroNombre" class="form-control" placeholder="Buscar por nombre..." [(ngModel)]="filtroNombre" />
+        </div>
+        <div class="col-md-4">
+          <label for="filtroTelefono" class="form-label">Teléfono</label>
+          <input type="text" id="filtroTelefono" class="form-control" placeholder="Buscar por teléfono..." [(ngModel)]="filtroTelefono" />
+        </div>
+        <div class="col-md-4">
+          <label for="filtroEstatus" class="form-label">Estatus</label>
+          <select id="filtroEstatus" class="form-control" [(ngModel)]="filtroSoloActivos">
+            <option [ngValue]="false">Todos</option>
+            <option [ngValue]="true">Solo activos</option>
+          </select>
+        </div>
+      </div>
+      <div class="row mb-3 mt-3">
+        <div class="col-md-auto">
+          <button type="button" class="btn btn-primary" (click)="onFiltroChange()">
+            <i class="feather icon-search"></i> Buscar
+          </button>
+        </div>
+      </div>
+
+      <!-- Contador -->
+      <div class="text-end mb-1" *ngIf="clientesFiltrados.length > 0">
+        <span class="text-muted small">
+          Mostrando {{ (paginaActual - 1) * itemsPorPagina + 1 }} -
+          {{ Math.min(paginaActual * itemsPorPagina, clientesFiltrados.length) }}
+          de {{ clientesFiltrados.length }} registros
+        </span>
+      </div>
+
+      <!-- Spinner -->
+      <div *ngIf="isLoading" class="text-center py-4">
+        <div class="spinner-border text-primary" role="status"></div>
+        <p class="text-muted mt-2 mb-0">Cargando clientes...</p>
+      </div>
+
+      <!-- Tabla -->
+      <div class="table-responsive" *ngIf="!isLoading">
+        <table class="table table-hover table-bordered clientes-table">
+          <thead>
+            <tr>
+              <th>Nombre completo</th>
+              <th class="text-center">Teléfono</th>
+              <th class="text-center">CURP</th>
+              <th class="text-center">RFC</th>
+              <th class="text-center">Activo</th>
+              <th class="text-center">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let c of clientesPaginados; trackBy: trackById">
+              <td>{{ c.nombreCompleto }}</td>
+              <td class="text-center">{{ c.telefono }}</td>
+              <td class="text-center text-uppercase">{{ c.curp }}</td>
+              <td class="text-center text-uppercase">{{ c.rfc }}</td>
+              <td class="text-center">
+                <i class="feather"
+                   [ngClass]="c.activo ? 'icon-check-circle text-success' : 'icon-x-circle text-secondary'"
+                   [title]="c.activo ? 'Activo' : 'Inactivo'"
+                   style="font-size: 1.2rem;">
+                </i>
+              </td>
+              <td>
+                <div class="action-buttons">
+                  <button type="button" class="btn-edit" (click)="editarCliente(c)" title="Editar">
+                    <i class="feather icon-edit-2"></i>
+                    <span>Editar</span>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Sin registros -->
+      <div *ngIf="clientes.length === 0" class="alert alert-info mt-3" role="alert">
+        No hay clientes registrados.
+      </div>
+      <div *ngIf="clientes.length > 0 && clientesFiltrados.length === 0" class="alert alert-warning mt-3" role="alert">
+        No se encontraron resultados para los filtros aplicados.
+      </div>
+
+      <!-- Paginación -->
+      <div *ngIf="clientesFiltrados.length > 0" class="d-flex justify-content-between align-items-center mt-3">
+        <div>
+          <label class="me-2">Items por página:</label>
+          <select
+            class="form-select form-select-sm d-inline-block w-auto"
+            [(ngModel)]="itemsPorPagina"
+            (ngModelChange)="paginaActual = 1; calcularPaginacion()"
+          >
+            <option [value]="5">5</option>
+            <option [value]="10">10</option>
+            <option [value]="20">20</option>
+            <option [value]="50">50</option>
+          </select>
+        </div>
+        <nav>
+          <ul class="pagination mb-0">
+            <li class="page-item" [class.disabled]="paginaActual === 1">
+              <a class="page-link" href="#" (click)="$event.preventDefault(); cambiarPagina(paginaActual - 1)">
+                <i class="feather icon-chevron-left"></i>
+              </a>
+            </li>
+            <li class="page-item" *ngFor="let pagina of getPaginas()" [class.active]="pagina === paginaActual">
+              <a class="page-link" href="#" (click)="$event.preventDefault(); cambiarPagina(pagina)">{{ pagina }}</a>
+            </li>
+            <li class="page-item" [class.disabled]="paginaActual === totalPaginas">
+              <a class="page-link" href="#" (click)="$event.preventDefault(); cambiarPagina(paginaActual + 1)">
+                <i class="feather icon-chevron-right"></i>
+              </a>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+    </app-card>
+  </div>
+</div>
