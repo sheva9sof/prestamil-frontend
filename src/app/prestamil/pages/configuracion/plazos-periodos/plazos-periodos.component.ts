@@ -188,7 +188,9 @@ export class PlazosPeriodosComponent implements OnInit {
           id: this.normalizarNombreTipoPrenda(t),
           label: t.tipo,
           kind: kind === 'auto-moto' ? 'otro' : kind, // defensivo: ya filtramos arriba
-          isAlhajas: kind === 'alhaja' || kind === 'plata' // ambos usan tabla kilataje/hechura
+          // Solo oro usa la tabla kilataje/hechura. Plata usa sus propios precios por ley (Phase 6, D-09),
+          // asi que abrir la pestana Platas ya no debe disparar cargarAlhajas().
+          isAlhajas: kind === 'alhaja'
         };
       });
   }
@@ -206,7 +208,9 @@ export class PlazosPeriodosComponent implements OnInit {
     const n = (tipo?.tipo ?? '')
       .trim().toLowerCase()
       .normalize('NFD').replace(/[̀-ͯ]/g, '');
-    return n === 'plata';
+    // El valor real sembrado en tipo_prenda (002-initial-data.sql, id=4) es 'PLATAS' en PLURAL.
+    // Aceptar ambas formas, mismo estilo tolerante que esTipoVarios (D-04 / Verified Finding 2).
+    return n === 'plata' || n === 'platas';
   }
 
   esTipoVarios(tipo: { tipo?: string } | null | undefined): boolean {
@@ -281,6 +285,8 @@ export class PlazosPeriodosComponent implements OnInit {
               porcPrestamoSAvaluo: 0,
               usaAvaluoReal: false,
               porcIncrementoAvaluo: 0,
+              ley925: 0,   // precio por gramo de plata, ley 925 (Phase 6, D-01)
+              ley725: 0,   // precio por gramo de plata, ley 725 (Phase 6, D-01/D-03)
               diasGraciaSinInteres: 0,
               diasAntesPaseVenta: 0,
               importeMinPrestamo: 0
