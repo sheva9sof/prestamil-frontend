@@ -155,10 +155,12 @@
                     <hr class="my-3" />
                     <ng-container *ngTemplateOutlet="tablaKilatajeTpl; context: { $implicit: tab }"></ng-container>
                   </ng-container>
+                  <!-- PLATA → precios por gramo por ley (Phase 6, D-09) + parámetros comunes.
+                       NO usa tablaKilatajeTpl: esa tabla de 8 kilates x 3 hechuras es exclusiva de oro. -->
                   <ng-container *ngSwitchCase="'plata'">
-                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
+                    <ng-container *ngTemplateOutlet="tablaLeyPlataTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
                     <hr class="my-3" />
-                    <ng-container *ngTemplateOutlet="tablaKilatajeTpl; context: { $implicit: tab }"></ng-container>
+                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
                   </ng-container>
 
                   <!-- VARIOS → parámetros completos -->
@@ -475,4 +477,55 @@
     </div>
     <div *ngIf="alhajaError" class="text-danger small mt-1">{{ alhajaError }}</div>
   </div>
+</ng-template>
+
+<!-- Template: precios por gramo de plata por ley (Phase 6 — PLATA-01, D-01/D-09).
+     El guardado lo hace el boton "Guardar" de paramsTpl, que envia el form completo
+     (incluidos ley925/ley725) por el endpoint de plazo_parametro ya existente. -->
+<ng-template #tablaLeyPlataTpl let-tipoId="tipoId" let-label="label">
+  <div *ngIf="isLoadingTab" class="text-center py-3">
+    <i class="feather icon-loader spin-icon"></i>
+  </div>
+  <div *ngIf="tabError && !isLoadingTab" class="alert alert-danger small">{{ tabError }}</div>
+
+  <ng-container *ngIf="!isLoadingTab">
+    <div *ngIf="!parametrosForm[tipoId]" class="text-muted small">Cargando precios de plata...</div>
+
+    <ng-container *ngIf="parametrosForm[tipoId]">
+      <div class="parameters-panel">
+        <h6 class="small mb-2">Precio por gramo de plata</h6>
+
+        <div class="alert alert-info small mb-3" role="alert">
+          <i class="feather icon-info me-1"></i>
+          El avalúo de una pieza de plata es <strong>peso (g) × precio por gramo de su ley</strong>.
+          El préstamo máximo es ese avalúo × <strong>% Préstamo s/Avalúo</strong> (abajo).
+          Si el precio de una ley queda en 0, el sistema rechazará las partidas de esa ley.
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label small mb-0">Precio por gramo — Ley 925</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" min="0" step="0.0001"
+                [(ngModel)]="parametrosForm[tipoId].ley925" [ngModelOptions]="{ standalone: true }" />
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-0">Precio por gramo — Ley 725</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" min="0" step="0.0001"
+                [(ngModel)]="parametrosForm[tipoId].ley725" [ngModelOptions]="{ standalone: true }" />
+            </div>
+          </div>
+        </div>
+
+        <small class="form-text text-muted d-block">
+          Ejemplo: 10 g de ley 925 a ${{ parametrosForm[tipoId].ley925 | number: '1.2-2' }}/g
+          → avalúo ${{ (parametrosForm[tipoId].ley925 || 0) * 10 | number: '1.2-2' }}
+        </small>
+      </div>
+    </ng-container>
+  </ng-container>
 </ng-template>
