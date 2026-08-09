@@ -160,23 +160,35 @@
                     [(ngModel)]="captura.descripcion"
                     placeholder="Descripción de la prenda"
                   />
-                  <button class="btn btn-outline-secondary btn-sm" type="button" (click)="abrirBuscarPrenda()">
+                  <button class="btn btn-outline-secondary btn-sm" type="button"
+                    *ngIf="tipoSeleccionado === 'Alhajas'" (click)="abrirBuscarPrenda()">
                     <i class="feather icon-search"></i>
                   </button>
                 </div>
                 <small class="text-muted" *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</small>
               </div>
-              <div class="form-group col-md-3">
-                <label class="form-label">Hechura</label>
-                <select class="form-control form-control-sm" [(ngModel)]="captura.hechura">
-                  <option *ngFor="let h of hechuras" [value]="h">{{ h }}</option>
+              <ng-container *ngIf="tipoSeleccionado === 'Alhajas'">
+                <div class="form-group col-md-3">
+                  <label class="form-label">Hechura</label>
+                  <select class="form-control form-control-sm" [(ngModel)]="captura.hechura" (change)="recalcularCaptura()">
+                    <option *ngFor="let h of hechuras" [value]="h">{{ h }}</option>
+                  </select>
+                </div>
+                <div class="form-group col-md-3">
+                  <label class="form-label">Kilataje</label>
+                  <select class="form-control form-control-sm" [(ngModel)]="captura.kilataje" (change)="recalcularCaptura()">
+                    <option *ngFor="let k of kilatajes" [value]="k">{{ k }}K</option>
+                  </select>
+                </div>
+              </ng-container>
+
+              <!-- PLATA: selector de Ley en vez de Kilataje/Hechura (Phase 6, D-10) -->
+              <div class="form-group col-md-3" *ngIf="tipoSeleccionado === 'Plata'">
+                <label class="form-label">Ley</label>
+                <select class="form-control form-control-sm" [(ngModel)]="captura.ley" (change)="recalcularCaptura()">
+                  <option *ngFor="let l of leyesPlata" [value]="l">{{ l }}</option>
                 </select>
-              </div>
-              <div class="form-group col-md-3">
-                <label class="form-label">Kilataje</label>
-                <select class="form-control form-control-sm" [(ngModel)]="captura.kilataje" (change)="recalcularAlhajas()">
-                  <option *ngFor="let k of kilatajes" [value]="k">{{ k }}K</option>
-                </select>
+                <small class="text-muted">Precio: ${{ captura.precioXGramo | number: '1.2-2' }}/g</small>
               </div>
             </div>
             <div class="form-row">
@@ -186,7 +198,8 @@
               </div>
               <div class="form-group col-md-3">
                 <label class="form-label">Peso (g)</label>
-                <input class="form-control form-control-sm" type="number" min="0" step="0.01" [(ngModel)]="captura.peso" (input)="recalcularAlhajas()" />
+                <input class="form-control form-control-sm" type="number" min="0" step="0.01"
+                  [(ngModel)]="captura.peso" (input)="recalcularCaptura()" />
               </div>
               <div class="form-group col-md-3">
                 <label class="form-label">Color <small class="text-muted">(opc.)</small></label>
@@ -212,7 +225,16 @@
               </div>
               <div>
                 <label class="form-label">Préstamo</label>
-                <input class="form-control form-control-sm text-right loan-preview" [value]="captura.prestamo | number: '1.2-2'" readonly />
+                <input *ngIf="tipoSeleccionado !== 'Plata'"
+                  class="form-control form-control-sm text-right loan-preview"
+                  [value]="captura.prestamo | number: '1.2-2'" readonly />
+                <input *ngIf="tipoSeleccionado === 'Plata'"
+                  class="form-control form-control-sm text-right loan-preview"
+                  type="number" min="0" step="0.01" [max]="prestamoMaximoPlata"
+                  [(ngModel)]="captura.prestamo" (input)="ajustarPrestamoPlata()" />
+                <small *ngIf="tipoSeleccionado === 'Plata'" class="text-muted">
+                  Máximo autorizado: ${{ prestamoMaximoPlata | number: '1.2-2' }} (solo ajuste a la baja)
+                </small>
               </div>
               <div>
                 <label class="form-label">Avalúo contrato</label>
@@ -328,7 +350,7 @@
               <td>{{ item.descripcion }}</td>
               <td>{{ item.cantidad }}</td>
               <td>{{ item.peso | number: '1.1-1' }}</td>
-              <td>{{ item.kilataje ? item.kilataje + 'K' : '—' }}</td>
+              <td>{{ item.kilataje ? item.kilataje + 'K' : (item.ley ? 'Ley ' + item.ley : '—') }}</td>
               <td class="text-right">${{ (item.precioXGramo ?? 0) | number: '1.2-2' }}</td>
               <td class="text-right">${{ item.avaluoReal | number: '1.2-2' }}</td>
               <td class="text-right fw-bold">${{ item.avaluoContrato | number: '1.2-2' }}</td>
