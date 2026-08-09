@@ -27,6 +27,7 @@ interface PartidaAvaluo {
   cantidad: number;
   peso: number;
   kilataje?: number;
+  ley?: number;
   hechura?: string;
   hechuraCod?: string;
   precioXGramo?: number;
@@ -127,9 +128,11 @@ export class AvaluoComponent implements OnInit {
     'Alhajas': 1, 'Plata': 4, 'Varios': 3, 'Autos/Motos': 5
   };
 
-  // idAtributo del catálogo a cargar según tipo (Kilataje para ALHAJA, Tipo para PLATA)
+  // idAtributo del catalogo a cargar segun tipo. Solo ALHAJA tiene catalogo real:
+  // cat_valor_prenda no tiene NINGUNA fila para id_atributo=7 (Plata), por eso plata
+  // usa el selector de Ley 925/725 en vez de un catalogo (Phase 6, D-10).
   private readonly ATRIBUTO_CATALOGO: Record<string, number> = {
-    'Alhajas': 4, 'Plata': 7
+    'Alhajas': 4
   };
 
   private hechuraCodigo(h: string): string {
@@ -189,7 +192,7 @@ export class AvaluoComponent implements OnInit {
     if (!plazo) return;
 
     this.plazoService.getTablaAlhajas(plazo.id, this.sucursalId).subscribe({
-      next: (tabla) => { this.tablaAlhajas = tabla; this.recalcularAlhajas(); }
+      next: (tabla) => { this.tablaAlhajas = tabla; this.recalcularCaptura(); }
     });
 
     // Carga todos los parámetros del plazo en un solo request y los indexa por tipo
@@ -197,7 +200,7 @@ export class AvaluoComponent implements OnInit {
       next: (lista) => {
         this.paramsMap = {};
         (lista ?? []).forEach(p => { this.paramsMap[p.tipoPrendaId] = p; });
-        this.recalcularAlhajas();
+        this.recalcularCaptura();
         this.recalcularVarios();
       }
     });
@@ -215,6 +218,7 @@ export class AvaluoComponent implements OnInit {
     'LICENCIA DE MANEJO', 'CARTILLA S.M.N.'
   ];
   readonly kilatajes = [6, 8, 10, 12, 14, 18, 21, 24];
+  readonly leyesPlata = [925, 725];
   readonly hechuras  = ['FUNDIR', 'NORMAL', 'ESPECIAL'];
   readonly subtiposVarios = ['Electrodoméstico', 'Celular', 'Laptop', 'Otro'];
   readonly estadosVarios  = ['Bueno', 'Regular', 'Malo'];
@@ -250,6 +254,7 @@ export class AvaluoComponent implements OnInit {
     descripcion: '',
     hechura: 'NORMAL',
     kilataje: 14,
+    ley: 925,
     cantidad: 1,
     peso: 0,
     color: '',
@@ -260,6 +265,9 @@ export class AvaluoComponent implements OnInit {
     prestamo: 0,
     idValorPrenda: undefined as number | undefined
   };
+
+  /** Prestamo maximo autorizado por el servidor para la captura de plata (avaluo x % / 100). */
+  prestamoMaximoPlata = 0;
 
   // -------------------------------------------------------------------------
   // Estado — captura VARIOS
@@ -277,6 +285,60 @@ export class AvaluoComponent implements OnInit {
   // -------------------------------------------------------------------------
   // Cálculos automáticos
   // -------------------------------------------------------------------------
+
+  /** Enruta el recalculo al motor correcto segun el tipo seleccionado. */
+  recalcularCaptura(): void {
+    if (this.tipoSeleccionado === 'Plata') {
+      this.recalcularPlata();
+    } else if (this.tipoSeleccionado === 'Alhajas') {
+      this.recalcularAlhajas();
+    }
+  }
+
+  /**
+   * Preview de plata (Phase 6 — PLATA-01/PLATA-03, D-01/D-10).
+   *   avaluo         = peso x precio por gramo de la ley (ley925 / ley725 de plazo_parametro)
+   *   prestamoMaximo = avaluo x porcPrestamoSAvaluo / 100  (si no hay %, el backend usa el avaluo completo)
+   * NUNCA usa tablaAlhajas ni preciosOro: esos son precios de ORO.
+   * El valor persistido lo recalcula el servidor en ContratoService.buildPartida.
+   */
+  recalcularPlata(): void {
+    const params = this.getParams(this.TIPO_PRENDA_ID['Plata']);
+    const ley = +this.captura.ley;
+    const precioGramo = ley === 925 ? (params?.ley925 ?? 0) : (params?.ley725 ?? 0);
+    const porcPrestamo = params?.porcPrestamoSAvaluo ?? 0;
+
+    this.captura.precioXGramo = precioGramo;
+    this.captura.avaluoReal = +(precioGramo * this.captura.peso).toFixed(2);
+    this.prestamoMaximoPlata = porcPrestamo > 0
+      ? +(this.captura.avaluoReal * porcPrestamo / 100).toFixed(2)
+      : this.captura.avaluoReal;
+
+    // Propuesta inicial = el maximo; el usuario solo puede ajustarlo hacia abajo (PLATA-03).
+    if (this.captura.prestamo <= 0 || this.captura.prestamo > this.prestamoMaximoPlata) {
+      this.captura.prestamo = this.prestamoMaximoPlata;
+    }
+    const porcInc = params?.porcIncrementoAvaluo ?? 0;
+    this.captura.avaluoContrato = +(this.captura.prestamo * (1 + porcInc / 100)).toFixed(2);
+  }
+
+  /**
+   * Ajuste manual del prestamo de plata: solo hacia abajo. Si el usuario escribe un
+   * monto por encima del maximo del servidor, se baja al maximo y se avisa (PLATA-03).
+   */
+  ajustarPrestamoPlata(): void {
+    const params = this.getParams(this.TIPO_PRENDA_ID['Plata']);
+    let valor = +this.captura.prestamo;
+    if (!Number.isFinite(valor) || valor < 0) valor = 0;
+    if (valor > this.prestamoMaximoPlata) {
+      valor = this.prestamoMaximoPlata;
+      this.mostrarError(`El préstamo no puede superar el máximo autorizado ($${this.prestamoMaximoPlata.toFixed(2)}).`);
+    }
+    this.captura.prestamo = valor;
+    const porcInc = params?.porcIncrementoAvaluo ?? 0;
+    this.captura.avaluoContrato = +(valor * (1 + porcInc / 100)).toFixed(2);
+  }
+
   recalcularAlhajas(): void {
     const kilataje = +this.captura.kilataje;
     const hechuraCod = this.hechuraCodigo(this.captura.hechura);
@@ -328,6 +390,9 @@ export class AvaluoComponent implements OnInit {
     this.tipoSeleccionado = tipo;
     this.puedeAgregarPartida = tipo !== 'Autos/Motos';
     this.prendasCatalogo = [];
+    this.prestamoMaximoPlata = 0;
+    this.captura.prestamo = 0;
+    this.recalcularCaptura();
   }
 
   agregarPartida(): void {
@@ -349,18 +414,32 @@ export class AvaluoComponent implements OnInit {
         this.mostrarError('Captura un peso mayor a 0');
         return;
       }
+      const esPlata = this.tipoSeleccionado === 'Plata';
+      if (esPlata && this.captura.precioXGramo <= 0) {
+        this.mostrarError(
+          `No hay precio por gramo configurado para la ley ${this.captura.ley} en este plazo. ` +
+          `Configúralo en Configuración → Plazos y periodos → pestaña Platas.`);
+        return;
+      }
+      if (esPlata && this.captura.prestamo <= 0) {
+        this.mostrarError('Captura un préstamo mayor a 0');
+        return;
+      }
       const nueva: PartidaAvaluo = {
         id: this.partidas.length + 1,
         idTipoPrenda: this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1,
         idValorPrenda: this.captura.idValorPrenda,
         tipo: this.tipoSeleccionado,
         clavePrenda: this.captura.clavePrenda || '—',
-        descripcion: this.captura.descripcion || `${this.tipoSeleccionado} ${this.captura.kilataje}K`,
+        descripcion: this.captura.descripcion || (esPlata
+          ? `Plata ley ${this.captura.ley}`
+          : `${this.tipoSeleccionado} ${this.captura.kilataje}K`),
         cantidad: this.captura.cantidad,
         peso: this.captura.peso,
-        kilataje: this.captura.kilataje,
-        hechura: this.captura.hechura,
-        hechuraCod: this.hechuraCodigo(this.captura.hechura),
+        kilataje: esPlata ? undefined : this.captura.kilataje,
+        ley: esPlata ? +this.captura.ley : undefined,
+        hechura: esPlata ? undefined : this.captura.hechura,
+        hechuraCod: esPlata ? undefined : this.hechuraCodigo(this.captura.hechura),
         precioXGramo: this.captura.precioXGramo,
         avaluoReal: this.captura.avaluoReal,
         avaluoContrato: this.captura.avaluoContrato,
@@ -495,7 +574,8 @@ export class AvaluoComponent implements OnInit {
 
   // --- Modal de prenda ---
   abrirBuscarPrenda(): void {
-    if (this.tipoSeleccionado !== 'Alhajas' && this.tipoSeleccionado !== 'Plata') return;
+    // Plata ya no usa catalogo: cat_valor_prenda no tiene filas para id_atributo=7 (D-10).
+    if (this.tipoSeleccionado !== 'Alhajas') return;
     this.filtroPrenda = '';
 
     const idAtributo = this.ATRIBUTO_CATALOGO[this.tipoSeleccionado];
@@ -581,6 +661,7 @@ export class AvaluoComponent implements OnInit {
       cantidad: p.cantidad,
       pesoGramos: p.peso > 0 ? p.peso : undefined,
       kilataje: p.kilataje,
+      ley: p.ley,
       hechura: p.hechuraCod,
       precioXGramo: p.precioXGramo,
       avaluoReal: p.avaluoReal,
