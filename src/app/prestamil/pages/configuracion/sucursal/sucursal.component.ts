@@ -65,7 +65,8 @@ export class SucursalComponent implements OnInit, AfterViewInit {
       jueves: [false],
       viernes: [false],
       sabado: [false],
-      domingo: [false]
+      domingo: [false],
+      horarioAtencion: ['']
     });
 
     // loadInitialData se llamará desde ngAfterViewInit para asegurar que el ViewChild esté disponible
@@ -332,7 +333,8 @@ export class SucursalComponent implements OnInit, AfterViewInit {
         jueves: sucursalData.jueves || false,
         viernes: sucursalData.viernes || false,
         sabado: sucursalData.sabado || false,
-        domingo: sucursalData.domingo || false
+        domingo: sucursalData.domingo || false,
+        horarioAtencion: sucursalData.horarioAtencion || ''
       });
       
       if (idRazonSocialControl) idRazonSocialControl.disable({ emitEvent: false });
@@ -494,7 +496,8 @@ export class SucursalComponent implements OnInit, AfterViewInit {
         jueves: formValue.jueves || false,
         viernes: formValue.viernes || false,
         sabado: formValue.sabado || false,
-        domingo: formValue.domingo || false
+        domingo: formValue.domingo || false,
+        horarioAtencion: formValue.horarioAtencion || null
       };
 
       const url = `${environment.apiUrl}/api/sucursales/${sucursalId}`;
