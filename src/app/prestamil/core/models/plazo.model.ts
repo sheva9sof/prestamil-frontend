@@ -20,6 +20,7 @@ export interface PlazoParametroRequest {
   porcPrestamoSAvaluo?: number;
   usaAvaluoReal?: boolean;
   porcIncrementoAvaluo?: number;
+  porcPrestamoSAvaluoReal?: number;
   cobrarReposicionContrato?: boolean;
   reposicionEsPorcentaje?: boolean;
   porcReposicion?: number;
@@ -76,6 +77,7 @@ export interface PlazoParametroResponse {
   porcPrestamoSAvaluo: number;
   usaAvaluoReal: boolean;
   porcIncrementoAvaluo: number;
+  porcPrestamoSAvaluoReal: number;
   cobrarReposicionContrato: boolean;
   reposicionEsPorcentaje: boolean;
   porcReposicion: number;

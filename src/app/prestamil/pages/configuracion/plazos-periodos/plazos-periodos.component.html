@@ -155,10 +155,12 @@
                     <hr class="my-3" />
                     <ng-container *ngTemplateOutlet="tablaKilatajeTpl; context: { $implicit: tab }"></ng-container>
                   </ng-container>
+                  <!-- PLATA → precios por gramo por ley (Phase 6, D-09) + parámetros comunes.
+                       NO usa tablaKilatajeTpl: esa tabla de 8 kilates x 3 hechuras es exclusiva de oro. -->
                   <ng-container *ngSwitchCase="'plata'">
-                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
+                    <ng-container *ngTemplateOutlet="tablaLeyPlataTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
                     <hr class="my-3" />
-                    <ng-container *ngTemplateOutlet="tablaKilatajeTpl; context: { $implicit: tab }"></ng-container>
+                    <ng-container *ngTemplateOutlet="paramsTpl; context: { tipoId: getTipoIdFromTab(tab.id), label: tab.label }"></ng-container>
                   </ng-container>
 
                   <!-- VARIOS → parámetros completos -->
@@ -186,10 +188,11 @@
 
       </div>
       <div class="modal-footer">
+        <span *ngIf="alhajaError" class="text-danger small me-auto">{{ alhajaError }}</span>
         <button type="button" class="btn btn-outline-secondary" (click)="cancelarCambiosDetalle()" [disabled]="isSavingDetalle">
           <i class="feather icon-x me-1"></i> Cancelar
         </button>
-        <button type="button" class="btn btn-primary" (click)="confirmarCambiosDetalle()" [disabled]="isSavingDetalle">
+        <button type="button" class="btn btn-primary" (click)="confirmarCambiosDetalle()" [disabled]="isSavingDetalle || isLoadingTab">
           <span *ngIf="isSavingDetalle" class="spinner-border spinner-border-sm me-1"></span>
           <i *ngIf="!isSavingDetalle" class="feather icon-check me-1"></i>
           {{ isSavingDetalle ? 'Guardando...' : 'Confirmar cambios' }}
@@ -327,8 +330,8 @@
         <div class="col-md-4">
           <label class="form-label small mb-0">% Incremento sobre Avalúo</label>
           <input type="number" class="form-control form-control-sm" step="0.0001"
-            [(ngModel)]="parametrosForm[tipoId].porcIncrementoAvaluo" [ngModelOptions]="{ standalone: true }"
-            title="Porcentaje de incremento sobre el préstamo para el avalúo del contrato." />
+            [(ngModel)]="parametrosForm[tipoId].porcPrestamoSAvaluoReal" [ngModelOptions]="{ standalone: true }"
+            title="Porcentaje de incremento sobre el préstamo para el avalúo del contrato (aplica si 'Usa Avalúo Real')." />
           <small class="form-text text-muted">
             Si el préstamo es ${{ avaluoPreview(tipoId).prestamo | number:'1.2-2' }}
             → avalúo en contrato: ${{ avaluoPreview(tipoId).avaluo | number:'1.2-2' }}
@@ -475,4 +478,57 @@
     </div>
     <div *ngIf="alhajaError" class="text-danger small mt-1">{{ alhajaError }}</div>
   </div>
+</ng-template>
+
+<!-- Template: precios por gramo de plata por ley (Phase 6 — PLATA-01, D-01/D-09).
+     El guardado lo hace el boton "Guardar" de paramsTpl, que envia el form completo
+     (incluidos ley925/ley725) por el endpoint de plazo_parametro ya existente. -->
+<ng-template #tablaLeyPlataTpl let-tipoId="tipoId" let-label="label">
+  <div *ngIf="isLoadingTab" class="text-center py-3">
+    <i class="feather icon-loader spin-icon"></i>
+  </div>
+  <div *ngIf="tabError && !isLoadingTab" class="alert alert-danger small">{{ tabError }}</div>
+
+  <ng-container *ngIf="!isLoadingTab">
+    <div *ngIf="!parametrosForm[tipoId]" class="text-muted small">Cargando precios de plata...</div>
+
+    <ng-container *ngIf="parametrosForm[tipoId]">
+      <div class="parameters-panel">
+        <h6 class="small mb-2">Precio por gramo de plata</h6>
+
+        <div class="alert alert-info small mb-3" role="alert">
+          <i class="feather icon-info me-1"></i>
+          El <strong>precio por gramo</strong> es el <strong>préstamo por gramo</strong> (como COCAE):
+          el préstamo de una pieza de plata es <strong>peso (g) × precio por gramo de su ley</strong>.
+          El <strong>avalúo del contrato</strong> es ese préstamo × (1 + <strong>% Incremento sobre Avalúo</strong>).
+          El campo <strong>% Préstamo s/Avalúo no aplica a plata</strong> (es de oro/varios).
+          Si el precio de una ley queda en 0, el sistema rechazará las partidas de esa ley.
+        </div>
+
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label small mb-0">Precio por gramo — Ley 925</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" min="0" step="0.0001"
+                [(ngModel)]="parametrosForm[tipoId].ley925" [ngModelOptions]="{ standalone: true }" />
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small mb-0">Precio por gramo — Ley 720</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">$</span>
+              <input type="number" class="form-control" min="0" step="0.0001"
+                [(ngModel)]="parametrosForm[tipoId].ley725" [ngModelOptions]="{ standalone: true }" />
+            </div>
+          </div>
+        </div>
+
+        <small class="form-text text-muted d-block">
+          Ejemplo: 10 g de ley 925 a ${{ parametrosForm[tipoId].ley925 | number: '1.2-2' }}/g
+          → avalúo ${{ (parametrosForm[tipoId].ley925 || 0) * 10 | number: '1.2-2' }}
+        </small>
+      </div>
+    </ng-container>
+  </ng-container>
 </ng-template>

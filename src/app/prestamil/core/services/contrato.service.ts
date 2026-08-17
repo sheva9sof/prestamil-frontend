@@ -33,4 +33,9 @@ export class ContratoService {
   getAmortizacion(id: number): Observable<VencimientoResponse[]> {
     return this.http.get<VencimientoResponse[]>(`${this.API_URL}/${id}/amortizacion`);
   }
+
+  /** PDF del contrato de mutuo (para visualizarlo/imprimirlo en el sistema). */
+  getPdf(id: number): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/${id}/pdf`, { responseType: 'blob' });
+  }
 }
