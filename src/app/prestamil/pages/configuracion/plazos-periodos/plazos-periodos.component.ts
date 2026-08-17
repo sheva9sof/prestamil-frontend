@@ -4,7 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { NgbModal, NgbModalRef, NgbNavModule } from '@ng-bootstrap/ng-bootstrap';
-import { forkJoin } from 'rxjs';
+import { forkJoin, of } from 'rxjs';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
@@ -285,8 +285,9 @@ export class PlazosPeriodosComponent implements OnInit {
               porcPrestamoSAvaluo: 0,
               usaAvaluoReal: false,
               porcIncrementoAvaluo: 0,
+              porcPrestamoSAvaluoReal: 0,  // % incremento del avalúo sobre el préstamo (campo canónico)
               ley925: 0,   // precio por gramo de plata, ley 925 (Phase 6, D-01)
-              ley725: 0,   // precio por gramo de plata, ley 725 (Phase 6, D-01/D-03)
+              ley725: 0,   // precio por gramo de plata, ley 720 (Phase 6, D-01/D-03; columna legacy ley725)
               diasGraciaSinInteres: 0,
               diasAntesPaseVenta: 0,
               importeMinPrestamo: 0
@@ -394,19 +395,22 @@ export class PlazosPeriodosComponent implements OnInit {
       return;
     }
 
-    const cambios = this.alhajas.filter(alhaja =>
+    const cambiosAlhajas = this.alhajas.filter(alhaja =>
       Number(alhaja.porcAumento) !== this.porcAumentoOriginal[this.getAlhajaKey(alhaja)]
     );
-    if (cambios.length === 0) {
-      this.detalleModalRef?.close();
-      this.detalleModalRef = null;
-      return;
-    }
 
     this.isSavingDetalle = true;
     this.alhajaError = '';
     const plazoId = this.selectedPlazo.id;
-    forkJoin(cambios.map(alhaja =>
+    const solicitudesParametros = Object.entries(this.parametrosForm).map(([tipoPrendaId, form]) =>
+      this.plazoService.guardarParametro(
+        plazoId,
+        Number(tipoPrendaId),
+        form as PlazoParametroRequest,
+        this.sucursalId
+      )
+    );
+    const solicitudesAlhajas = cambiosAlhajas.map(alhaja =>
       this.plazoService.actualizarPorcAumento(
         plazoId,
         alhaja.kilataje,
@@ -414,10 +418,28 @@ export class PlazosPeriodosComponent implements OnInit {
         Number(alhaja.porcAumento),
         this.sucursalId
       )
-    )).subscribe({
-      next: (actualizadas) => {
-        const porClave = new Map(actualizadas.map(alhaja => [this.getAlhajaKey(alhaja), alhaja]));
-        this.alhajas = this.alhajas.map(alhaja => porClave.get(this.getAlhajaKey(alhaja)) ?? alhaja);
+    );
+
+    forkJoin({
+      parametros: solicitudesParametros.length > 0 ? forkJoin(solicitudesParametros) : of([]),
+      alhajas: solicitudesAlhajas.length > 0 ? forkJoin(solicitudesAlhajas) : of([])
+    }).subscribe({
+      next: ({ parametros, alhajas }) => {
+        const parametrosPorTipo = new Map(parametros.map(parametro => [parametro.tipoPrendaId, parametro]));
+        this.parametros = this.parametros.map(
+          parametro => parametrosPorTipo.get(parametro.tipoPrendaId) ?? parametro
+        );
+        parametros.forEach(parametro => {
+          if (!this.parametros.some(actual => actual.tipoPrendaId === parametro.tipoPrendaId)) {
+            this.parametros.push(parametro);
+          }
+        });
+
+        const alhajasPorClave = new Map(alhajas.map(alhaja => [this.getAlhajaKey(alhaja), alhaja]));
+        this.alhajas = this.alhajas.map(alhaja => alhajasPorClave.get(this.getAlhajaKey(alhaja)) ?? alhaja);
+        alhajas.forEach(alhaja => {
+          this.porcAumentoOriginal[this.getAlhajaKey(alhaja)] = Number(alhaja.porcAumento);
+        });
         this.isSavingDetalle = false;
         this.detalleModalRef?.close();
         this.detalleModalRef = null;
@@ -795,7 +817,7 @@ export class PlazosPeriodosComponent implements OnInit {
     const prestamo = this.PREVIEW_PRESTAMO;
     const form = this.parametrosForm[tipoPrendaId];
     if (!form || !form.usaAvaluoReal) return { prestamo, avaluo: prestamo };
-    const porc = Number(form.porcIncrementoAvaluo ?? 0);
+    const porc = Number(form.porcPrestamoSAvaluoReal ?? 0);
     if (!porc || isNaN(porc)) return { prestamo, avaluo: prestamo };
     const avaluo = prestamo * (1 + porc / 100);
     return { prestamo, avaluo };

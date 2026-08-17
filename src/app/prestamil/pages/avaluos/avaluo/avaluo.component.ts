@@ -1,7 +1,10 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, TemplateRef, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbModal, NgbTypeaheadSelectItemEvent } from '@ng-bootstrap/ng-bootstrap';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Observable, OperatorFunction, of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, finalize, map, switchMap } from 'rxjs/operators';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { AuthService } from 'src/app/prestamil/core/services/auth.service';
 import { PlazoService } from 'src/app/prestamil/core/services/plazo.service';
@@ -9,7 +12,7 @@ import { ClienteService } from 'src/app/prestamil/core/services/cliente.service'
 import { ContratoService } from 'src/app/prestamil/core/services/contrato.service';
 import { PrendaService } from 'src/app/prestamil/core/services/prenda.service';
 import { PlazoHechuraAlhajaResponse, PlazoParametroResponse } from 'src/app/prestamil/core/models/plazo.model';
-import { CatValorPrendaResponse } from 'src/app/prestamil/core/models/cliente.model';
+import { CatValorPrendaResponse, ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
 import { ContratoRequest, ContratoResponse, PartidaContratoRequest } from 'src/app/prestamil/core/models/contrato.model';
 import { environment } from 'src/environments/environment';
 
@@ -43,6 +46,46 @@ interface PartidaAvaluo {
   estadoFisico?: string;
 }
 
+// Fila de la tabla de amortización (un vencimiento por periodo), estilo COCAE
+interface FilaAmortizacion {
+  periodo: number;
+  fecha: string;
+  interes: number;
+  almacen: number;
+  gastos: number;
+  totalInteres: number;
+  iva: number;
+  refrendo: number;   // pago para EXTENDER (solo intereses + IVA acumulados)
+  desempeno: number;  // pago para RECUPERAR la prenda (préstamo + intereses + IVA)
+}
+
+// Preview completo de "Vencimientos de Contrato" (réplica de la pantalla de COCAE)
+interface AmortizacionPreview {
+  periodoNombre: string;
+  diasPorPeriodo: number;
+  numeroPeriodos: number;
+  porcInteres: number;
+  porcAlmacen: number;
+  porcInteresTotal: number;
+  ivaPorc: number;
+  avaluo: number;
+  prestamo: number;
+  interesPeriodo: number;
+  ivaPeriodo: number;
+  totalPagoPeriodo: number;
+  alVencimiento: number;
+  importeAEntregar: number;
+  fechaLimiteNormal: string;
+  diasGracia: number;
+  filas: FilaAmortizacion[];
+  fechaLimiteExtemp: string;
+  porcSancionSemanal: number;
+  sancionSemanal: number;
+  porcReposicion: number;
+  fechaPaseVenta: string;
+  comisionVenta: number;
+}
+
 interface ClienteLocal {
   id: number;
   folio: string;
@@ -65,6 +108,7 @@ interface PlazoAvaluo {
   nombre: string;
   diasPorPeriodo: number;
   numeroPeriodos: number;
+  tiposPrenda?: Array<{ id: number; tipo: string }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +132,7 @@ export class AvaluoComponent implements OnInit {
   private contratoService = inject(ContratoService);
   private prendaService  = inject(PrendaService);
   private modalService   = inject(NgbModal);
+  private sanitizer      = inject(DomSanitizer);
 
   // -------------------------------------------------------------------------
   // Sesión / encabezado
@@ -178,7 +223,8 @@ export class AvaluoComponent implements OnInit {
           id: p.id,
           nombre: p.nombre,
           diasPorPeriodo: p.diasPorPeriodo ?? 7,
-          numeroPeriodos: p.numeroPeriodos ?? 1
+          numeroPeriodos: p.numeroPeriodos ?? 1,
+          tiposPrenda: p.tiposPrenda ?? []
         }));
         if (this.plazos.length === 0) this.plazos = this.plazosDemo;
       },
@@ -190,6 +236,13 @@ export class AvaluoComponent implements OnInit {
     this.tablaAlhajas = [];
     this.paramsMap = {};
     if (!plazo) return;
+
+    const tiposAsociados = this.tiposPrenda.filter(tipo =>
+      (plazo.tiposPrenda ?? []).some(asociado => Number(asociado.id) === this.TIPO_PRENDA_ID[tipo])
+    );
+    if (tiposAsociados.length > 0 && !tiposAsociados.includes(this.tipoSeleccionado)) {
+      this.seleccionarTipo(tiposAsociados[0]);
+    }
 
     this.plazoService.getTablaAlhajas(plazo.id, this.sucursalId).subscribe({
       next: (tabla) => { this.tablaAlhajas = tabla; this.recalcularCaptura(); }
@@ -218,20 +271,59 @@ export class AvaluoComponent implements OnInit {
     'LICENCIA DE MANEJO', 'CARTILLA S.M.N.'
   ];
   readonly kilatajes = [6, 8, 10, 12, 14, 18, 21, 24];
-  readonly leyesPlata = [925, 725];
+  readonly leyesPlata = [925, 720];
   readonly hechuras  = ['FUNDIR', 'NORMAL', 'ESPECIAL'];
   readonly subtiposVarios = ['Electrodoméstico', 'Celular', 'Laptop', 'Otro'];
   readonly estadosVarios  = ['Bueno', 'Regular', 'Malo'];
+  readonly IVA_PORC = 16;   // IVA estándar (México); COCAE lo aplica sobre el interés total
+
+  // Preview de la tabla de amortización del contrato en curso (modal estilo COCAE)
+  amortizacion: AmortizacionPreview | null = null;
+
+  // Visor del PDF del contrato generado
+  pdfUrl: SafeResourceUrl | null = null;
+  private pdfBlobUrl: string | null = null;
+  contratoPdfFolio = '';
 
   // -------------------------------------------------------------------------
   // Estado — cliente seleccionado
   // -------------------------------------------------------------------------
   clienteSeleccionado: ClienteLocal | null = null;
+  clienteBusquedaInput: ClienteLocal | string = '';
   beneficiario = '';
   identificacionSeleccionada = 'CREDENCIAL IFE';
   filtroCliente = '';
   clientesBusqueda: ClienteLocal[] = [];
   isSearchingCliente = false;
+
+  readonly buscarClientesAutocomplete: OperatorFunction<string, readonly ClienteLocal[]> = (texto$: Observable<string>) =>
+    texto$.pipe(
+      debounceTime(250),
+      distinctUntilChanged(),
+      switchMap((texto) => {
+        const q = texto.trim();
+        if (q.length < 2) {
+          this.isSearchingCliente = false;
+          return of([]);
+        }
+
+        this.isSearchingCliente = true;
+        return this.clienteService.search(q).pipe(
+          map((clientes) => clientes
+            .filter((cliente) => cliente.activo)
+            .slice(0, 10)
+            .map((cliente) => this.mapearCliente(cliente))),
+          catchError(() => of([])),
+          finalize(() => { this.isSearchingCliente = false; })
+        );
+      })
+    );
+
+  readonly formatearClienteInput = (cliente: ClienteLocal | string): string =>
+    typeof cliente === 'string' ? cliente : cliente?.nombre ?? '';
+
+  readonly formatearClienteResultado = (cliente: ClienteLocal): string =>
+    `${cliente.nombre} · ${cliente.folio} · ${cliente.telefono || 'Sin teléfono'}`;
 
   // -------------------------------------------------------------------------
   // Estado — catálogo de prendas
@@ -298,7 +390,7 @@ export class AvaluoComponent implements OnInit {
   /**
    * Preview de plata (Phase 6 — PLATA-01/PLATA-03, D-01/D-10).
    *   avaluo         = peso x precio por gramo de la ley (ley925 / ley725 de plazo_parametro)
-   *   prestamoMaximo = avaluo x porcPrestamoSAvaluo / 100  (si no hay %, el backend usa el avaluo completo)
+   *   prestamoMaximo = peso x precio (COCAE: el precio por gramo YA es el prestamo; NO se aplica % Prestamo s/Avaluo)
    * NUNCA usa tablaAlhajas ni preciosOro: esos son precios de ORO.
    * El valor persistido lo recalcula el servidor en ContratoService.buildPartida.
    */
@@ -306,20 +398,18 @@ export class AvaluoComponent implements OnInit {
     const params = this.getParams(this.TIPO_PRENDA_ID['Plata']);
     const ley = +this.captura.ley;
     const precioGramo = ley === 925 ? (params?.ley925 ?? 0) : (params?.ley725 ?? 0);
-    const porcPrestamo = params?.porcPrestamoSAvaluo ?? 0;
-
     this.captura.precioXGramo = precioGramo;
     this.captura.avaluoReal = +(precioGramo * this.captura.peso).toFixed(2);
-    this.prestamoMaximoPlata = porcPrestamo > 0
-      ? +(this.captura.avaluoReal * porcPrestamo / 100).toFixed(2)
-      : this.captura.avaluoReal;
+    // El precio por gramo YA es el precio de préstamo (COCAE): préstamo = peso × precio,
+    // SIN aplicar "% Préstamo s/Avalúo" (ese recorte no aplica a plata). Igual que el backend y que oro.
+    this.prestamoMaximoPlata = this.captura.avaluoReal;
 
-    // Propuesta inicial = el maximo; el usuario solo puede ajustarlo hacia abajo (PLATA-03).
-    if (this.captura.prestamo <= 0 || this.captura.prestamo > this.prestamoMaximoPlata) {
-      this.captura.prestamo = this.prestamoMaximoPlata;
-    }
-    const porcInc = params?.porcIncrementoAvaluo ?? 0;
-    this.captura.avaluoContrato = +(this.captura.prestamo * (1 + porcInc / 100)).toFixed(2);
+    // Propuesta inicial = el máximo (peso × precio). Al cambiar peso/ley/plazo SIEMPRE se re-propone
+    // el máximo, para que el préstamo no se quede pegado en un valor viejo mientras escribes el peso
+    // (ej. teclear "20" pasa por "2" → préstamo 13). El ajuste a la baja se hace en el campo Préstamo
+    // (ajustarPrestamoPlata). Igual que oro, que también recalcula el préstamo al cambiar el peso.
+    this.captura.prestamo = this.prestamoMaximoPlata;
+    this.captura.avaluoContrato = this.avaluoContratoDesde(this.captura.prestamo, params);
   }
 
   /**
@@ -335,8 +425,7 @@ export class AvaluoComponent implements OnInit {
       this.mostrarError(`El préstamo no puede superar el máximo autorizado ($${this.prestamoMaximoPlata.toFixed(2)}).`);
     }
     this.captura.prestamo = valor;
-    const porcInc = params?.porcIncrementoAvaluo ?? 0;
-    this.captura.avaluoContrato = +(valor * (1 + porcInc / 100)).toFixed(2);
+    this.captura.avaluoContrato = this.avaluoContratoDesde(valor, params);
   }
 
   recalcularAlhajas(): void {
@@ -357,19 +446,30 @@ export class AvaluoComponent implements OnInit {
     this.captura.avaluoReal = this.captura.prestamo;
     const tipoPrendaId = this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1;
     const params = this.getParams(tipoPrendaId);
-    const porcInc = params?.porcIncrementoAvaluo ?? 0;
-    this.captura.avaluoContrato = +(this.captura.prestamo * (1 + porcInc / 100)).toFixed(2);
+    this.captura.avaluoContrato = this.avaluoContratoDesde(this.captura.prestamo, params);
   }
 
   recalcularVarios(): void {
     const params = this.getParams(this.TIPO_PRENDA_ID['Varios']);
-    const porcInc = params?.porcIncrementoAvaluo ?? 0;
-    this.capturaVarios.avaluoContrato = +(this.capturaVarios.prestamo * (1 + porcInc / 100)).toFixed(2);
+    this.capturaVarios.avaluoContrato = this.avaluoContratoDesde(this.capturaVarios.prestamo, params);
   }
 
   get porcIncrementoVarios(): number {
     const params = this.getParams(this.TIPO_PRENDA_ID['Varios']);
-    return params?.porcIncrementoAvaluo ?? 0;
+    return params?.porcPrestamoSAvaluoReal ?? 0;
+  }
+
+  /**
+   * Avalúo de contrato = préstamo × (1 + porcPrestamoSAvaluoReal/100) si usaAvaluoReal.
+   * Réplica exacta del backend (PlazoService.calcularAvaluoContrato) para que el preview
+   * coincida con el valor persistido. Campo canónico: porcPrestamoSAvaluoReal.
+   */
+  private avaluoContratoDesde(prestamo: number, params: PlazoParametroResponse | null): number {
+    const usa = params?.usaAvaluoReal ?? false;
+    const porc = params?.porcPrestamoSAvaluoReal ?? 0;
+    return (usa && porc > 0)
+      ? +(prestamo * (1 + porc / 100)).toFixed(2)
+      : +(prestamo).toFixed(2);
   }
 
   // -------------------------------------------------------------------------
@@ -528,6 +628,8 @@ export class AvaluoComponent implements OnInit {
   @ViewChild('modalPrenda')       modalPrenda!: TemplateRef<any>;
   @ViewChild('modalContrato')     modalContrato!: TemplateRef<any>;
   @ViewChild('modalVencimientos') modalVencimientos!: TemplateRef<any>;
+  @ViewChild('modalAmortizacion') modalAmortizacion!: TemplateRef<any>;
+  @ViewChild('modalPdf')          modalPdf!: TemplateRef<any>;
 
   // --- Modal de cliente ---
   abrirBuscarCliente(): void {
@@ -543,25 +645,50 @@ export class AvaluoComponent implements OnInit {
     this.isSearchingCliente = true;
     this.clienteService.search(q).subscribe({
       next: (lista) => {
-        this.clientesBusqueda = lista.map(c => ({
-          id: c.id,
-          folio: `CLI-${String(c.id).padStart(6, '0')}`,
-          nombre: `${c.nombre} ${c.apellidoPaterno} ${c.apellidoMaterno}`.trim(),
-          identificacion: 'CREDENCIAL IFE',
-          telefono: c.telefono,
-          prestamoAcumulado: 0
-        }));
+        this.clientesBusqueda = lista
+          .filter((cliente) => cliente.activo)
+          .map((cliente) => this.mapearCliente(cliente));
         this.isSearchingCliente = false;
       },
       error: () => { this.isSearchingCliente = false; }
     });
   }
 
+  onClienteInputChange(valor: ClienteLocal | string): void {
+    this.clienteBusquedaInput = valor;
+
+    if (typeof valor === 'string' && this.clienteSeleccionado && valor !== this.clienteSeleccionado.nombre) {
+      this.clienteSeleccionado = null;
+      this.contratosPorCliente = [];
+    }
+  }
+
+  seleccionarClienteAutocomplete(evento: NgbTypeaheadSelectItemEvent<ClienteLocal>): void {
+    this.establecerCliente(evento.item);
+  }
+
   seleccionarCliente(c: ClienteLocal, modal: any): void {
-    this.clienteSeleccionado = c;
-    this.identificacionSeleccionada = c.identificacion;
-    this.cargarContratosPorCliente(c.id);
+    this.establecerCliente(c);
     modal.close();
+  }
+
+  private establecerCliente(cliente: ClienteLocal): void {
+    this.clienteSeleccionado = cliente;
+    this.clienteBusquedaInput = cliente;
+    this.identificacionSeleccionada = cliente.identificacion;
+    this.cargarContratosPorCliente(cliente.id);
+  }
+
+  private mapearCliente(cliente: ClienteResponse): ClienteLocal {
+    return {
+      id: cliente.id,
+      folio: `CLI-${String(cliente.id).padStart(6, '0')}`,
+      nombre: cliente.nombreCompleto ||
+        `${cliente.nombre} ${cliente.apellidoPaterno} ${cliente.apellidoMaterno}`.trim(),
+      identificacion: 'CREDENCIAL IFE',
+      telefono: cliente.telefono,
+      prestamoAcumulado: 0
+    };
   }
 
   private cargarContratosPorCliente(clienteId: number): void {
@@ -637,9 +764,11 @@ export class AvaluoComponent implements OnInit {
             this.isGuardando = false;
             this.partidas = [];
             this.clienteSeleccionado = null;
+            this.clienteBusquedaInput = '';
             this.beneficiario = '';
             this.contratosPorCliente = [];
             this.mostrarExito(`Contrato ${resp.folio} registrado exitosamente.`);
+            this.abrirPdfContrato(resp.id, resp.folio);
           },
           error: (err) => {
             this.isGuardando = false;
@@ -650,6 +779,29 @@ export class AvaluoComponent implements OnInit {
       },
       () => { /* dismissed */ }
     );
+  }
+
+  /** Descarga el PDF del contrato recién creado y lo muestra en un visor modal. */
+  private abrirPdfContrato(id: number, folio: string): void {
+    this.contratoService.getPdf(id).subscribe({
+      next: (blob) => {
+        if (this.pdfBlobUrl) URL.revokeObjectURL(this.pdfBlobUrl);
+        this.pdfBlobUrl = URL.createObjectURL(blob);
+        this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfBlobUrl);
+        this.contratoPdfFolio = folio;
+        this.modalService.open(this.modalPdf, { size: 'xl', scrollable: true });
+      },
+      error: () => this.mostrarError('El contrato se guardó, pero no se pudo generar el PDF.')
+    });
+  }
+
+  /** Descarga el PDF actualmente mostrado en el visor. */
+  descargarPdfContrato(): void {
+    if (!this.pdfBlobUrl) return;
+    const a = document.createElement('a');
+    a.href = this.pdfBlobUrl;
+    a.download = `contrato-${this.contratoPdfFolio || 'sin-folio'}.pdf`;
+    a.click();
   }
 
   private buildContratoRequest(): ContratoRequest {
@@ -690,6 +842,101 @@ export class AvaluoComponent implements OnInit {
       return;
     }
     this.modalService.open(this.modalVencimientos, { size: 'lg' });
+  }
+
+  // --- Modal de amortización (vencimientos del contrato en curso, estilo COCAE) ---
+  private nombrePeriodo(dias: number): string {
+    if (dias === 1) return 'DIARIO';
+    if (dias === 7) return 'SEMANAL';
+    if (dias === 15) return 'QUINCENAL';
+    if (dias >= 28 && dias <= 31) return 'MENSUAL';
+    return `${dias} DÍAS`;
+  }
+
+  /**
+   * Calcula la tabla de amortización del contrato en curso (préstamo total del contrato) y
+   * abre el modal estilo "Vencimientos de Contrato" de COCAE. Cálculo de referencia al vuelo:
+   * interés/almacén/IVA acumulativos por periodo, con desempeño = préstamo + acumulado.
+   * Réplica de la fórmula verificada contra COCAE (ver Cerebro: flujo-plata).
+   */
+  verAmortizacion(): void {
+    if (this.partidas.length === 0) {
+      this.mostrarError('Agrega al menos una partida para calcular los vencimientos');
+      return;
+    }
+    if (!this.plazoSeleccionado) {
+      this.mostrarError('Selecciona un plazo');
+      return;
+    }
+    const params = this.getParams(this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1);
+    const prestamo = this.prestamoTotal;
+    const avaluo = this.avaluoContratoTotal;
+    const dias = this.plazoSeleccionado.diasPorPeriodo;
+    const nPer = this.plazoSeleccionado.numeroPeriodos;
+
+    const porcInteres = Number(params?.porcInteres ?? 0);
+    const porcAlmacen = Number(params?.porcAlmacen ?? 0);
+    const porcGastos  = Number(params?.porcGastosAdmin ?? 0);
+    // Total interés = interés + almacén + gastos (derivado; el campo porcInteresTotal puede quedar en 0)
+    const porcTotal   = porcInteres + porcAlmacen + porcGastos;
+    const iva         = this.IVA_PORC;
+
+    const r2 = (x: number) => +x.toFixed(2);
+    const interesPer = prestamo * porcInteres / 100;
+    const almacenPer = prestamo * porcAlmacen / 100;
+    const gastosPer  = prestamo * porcGastos  / 100;
+    const totalIntPer = prestamo * porcTotal / 100;
+    const trunc2 = (x: number) => Math.floor(x * 100) / 100;   // truncar a 2 decimales (IVA como COCAE)
+    const ivaPeriodoVal = trunc2(totalIntPer * iva / 100);
+
+    const hoy = new Date();
+    const fechaMas = (d: number): string => {
+      const f = new Date(hoy);
+      f.setDate(f.getDate() + d);
+      return f.toLocaleDateString('es-MX');
+    };
+
+    const filas: FilaAmortizacion[] = [];
+    for (let n = 1; n <= nPer; n++) {
+      const totalIntN = r2(totalIntPer * n);
+      const ivaN = trunc2(totalIntPer * n * iva / 100);   // IVA truncado como COCAE
+      filas.push({
+        periodo: n,
+        fecha: fechaMas(dias * n),
+        interes: r2(interesPer * n),
+        almacen: r2(almacenPer * n),
+        gastos: r2(gastosPer * n),
+        totalInteres: totalIntN,
+        iva: ivaN,
+        refrendo: r2(totalIntN + ivaN),
+        desempeno: r2(prestamo + totalIntN + ivaN)
+      });
+    }
+    const ult = filas[filas.length - 1];
+
+    this.amortizacion = {
+      periodoNombre: this.nombrePeriodo(dias),
+      diasPorPeriodo: dias,
+      numeroPeriodos: nPer,
+      porcInteres, porcAlmacen, porcInteresTotal: porcTotal, ivaPorc: iva,
+      avaluo: r2(avaluo),
+      prestamo: r2(prestamo),
+      interesPeriodo: r2(interesPer),
+      ivaPeriodo: ivaPeriodoVal,
+      totalPagoPeriodo: r2(r2(totalIntPer) + ivaPeriodoVal),
+      alVencimiento: ult ? r2(ult.totalInteres + ult.iva) : 0,
+      importeAEntregar: r2(prestamo),
+      fechaLimiteNormal: fechaMas(dias * nPer + Number(params?.diasGraciaSinInteres ?? 0)),
+      diasGracia: Number(params?.diasGraciaSinInteres ?? 0),
+      filas,
+      fechaLimiteExtemp: fechaMas(dias * nPer + dias),
+      porcSancionSemanal: Number(params?.porcSancionSemanal ?? 0),
+      sancionSemanal: r2(prestamo * Number(params?.porcSancionSemanal ?? 0) / 100),
+      porcReposicion: Number(params?.porcReposicion ?? 0),
+      fechaPaseVenta: fechaMas(dias * nPer + Number(params?.diasAntesPaseVenta ?? 0)),
+      comisionVenta: r2(prestamo * Number(params?.comisionPorVentaPrenda ?? 0) / 100)
+    };
+    this.modalService.open(this.modalAmortizacion, { size: 'xl' });
   }
 
   estatusContratoBadge(estatus: string): string {
