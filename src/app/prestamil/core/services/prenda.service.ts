@@ -12,8 +12,9 @@ export interface TipoPrendaResponse {
 export interface CatValorPrendaRequest {
   idTipoPrenda: number;
   idAtributo: number;
-  descripcion: string;
-  clave: string | null;
+  /** Nombre histórico del catálogo. Ya no se captura en el modal; si se omite, el backend conserva el existente. */
+  descripcion?: string;
+  clave: string;
   kilataje: number | null;
   contienePiedad: boolean;
 }

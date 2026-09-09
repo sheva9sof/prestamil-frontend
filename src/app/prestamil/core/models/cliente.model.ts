@@ -39,7 +39,8 @@ export interface CatValorPrendaResponse {
   idTipoPrenda: number;
   tipo: string;
   clave?: string;
-  descripcion: string;
+  /** Nombre histórico del catálogo. Puede venir vacío: los ítems nuevos se identifican por clave. */
+  descripcion?: string;
   kilataje?: number;
   contienePiedad?: boolean;
 }

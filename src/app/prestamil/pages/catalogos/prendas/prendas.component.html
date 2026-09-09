@@ -50,22 +50,8 @@
             </div>
           </div>
           <div class="row">
-            <div class="col-12 mb-3">
-              <label for="modalDescripcion" class="form-label">Nombre / descripción del catálogo <span class="text-danger">*</span></label>
-              <input
-                type="text"
-                id="modalDescripcion"
-                class="form-control"
-                [(ngModel)]="formData.descripcion"
-                name="modalDescripcion"
-                placeholder="Ej. 6k, 8k, descripción del valor"
-                required
-              />
-            </div>
-          </div>
-          <div class="row">
             <div class="col-md-4 mb-3">
-              <label for="modalClave" class="form-label">Clave</label>
+              <label for="modalClave" class="form-label">Clave <span class="text-danger">*</span></label>
               <input
                 type="text"
                 maxlength="20"
@@ -73,8 +59,10 @@
                 class="form-control"
                 [(ngModel)]="formData.clave"
                 name="modalClave"
-                placeholder="Opcional (alfanumérico, ej. esclava 14)"
+                placeholder="Ej. esclava 14, pulsera oro 14k"
+                required
               />
+              <small class="text-muted d-block mt-1">Grupo estándar del catálogo. El detalle de cada pieza se captura en Avalúos.</small>
             </div>
             <div class="col-md-4 mb-3">
               <label for="modalKilataje" class="form-label">Kilataje</label>
@@ -117,7 +105,7 @@
           type="button" 
           class="btn btn-primary"
           (click)="guardarPrenda()"
-          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !formData.descripcion.trim()"
+          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !claveCapturada()"
         >
           <i class="feather icon-save"></i>
           {{ isLoadingGuardar ? 'Guardando...' : (isEditingPrenda ? 'Actualizar' : 'Guardar') }}

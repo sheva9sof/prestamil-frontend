@@ -725,7 +725,7 @@ export class AvaluoComponent implements OnInit {
               idAtributo: subtipo.idAtributo,
               categoria: subtipo.nombreAtributo,
               clave: valor.clave != null ? String(valor.clave) : '—',
-              descripcion: valor.descripcion,
+              descripcion: valor.descripcion ?? '',
               kilataje: valor.kilataje ?? 0,
               tipo: tipoSeleccionado
             }))),
@@ -768,7 +768,9 @@ export class AvaluoComponent implements OnInit {
 
   private aplicarAtributosCatalogoAlhaja(prenda: PrendaCatalogo): void {
     const categoria = prenda.categoria.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
-    const descripcion = prenda.descripcion.trim().toUpperCase();
+    // La clave es el nombre del \u00edtem del cat\u00e1logo (los \u00edtems nuevos ya no traen descripci\u00f3n),
+    // as\u00ed que el kilataje/hechura se infieren de clave + descripci\u00f3n hist\u00f3rica.
+    const descripcion = `${prenda.clave === '\u2014' ? '' : prenda.clave} ${prenda.descripcion}`.trim().toUpperCase();
 
     if (prenda.kilataje > 0) {
       this.captura.kilataje = prenda.kilataje;

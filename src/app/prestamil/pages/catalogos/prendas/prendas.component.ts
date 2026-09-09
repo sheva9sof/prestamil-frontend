@@ -71,14 +71,12 @@ export class PrendasComponent implements OnInit {
   formData: {
     tipoPrenda: string;
     categoria: string;
-    descripcion: string;
     clave: string | number;
     kilataje: string | number;
     contienePiedad: boolean;
   } = {
     tipoPrenda: '',
     categoria: '',
-    descripcion: '',
     clave: '',
     kilataje: '',
     contienePiedad: false
@@ -262,7 +260,6 @@ export class PrendasComponent implements OnInit {
     this.formData = {
       tipoPrenda: '',
       categoria: '',
-      descripcion: '',
       clave: '',
       kilataje: '',
       contienePiedad: false
@@ -291,7 +288,6 @@ export class PrendasComponent implements OnInit {
     this.formData = {
       tipoPrenda: '',
       categoria: '',
-      descripcion: '',
       clave: '',
       kilataje: '',
       contienePiedad: false
@@ -358,7 +354,7 @@ export class PrendasComponent implements OnInit {
   }
 
   guardarPrenda(): void {
-    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.formData.descripcion.trim()) {
+    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.claveCapturada()) {
       console.warn('Por favor complete todos los campos obligatorios');
       return;
     }
@@ -375,7 +371,6 @@ export class PrendasComponent implements OnInit {
 
     const idTipoPrenda = Number(this.formData.tipoPrenda);
     const idAtributo = Number(this.formData.categoria);
-    const descripcion = this.formData.descripcion.trim();
     const clave = this.parseOptionalClave(this.formData.clave);
     const kilataje = this.parseOptionalInteger(this.formData.kilataje, 'El kilataje');
 
@@ -386,15 +381,22 @@ export class PrendasComponent implements OnInit {
       return;
     }
 
+    if (!clave) {
+      this.isLoadingGuardar = false;
+      this.modalError = 'La clave es obligatoria.';
+      return;
+    }
+
     if (kilataje === undefined) {
       this.isLoadingGuardar = false;
       return;
     }
 
+    // `descripcion` ya no se captura aquí: el detalle por pieza vive en Avalúos.
+    // No se envía para que el backend conserve los nombres históricos del catálogo.
     const body: CatValorPrendaRequest = {
       idTipoPrenda,
       idAtributo,
-      descripcion,
       clave,
       kilataje,
       contienePiedad: this.formData.contienePiedad
@@ -442,6 +444,11 @@ export class PrendasComponent implements OnInit {
     return trimmed ? trimmed : null;
   }
 
+  /** La clave es el identificador del ítem del catálogo, por eso es obligatoria. */
+  claveCapturada(): boolean {
+    return String(this.formData.clave ?? '').trim().length > 0;
+  }
+
   editarPrenda(prenda: Prenda): void {
     this.modalError = '';
     this.isEditingPrenda = true;
@@ -449,7 +456,6 @@ export class PrendasComponent implements OnInit {
     this.formData = {
       tipoPrenda: String(prenda.idTipoPrenda),
       categoria: String(prenda.idAtributo),
-      descripcion: (prenda.descripcion ?? prenda.valor ?? '').toString(),
       clave: (prenda.clave ?? '').toString(),
       kilataje: (prenda.kilataje ?? '').toString(),
       contienePiedad: !!prenda.contienePiedad
