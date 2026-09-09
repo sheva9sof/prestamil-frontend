@@ -1,9 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, TemplateRef, ViewChild, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { NgbModal, NgbTypeaheadSelectItemEvent } from '@ng-bootstrap/ng-bootstrap';
+import { NgbActiveModal, NgbModal, NgbTypeaheadSelectItemEvent } from '@ng-bootstrap/ng-bootstrap';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { Observable, OperatorFunction, of } from 'rxjs';
+import { forkJoin, Observable, OperatorFunction, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, finalize, map, switchMap } from 'rxjs/operators';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { AuthService } from 'src/app/prestamil/core/services/auth.service';
@@ -12,7 +12,7 @@ import { ClienteService } from 'src/app/prestamil/core/services/cliente.service'
 import { ContratoService } from 'src/app/prestamil/core/services/contrato.service';
 import { PrendaService } from 'src/app/prestamil/core/services/prenda.service';
 import { PlazoHechuraAlhajaResponse, PlazoParametroResponse } from 'src/app/prestamil/core/models/plazo.model';
-import { CatValorPrendaResponse, ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
+import { ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
 import { ContratoRequest, ContratoResponse, PartidaContratoRequest } from 'src/app/prestamil/core/models/contrato.model';
 import { environment } from 'src/environments/environment';
 
@@ -97,6 +97,8 @@ interface ClienteLocal {
 
 interface PrendaCatalogo {
   idValorAtributo: number;
+  idAtributo: number;
+  categoria: string;
   clave: string;
   descripcion: string;
   kilataje: number;
@@ -171,13 +173,6 @@ export class AvaluoComponent implements OnInit {
 
   private readonly TIPO_PRENDA_ID: Record<string, number> = {
     'Alhajas': 1, 'Plata': 4, 'Varios': 3, 'Autos/Motos': 5
-  };
-
-  // idAtributo del catalogo a cargar segun tipo. Solo ALHAJA tiene catalogo real:
-  // cat_valor_prenda no tiene NINGUNA fila para id_atributo=7 (Plata), por eso plata
-  // usa el selector de Ley 925/725 en vez de un catalogo (Phase 6, D-10).
-  private readonly ATRIBUTO_CATALOGO: Record<string, number> = {
-    'Alhajas': 4
   };
 
   private hechuraCodigo(h: string): string {
@@ -331,6 +326,7 @@ export class AvaluoComponent implements OnInit {
   prendasCatalogo: PrendaCatalogo[] = [];
   filtroPrenda = '';
   isLoadingPrendas = false;
+  catalogoPrendasError = '';
 
   // -------------------------------------------------------------------------
   // Estado — contratos del cliente (vencimientos)
@@ -343,6 +339,7 @@ export class AvaluoComponent implements OnInit {
   // -------------------------------------------------------------------------
   captura = {
     clavePrenda: '',
+    nombreCatalogo: '',
     descripcion: '',
     hechura: 'NORMAL',
     kilataje: 14,
@@ -366,6 +363,8 @@ export class AvaluoComponent implements OnInit {
   // -------------------------------------------------------------------------
   capturaVarios = {
     subtipo: 'Celular',
+    idValorPrenda: undefined as number | undefined,
+    clavePrenda: '',
     marca: '',
     modelo: '',
     serie: '',
@@ -531,7 +530,7 @@ export class AvaluoComponent implements OnInit {
         idValorPrenda: this.captura.idValorPrenda,
         tipo: this.tipoSeleccionado,
         clavePrenda: this.captura.clavePrenda || '—',
-        descripcion: this.captura.descripcion || (esPlata
+        descripcion: this.captura.descripcion || this.captura.nombreCatalogo || (esPlata
           ? `Plata ley ${this.captura.ley}`
           : `${this.tipoSeleccionado} ${this.captura.kilataje}K`),
         cantidad: this.captura.cantidad,
@@ -557,8 +556,10 @@ export class AvaluoComponent implements OnInit {
       const nueva: PartidaAvaluo = {
         id: this.partidas.length + 1,
         idTipoPrenda: 3,
+        idValorPrenda: this.capturaVarios.idValorPrenda,
         tipo: 'Varios',
-        clavePrenda: this.capturaVarios.subtipo.substring(0, 3).toUpperCase(),
+        clavePrenda: this.capturaVarios.clavePrenda
+          || this.capturaVarios.subtipo.substring(0, 3).toUpperCase(),
         descripcion: `${this.capturaVarios.subtipo} ${this.capturaVarios.marca} ${this.capturaVarios.modelo}`.trim(),
         cantidad: 1,
         peso: 0,
@@ -596,6 +597,7 @@ export class AvaluoComponent implements OnInit {
     this.captura = {
       ...this.captura,
       clavePrenda: '',
+      nombreCatalogo: '',
       descripcion: '',
       cantidad: 1,
       peso: 0,
@@ -612,6 +614,8 @@ export class AvaluoComponent implements OnInit {
   private resetCapturaVarios(): void {
     this.capturaVarios = {
       subtipo: 'Celular',
+      idValorPrenda: undefined,
+      clavePrenda: '',
       marca: '',
       modelo: '',
       serie: '',
@@ -624,12 +628,12 @@ export class AvaluoComponent implements OnInit {
   // -------------------------------------------------------------------------
   // Modales — ViewChild + TemplateRef
   // -------------------------------------------------------------------------
-  @ViewChild('modalCliente')      modalCliente!: TemplateRef<any>;
-  @ViewChild('modalPrenda')       modalPrenda!: TemplateRef<any>;
-  @ViewChild('modalContrato')     modalContrato!: TemplateRef<any>;
-  @ViewChild('modalVencimientos') modalVencimientos!: TemplateRef<any>;
-  @ViewChild('modalAmortizacion') modalAmortizacion!: TemplateRef<any>;
-  @ViewChild('modalPdf')          modalPdf!: TemplateRef<any>;
+  @ViewChild('modalCliente')      modalCliente!: TemplateRef<unknown>;
+  @ViewChild('modalPrenda')       modalPrenda!: TemplateRef<unknown>;
+  @ViewChild('modalContrato')     modalContrato!: TemplateRef<unknown>;
+  @ViewChild('modalVencimientos') modalVencimientos!: TemplateRef<unknown>;
+  @ViewChild('modalAmortizacion') modalAmortizacion!: TemplateRef<unknown>;
+  @ViewChild('modalPdf')          modalPdf!: TemplateRef<unknown>;
 
   // --- Modal de cliente ---
   abrirBuscarCliente(): void {
@@ -667,7 +671,7 @@ export class AvaluoComponent implements OnInit {
     this.establecerCliente(evento.item);
   }
 
-  seleccionarCliente(c: ClienteLocal, modal: any): void {
+  seleccionarCliente(c: ClienteLocal, modal: NgbActiveModal): void {
     this.establecerCliente(c);
     modal.close();
   }
@@ -701,45 +705,91 @@ export class AvaluoComponent implements OnInit {
 
   // --- Modal de prenda ---
   abrirBuscarPrenda(): void {
-    // Plata ya no usa catalogo: cat_valor_prenda no tiene filas para id_atributo=7 (D-10).
-    if (this.tipoSeleccionado !== 'Alhajas') return;
+    // Plata conserva su selector especializado de ley; Autos/Motos aún no está habilitado.
+    if (this.tipoSeleccionado !== 'Alhajas' && this.tipoSeleccionado !== 'Varios') return;
     this.filtroPrenda = '';
-
-    const idAtributo = this.ATRIBUTO_CATALOGO[this.tipoSeleccionado];
-    if (idAtributo && this.prendasCatalogo.length === 0) {
-      this.isLoadingPrendas = true;
-      this.prendaService.getValores(idAtributo).subscribe({
-        next: (vals) => {
-          this.prendasCatalogo = vals.map(v => ({
-            idValorAtributo: v.idValorAtributo,
-            clave: v.clave ? String(v.clave) : '—',
-            descripcion: v.descripcion,
-            kilataje: v.kilataje ?? 0,
-            tipo: this.tipoSeleccionado
-          }));
-          this.isLoadingPrendas = false;
-        },
-        error: () => { this.isLoadingPrendas = false; }
-      });
-    }
-
+    this.catalogoPrendasError = '';
+    this.prendasCatalogo = [];
+    this.isLoadingPrendas = true;
     this.modalService.open(this.modalPrenda, { size: 'lg' });
+
+    const tipoSeleccionado = this.tipoSeleccionado;
+    const idTipoPrenda = this.TIPO_PRENDA_ID[tipoSeleccionado];
+    this.prendaService.getSubtipos(idTipoPrenda).pipe(
+      switchMap(subtipos => {
+        if (subtipos.length === 0) return of([] as PrendaCatalogo[][]);
+        return forkJoin(subtipos.map(subtipo =>
+          this.prendaService.getValores(subtipo.idAtributo).pipe(
+            map(valores => valores.map(valor => ({
+              idValorAtributo: valor.idValorAtributo,
+              idAtributo: subtipo.idAtributo,
+              categoria: subtipo.nombreAtributo,
+              clave: valor.clave != null ? String(valor.clave) : '—',
+              descripcion: valor.descripcion,
+              kilataje: valor.kilataje ?? 0,
+              tipo: tipoSeleccionado
+            }))),
+            catchError(() => of([] as PrendaCatalogo[]))
+          )
+        ));
+      }),
+      map(grupos => grupos.flat()),
+      finalize(() => { this.isLoadingPrendas = false; })
+    ).subscribe({
+      next: prendas => { this.prendasCatalogo = prendas; },
+      error: () => {
+        this.catalogoPrendasError = 'No se pudo cargar el catálogo de prendas.';
+      }
+    });
   }
 
-  seleccionarPrenda(p: PrendaCatalogo, modal: any): void {
-    this.captura.clavePrenda = p.clave;
-    this.captura.descripcion = p.descripcion;
-    if (p.kilataje) this.captura.kilataje = p.kilataje;
-    this.captura.idValorPrenda = p.idValorAtributo;
-    this.recalcularAlhajas();
+  seleccionarPrenda(p: PrendaCatalogo, modal: NgbActiveModal): void {
+    const clave = p.clave === '—' ? '' : p.clave;
+    if (this.tipoSeleccionado === 'Alhajas') {
+      this.captura.clavePrenda = clave;
+      this.captura.nombreCatalogo = p.descripcion;
+      this.captura.descripcion = '';
+      this.captura.idValorPrenda = p.idValorAtributo;
+      this.aplicarAtributosCatalogoAlhaja(p);
+      this.recalcularAlhajas();
+    } else if (this.tipoSeleccionado === 'Varios') {
+      this.capturaVarios.clavePrenda = clave;
+      this.capturaVarios.subtipo = p.descripcion;
+      this.capturaVarios.idValorPrenda = p.idValorAtributo;
+      this.recalcularVarios();
+    }
     modal.close();
+  }
+
+  limpiarSeleccionCatalogoVarios(): void {
+    this.capturaVarios.idValorPrenda = undefined;
+    this.capturaVarios.clavePrenda = '';
+  }
+
+  private aplicarAtributosCatalogoAlhaja(prenda: PrendaCatalogo): void {
+    const categoria = prenda.categoria.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    const descripcion = prenda.descripcion.trim().toUpperCase();
+
+    if (prenda.kilataje > 0) {
+      this.captura.kilataje = prenda.kilataje;
+    } else if (categoria.includes('KILATAJE')) {
+      const kilataje = Number(descripcion.match(/\d+/)?.[0]);
+      if (this.kilatajes.includes(kilataje)) this.captura.kilataje = kilataje;
+    }
+
+    if (categoria.includes('HECHURA')) {
+      const hechura = this.hechuras.find(valor => descripcion.includes(valor));
+      if (hechura) this.captura.hechura = hechura;
+    }
   }
 
   get prendasFiltradas(): PrendaCatalogo[] {
     const q = this.filtroPrenda.trim().toLowerCase();
     if (!q) return this.prendasCatalogo;
     return this.prendasCatalogo.filter(p =>
-      p.clave.toLowerCase().includes(q) || p.descripcion.toLowerCase().includes(q)
+      p.clave.toLowerCase().includes(q)
+      || p.descripcion.toLowerCase().includes(q)
+      || p.categoria.toLowerCase().includes(q)
     );
   }
 
