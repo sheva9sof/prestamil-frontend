@@ -34,7 +34,11 @@ export interface CatSubtipoPrendaResponse {
 
 export interface CatValorPrendaResponse {
   idValorAtributo: number;
-  clave?: number;
+  idAtributo: number;
+  nombreAtributo: string;
+  idTipoPrenda: number;
+  tipo: string;
+  clave?: string;
   descripcion: string;
   kilataje?: number;
   contienePiedad?: boolean;

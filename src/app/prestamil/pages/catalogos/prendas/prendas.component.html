@@ -51,7 +51,7 @@
           </div>
           <div class="row">
             <div class="col-12 mb-3">
-              <label for="modalDescripcion" class="form-label">Descripción <span class="text-danger">*</span></label>
+              <label for="modalDescripcion" class="form-label">Nombre / descripción del catálogo <span class="text-danger">*</span></label>
               <input
                 type="text"
                 id="modalDescripcion"
@@ -68,17 +68,20 @@
               <label for="modalClave" class="form-label">Clave</label>
               <input
                 type="text"
+                maxlength="20"
                 id="modalClave"
                 class="form-control"
                 [(ngModel)]="formData.clave"
                 name="modalClave"
-                placeholder="Opcional"
+                placeholder="Opcional (alfanumérico, ej. esclava 14)"
               />
             </div>
             <div class="col-md-4 mb-3">
               <label for="modalKilataje" class="form-label">Kilataje</label>
               <input
-                type="text"
+                type="number"
+                min="0"
+                step="1"
                 id="modalKilataje"
                 class="form-control"
                 [(ngModel)]="formData.kilataje"
@@ -216,7 +219,7 @@
               <td>
                 <span *ngIf="prenda.contienePiedad === true" class="text-success">Sí</span>
                 <span *ngIf="prenda.contienePiedad === false" class="text-muted">No</span>
-                <span *ngIf="prenda.contienePiedad == null" class="text-muted">—</span>
+                <span *ngIf="prenda.contienePiedad !== true && prenda.contienePiedad !== false" class="text-muted">—</span>
               </td>
               <td>
                 <div class="action-buttons">
