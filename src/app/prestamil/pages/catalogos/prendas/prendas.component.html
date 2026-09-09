@@ -185,7 +185,6 @@
             <tr>
               <th>Tipo de prenda</th>
               <th>Categoría</th>
-              <th>Descripción</th>
               <th>Clave</th>
               <th>Kilataje</th>
               <th>Piedad</th>
@@ -194,15 +193,14 @@
           </thead>
           <tbody>
             <tr *ngIf="isLoadingPrendas">
-              <td colspan="7" class="text-center">
+              <td colspan="6" class="text-center">
                 <i class="feather icon-loader spin-icon"></i> Cargando prendas...
               </td>
             </tr>
             <tr *ngFor="let prenda of prendasPaginadas; trackBy: trackByFn">
               <td>{{ prenda.tipo }}</td>
               <td>{{ prenda.nombreAtributo }}</td>
-              <td>{{ textoPrenda(prenda) }}</td>
-              <td>{{ textoCelda(prenda.clave) }}</td>
+              <td>{{ clavePrenda(prenda) }}</td>
               <td>{{ textoCelda(prenda.kilataje) }}</td>
               <td>
                 <span *ngIf="prenda.contienePiedad === true" class="text-success">Sí</span>

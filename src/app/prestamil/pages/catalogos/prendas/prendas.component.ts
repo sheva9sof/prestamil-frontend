@@ -295,6 +295,16 @@ export class PrendasComponent implements OnInit {
     this.categoriasModal = [];
   }
 
+  /**
+   * Clave a mostrar en la tabla. Los registros anteriores al cambio de regla de
+   * negocio no tienen clave y su nombre quedó en `descripcion`, así que se usa
+   * como respaldo para que no aparezcan en blanco.
+   */
+  clavePrenda(prenda: Prenda): string {
+    const clave = String(prenda.clave ?? '').trim();
+    return clave ? clave : this.textoPrenda(prenda);
+  }
+
   textoPrenda(prenda: Prenda): string {
     const d = prenda.descripcion?.trim();
     if (d) {

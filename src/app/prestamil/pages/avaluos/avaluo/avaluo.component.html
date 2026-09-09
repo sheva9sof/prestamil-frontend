@@ -526,16 +526,14 @@
           <tr>
             <th>Clave</th>
             <th>Categoría</th>
-            <th>Descripción</th>
             <th>Kilataje</th>
             <th></th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let p of prendasFiltradas">
-            <td><code>{{ p.clave }}</code></td>
+            <td><code>{{ etiquetaCatalogo(p) }}</code></td>
             <td>{{ p.categoria }}</td>
-            <td>{{ p.descripcion }}</td>
             <td>{{ p.kilataje > 0 ? p.kilataje + 'K' : '—' }}</td>
             <td>
               <button class="btn btn-sm btn-primary py-0" (click)="seleccionarPrenda(p, modal)">
@@ -544,7 +542,7 @@
             </td>
           </tr>
           <tr *ngIf="prendasFiltradas.length === 0">
-            <td colspan="5" class="text-center text-muted">Sin resultados en catálogo</td>
+            <td colspan="4" class="text-center text-muted">Sin resultados en catálogo</td>
           </tr>
         </tbody>
       </table>
