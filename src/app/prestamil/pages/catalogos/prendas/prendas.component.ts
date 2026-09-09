@@ -45,6 +45,7 @@ interface Categoria {
 })
 export class PrendasComponent implements OnInit {
   @ViewChild('prendaModal') prendaModalTemplate!: TemplateRef<unknown>;
+  @ViewChild('eliminarModal') eliminarModalTemplate!: TemplateRef<unknown>;
 
   private prendaService = inject(PrendaService);
   private authService = inject(AuthService);
@@ -87,6 +88,12 @@ export class PrendasComponent implements OnInit {
   isEditingPrenda = false;
   idValorAtributoEdicion: number | null = null;
   modalError = '';
+
+  // Borrado físico
+  eliminarModalRef: NgbModalRef | null = null;
+  prendaAEliminar: Prenda | null = null;
+  isEliminando = false;
+  eliminarError = '';
 
   ngOnInit(): void {
     this.cargarTiposPrenda();
@@ -295,14 +302,50 @@ export class PrendasComponent implements OnInit {
     this.categoriasModal = [];
   }
 
-  /**
-   * Clave a mostrar en la tabla. Los registros anteriores al cambio de regla de
-   * negocio no tienen clave y su nombre quedó en `descripcion`, así que se usa
-   * como respaldo para que no aparezcan en blanco.
-   */
-  clavePrenda(prenda: Prenda): string {
-    const clave = String(prenda.clave ?? '').trim();
-    return clave ? clave : this.textoPrenda(prenda);
+  confirmarEliminar(prenda: Prenda): void {
+    this.prendaAEliminar = prenda;
+    this.eliminarError = '';
+    this.isEliminando = false;
+    this.eliminarModalRef = this.modalService.open(this.eliminarModalTemplate, {
+      backdrop: 'static',
+      keyboard: false,
+      centered: true
+    });
+  }
+
+  cerrarEliminarModal(): void {
+    if (this.eliminarModalRef) {
+      this.eliminarModalRef.close();
+      this.eliminarModalRef = null;
+    }
+    this.prendaAEliminar = null;
+    this.eliminarError = '';
+    this.isEliminando = false;
+  }
+
+  eliminarPrenda(): void {
+    if (!this.prendaAEliminar) return;
+
+    this.isEliminando = true;
+    this.eliminarError = '';
+
+    this.prendaService.deleteValor(this.prendaAEliminar.idValorAtributo).subscribe({
+      next: () => {
+        this.isEliminando = false;
+        this.cerrarEliminarModal();
+        if (this.filtroCategoria) {
+          this.buscar();
+        } else {
+          this.cargarTodasPrendas();
+        }
+      },
+      error: (err) => {
+        this.isEliminando = false;
+        // 400 = la prenda ya se usó en un contrato; el backend explica el motivo.
+        this.eliminarError = err.error?.message || 'No se pudo eliminar la prenda. Intenta de nuevo.';
+        console.error('Error al eliminar prenda:', err);
+      }
+    });
   }
 
   textoPrenda(prenda: Prenda): string {

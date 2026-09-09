@@ -47,4 +47,9 @@ export class PrendaService {
   updateValor(idValorAtributo: number, request: CatValorPrendaRequest): Observable<CatValorPrendaResponse> {
     return this.http.put<CatValorPrendaResponse>(`${this.API_URL}/valores/${idValorAtributo}`, request);
   }
+
+  /** Borrado físico. El backend responde 400 si la prenda ya se usó en un contrato. */
+  deleteValor(idValorAtributo: number): Observable<void> {
+    return this.http.delete<void>(`${this.API_URL}/valores/${idValorAtributo}`);
+  }
 }

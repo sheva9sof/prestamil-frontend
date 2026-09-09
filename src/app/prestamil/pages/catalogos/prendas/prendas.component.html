@@ -113,6 +113,31 @@
       </div>
     </ng-template>
 
+    <!-- Modal de confirmación de borrado físico -->
+    <ng-template #eliminarModal>
+      <div class="modal-header">
+        <h5 class="modal-title">Eliminar prenda</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="cerrarEliminarModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="eliminarError" class="alert alert-danger mb-3" role="alert">{{ eliminarError }}</div>
+        <p class="mb-1">Esta acción elimina la prenda del catálogo de forma permanente.</p>
+        <p class="mb-0 text-muted">
+          <strong>{{ textoCelda(prendaAEliminar?.clave) }}</strong>
+          <span *ngIf="prendaAEliminar"> · {{ prendaAEliminar.tipo }} / {{ prendaAEliminar.nombreAtributo }}</span>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarEliminarModal()" [disabled]="isEliminando">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-danger" (click)="eliminarPrenda()" [disabled]="isEliminando">
+          <i class="feather icon-trash-2"></i>
+          {{ isEliminando ? 'Eliminando...' : 'Eliminar' }}
+        </button>
+      </div>
+    </ng-template>
+
     <app-card cardTitle="Prendas" [hidHeader]="true">
       <!-- Filtros de búsqueda -->
       <div class="row mb-3">
@@ -200,7 +225,7 @@
             <tr *ngFor="let prenda of prendasPaginadas; trackBy: trackByFn">
               <td>{{ prenda.tipo }}</td>
               <td>{{ prenda.nombreAtributo }}</td>
-              <td>{{ clavePrenda(prenda) }}</td>
+              <td>{{ textoCelda(prenda.clave) }}</td>
               <td>{{ textoCelda(prenda.kilataje) }}</td>
               <td>
                 <span *ngIf="prenda.contienePiedad === true" class="text-success">Sí</span>
@@ -209,13 +234,21 @@
               </td>
               <td>
                 <div class="action-buttons">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     class="btn-edit"
                     (click)="editarPrenda(prenda)"
                     title="Editar">
                     <i class="feather icon-edit-2"></i>
                     <span>Editar</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger ms-2"
+                    (click)="confirmarEliminar(prenda)"
+                    title="Eliminar">
+                    <i class="feather icon-trash-2"></i>
+                    <span>Eliminar</span>
                   </button>
                 </div>
               </td>

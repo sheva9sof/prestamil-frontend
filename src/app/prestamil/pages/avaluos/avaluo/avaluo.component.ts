@@ -785,16 +785,6 @@ export class AvaluoComponent implements OnInit {
     }
   }
 
-  /**
-   * Etiqueta del ítem en el catálogo: su clave. Los registros anteriores al
-   * cambio de regla de negocio no tienen clave y su nombre quedó en
-   * `descripcion`, así que se usa como respaldo.
-   */
-  etiquetaCatalogo(p: PrendaCatalogo): string {
-    const clave = p.clave === '—' ? '' : p.clave.trim();
-    return clave || p.descripcion.trim() || '—';
-  }
-
   get prendasFiltradas(): PrendaCatalogo[] {
     const q = this.filtroPrenda.trim().toLowerCase();
     if (!q) return this.prendasCatalogo;
