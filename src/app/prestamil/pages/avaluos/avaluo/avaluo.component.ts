@@ -28,7 +28,10 @@ interface PartidaAvaluo {
   clavePrenda: string;
   descripcion: string;
   cantidad: number;
-  peso: number;
+  /** Peso del metal precioso (g), del lote completo. Alimenta el cálculo de avalúo y préstamo. */
+  pesoNeto: number;
+  /** Peso físico total (g) incluyendo piedras y soldadura. Informativo; nunca entra al cálculo. */
+  pesoTotal: number;
   kilataje?: number;
   ley?: number;
   hechura?: string;
@@ -168,12 +171,50 @@ export class AvaluoComponent implements OnInit {
   // Tipos de prenda
   // -------------------------------------------------------------------------
   tiposPrenda = ['Alhajas', 'Plata', 'Varios', 'Autos/Motos'];
-  tipoSeleccionado = 'Alhajas';
-  puedeAgregarPartida = true;
+  /** Vacío hasta elegir plazo: sin plazo no hay tipo capturable (bloqueo preventivo). */
+  tipoSeleccionado = '';
 
   private readonly TIPO_PRENDA_ID: Record<string, number> = {
     'Alhajas': 1, 'Plata': 4, 'Varios': 3, 'Autos/Motos': 5
   };
+
+  /** Tipos sin flujo de captura implementado: se bloquean aunque el plazo los admita. */
+  private readonly TIPOS_NO_IMPLEMENTADOS = ['Autos/Motos'];
+
+  /**
+   * Tipos que el plazo seleccionado admite según plazo_prenda. Vacío mientras no haya plazo.
+   * Se recalcula en cada cambio de plazo; es la fuente del grisado en el selector.
+   */
+  tiposPermitidos: string[] = [];
+
+  /**
+   * Un tipo es capturable solo si el plazo lo admite (plazo_prenda) Y tiene flujo implementado.
+   * Doble candado: la misma condición se revalida al agregar la partida.
+   */
+  tipoHabilitado(tipo: string): boolean {
+    return this.tiposPermitidos.includes(tipo) && !this.TIPOS_NO_IMPLEMENTADOS.includes(tipo);
+  }
+
+  /** Explica en el tooltip por qué un tipo aparece grisado. */
+  motivoTipoDeshabilitado(tipo: string): string {
+    if (tipo === '') {
+      return 'Selecciona un tipo de prenda';
+    }
+    if (this.TIPOS_NO_IMPLEMENTADOS.includes(tipo)) {
+      return `${tipo} no está disponible en esta versión`;
+    }
+    if (!this.plazoSeleccionado) {
+      return 'Selecciona un plazo para habilitar los tipos de prenda';
+    }
+    if (!this.tiposPermitidos.includes(tipo)) {
+      return `El plazo "${this.plazoSeleccionado.nombre}" no admite ${tipo}`;
+    }
+    return '';
+  }
+
+  get puedeAgregarPartida(): boolean {
+    return this.tipoSeleccionado !== '' && this.tipoHabilitado(this.tipoSeleccionado);
+  }
 
   private hechuraCodigo(h: string): string {
     if (h === 'FUNDIR')   return 'F';
@@ -187,11 +228,13 @@ export class AvaluoComponent implements OnInit {
   plazos: PlazoAvaluo[] = [];
   plazoSeleccionado: PlazoAvaluo | null = null;
 
+  // Los tiposPrenda del demo replican plazo_prenda real (002-initial-data.sql): sin ellos
+  // el fallback dejaría los cuatro tipos grisados y la pantalla inservible.
   private readonly plazosDemo: PlazoAvaluo[] = [
-    { id: 1, nombre: 'ALHAJAS - 12 SEMANAS', diasPorPeriodo: 7,  numeroPeriodos: 12 },
-    { id: 2, nombre: 'ALHAJAS - 10 SEMANAS', diasPorPeriodo: 7,  numeroPeriodos: 10 },
-    { id: 3, nombre: 'QUINCENAL',            diasPorPeriodo: 15, numeroPeriodos: 6  },
-    { id: 4, nombre: 'MENSUAL',              diasPorPeriodo: 30, numeroPeriodos: 6  }
+    { id: 1, nombre: 'ALHAJAS - 12 SEMANAS', diasPorPeriodo: 7,  numeroPeriodos: 12, tiposPrenda: [{ id: 1, tipo: 'ALHAJA' }] },
+    { id: 2, nombre: 'ALHAJAS - 10 SEMANAS', diasPorPeriodo: 7,  numeroPeriodos: 10, tiposPrenda: [{ id: 1, tipo: 'ALHAJA' }] },
+    { id: 3, nombre: 'QUINCENAL',            diasPorPeriodo: 15, numeroPeriodos: 6,  tiposPrenda: [{ id: 4, tipo: 'PLATAS' }] },
+    { id: 4, nombre: 'MENSUAL',              diasPorPeriodo: 30, numeroPeriodos: 6,  tiposPrenda: [{ id: 3, tipo: 'VARIOS' }] }
   ];
 
   // Precios fallback mientras no haya tabla cargada (última tabla real o demo)
@@ -227,16 +270,80 @@ export class AvaluoComponent implements OnInit {
     });
   }
 
-  onPlazoChange(plazo: PlazoAvaluo | null): void {
-    this.tablaAlhajas = [];
-    this.paramsMap = {};
-    if (!plazo) return;
+  /** Plazo vigente antes del cambio en curso: permite revertir el select si se cancela. */
+  private plazoPrevio: PlazoAvaluo | null = null;
 
-    const tiposAsociados = this.tiposPrenda.filter(tipo =>
+  /** Partidas que el plazo entrante no admite; alimenta el modal de confirmación. */
+  partidasIncompatibles: PartidaAvaluo[] = [];
+
+  /** Nombres de los tipos de prenda (según plazo_prenda) que admite un plazo. */
+  private tiposPermitidosDe(plazo: PlazoAvaluo): string[] {
+    return this.tiposPrenda.filter(tipo =>
       (plazo.tiposPrenda ?? []).some(asociado => Number(asociado.id) === this.TIPO_PRENDA_ID[tipo])
     );
-    if (tiposAsociados.length > 0 && !tiposAsociados.includes(this.tipoSeleccionado)) {
-      this.seleccionarTipo(tiposAsociados[0]);
+  }
+
+  /**
+   * Al cambiar de plazo se recalculan los tipos capturables. Si ya hay partidas de un tipo
+   * que el plazo entrante no admite, se pide confirmación antes de descartarlas: cancelar
+   * devuelve el select al plazo anterior y deja las partidas intactas.
+   */
+  onPlazoChange(plazo: PlazoAvaluo | null): void {
+    if (!plazo) {
+      this.aplicarPlazo(null);
+      return;
+    }
+
+    const idsPermitidos = new Set(
+      this.tiposPermitidosDe(plazo).map(tipo => this.TIPO_PRENDA_ID[tipo])
+    );
+    const incompatibles = this.partidas.filter(p => !idsPermitidos.has(p.idTipoPrenda));
+
+    if (incompatibles.length === 0) {
+      this.aplicarPlazo(plazo);
+      return;
+    }
+
+    this.partidasIncompatibles = incompatibles;
+    this.modalService.open(this.modalCambioPlazo, { size: 'md' }).result.then(
+      () => {
+        // No se reindexa: siguienteIdPartida garantiza ids únicos, y el "#" de la tabla
+        // es el índice de la fila, así que los huecos no se ven.
+        this.partidas = this.partidas.filter(p => idsPermitidos.has(p.idTipoPrenda));
+        if (this.partidaEnEdicion !== null && !this.partidas.some(p => p.id === this.partidaEnEdicion)) {
+          this.cancelarEdicion();
+        }
+        this.partidasIncompatibles = [];
+        this.aplicarPlazo(plazo);
+        this.mostrarExito(`Se descartaron ${incompatibles.length} partida(s) que el plazo "${plazo.nombre}" no admite.`);
+      },
+      () => {
+        // Cancelado: se revierte el select al plazo anterior y no se toca nada más.
+        this.partidasIncompatibles = [];
+        this.plazoSeleccionado = this.plazoPrevio;
+      }
+    );
+  }
+
+  /** Aplica el plazo: fija los tipos capturables y carga tabla de alhajas + parámetros. */
+  private aplicarPlazo(plazo: PlazoAvaluo | null): void {
+    this.tablaAlhajas = [];
+    this.paramsMap = {};
+    this.plazoPrevio = plazo;
+
+    if (!plazo) {
+      this.tiposPermitidos = [];
+      this.tipoSeleccionado = '';
+      return;
+    }
+
+    this.tiposPermitidos = this.tiposPermitidosDe(plazo);
+
+    // Si el tipo en curso ya no lo admite el plazo, se deselecciona y se salta al primer
+    // tipo capturable (o a ninguno, si el plazo solo admite tipos sin flujo implementado).
+    if (!this.tipoHabilitado(this.tipoSeleccionado)) {
+      const primerCapturable = this.tiposPermitidos.find(tipo => this.tipoHabilitado(tipo));
+      this.seleccionarTipo(primerCapturable ?? '');
     }
 
     this.plazoService.getTablaAlhajas(plazo.id, this.sucursalId).subscribe({
@@ -345,7 +452,9 @@ export class AvaluoComponent implements OnInit {
     kilataje: 14,
     ley: 925,
     cantidad: 1,
-    peso: 0,
+    // Ambos pesos son del LOTE completo cuando cantidad > 1: nunca se multiplican por cantidad.
+    pesoNeto: 0,
+    pesoTotal: 0,   // 0 = no capturado; al agregar la partida se iguala al neto
     color: '',
     claridad: '',
     precioXGramo: 0,
@@ -398,7 +507,7 @@ export class AvaluoComponent implements OnInit {
     const ley = +this.captura.ley;
     const precioGramo = ley === 925 ? (params?.ley925 ?? 0) : (params?.ley725 ?? 0);
     this.captura.precioXGramo = precioGramo;
-    this.captura.avaluoReal = +(precioGramo * this.captura.peso).toFixed(2);
+    this.captura.avaluoReal = +(precioGramo * this.captura.pesoNeto).toFixed(2);
     // El precio por gramo YA es el precio de préstamo (COCAE): préstamo = peso × precio,
     // SIN aplicar "% Préstamo s/Avalúo" (ese recorte no aplica a plata). Igual que el backend y que oro.
     this.prestamoMaximoPlata = this.captura.avaluoReal;
@@ -434,12 +543,12 @@ export class AvaluoComponent implements OnInit {
     const row = this.tablaAlhajas.find(r => r.kilataje === kilataje && r.hechura === hechuraCod);
     if (row) {
       this.captura.precioXGramo = row.precioBase;
-      this.captura.prestamo = +(row.precioPrestamo * this.captura.peso).toFixed(2);
+      this.captura.prestamo = +(row.precioPrestamo * this.captura.pesoNeto).toFixed(2);
     } else {
       // Fallback a precios demo mientras no haya tabla real
       const precioBase = this.preciosOro[kilataje] ?? 0;
       this.captura.precioXGramo = precioBase;
-      this.captura.prestamo = +(precioBase * this.captura.peso * 1.03).toFixed(2);
+      this.captura.prestamo = +(precioBase * this.captura.pesoNeto * 1.03).toFixed(2);
     }
 
     this.captura.avaluoReal = this.captura.prestamo;
@@ -476,8 +585,30 @@ export class AvaluoComponent implements OnInit {
   // -------------------------------------------------------------------------
   partidas: PartidaAvaluo[] = [];
 
+  /**
+   * Contador monótono del id de partida: nunca se reutiliza un id, aunque se eliminen filas.
+   * Derivarlo de partidas.length reciclaba ids (eliminar la #2 de 3 y agregar otra producía
+   * dos filas con id 3, y eliminar borraba ambas). El "#" visible es el índice de la fila.
+   */
+  private siguienteIdPartida = 1;
+
+  /** Id de la partida que se está modificando; null en modo alta. */
+  partidaEnEdicion: number | null = null;
+
+  get enModoEdicion(): boolean {
+    return this.partidaEnEdicion !== null;
+  }
+
+  /** "#" de la fila en edición (el mismo que muestra la tabla), para rotularlo en el formulario. */
+  get numeroPartidaEnEdicion(): number {
+    return this.partidas.findIndex(p => p.id === this.partidaEnEdicion) + 1;
+  }
+
   get totalPartidas(): number       { return this.partidas.length; }
-  get pesoTotal(): number           { return this.partidas.reduce((a, i) => a + i.peso, 0); }
+  /** Suma del metal precioso de todas las partidas: es el gramaje que se cobra. */
+  get sumaPesoNeto(): number        { return this.partidas.reduce((a, i) => a + i.pesoNeto, 0); }
+  /** Suma del peso físico de todas las partidas (metal + piedras). Informativo. */
+  get sumaPesoTotal(): number       { return this.partidas.reduce((a, i) => a + i.pesoTotal, 0); }
   get avaluoTotal(): number         { return this.partidas.reduce((a, i) => a + i.avaluoReal, 0); }
   get avaluoContratoTotal(): number { return this.partidas.reduce((a, i) => a + i.avaluoContrato, 0); }
   get prestamoTotal(): number       { return this.partidas.reduce((a, i) => a + i.prestamo, 0); }
@@ -486,75 +617,73 @@ export class AvaluoComponent implements OnInit {
   // Acciones de flujo
   // -------------------------------------------------------------------------
   seleccionarTipo(tipo: string): void {
+    // Candado preventivo: un tipo que el plazo no admite no se puede ni activar.
+    if (tipo !== '' && !this.tipoHabilitado(tipo)) {
+      this.mostrarError(this.motivoTipoDeshabilitado(tipo));
+      return;
+    }
     this.tipoSeleccionado = tipo;
-    this.puedeAgregarPartida = tipo !== 'Autos/Motos';
+    // Cambiar de tipo vacía la captura: una edición en curso perdería sus datos, así que
+    // se abandona el modo edición y la partida original queda intacta.
+    this.partidaEnEdicion = null;
     this.prendasCatalogo = [];
     this.prestamoMaximoPlata = 0;
     this.captura.prestamo = 0;
     this.recalcularCaptura();
   }
 
-  agregarPartida(): void {
+  /**
+   * Valida la captura en curso. Es la única fuente de reglas para alta y edición: si
+   * divergieran, se podría guardar editando algo que agregando se rechaza.
+   * @return el mensaje de error, o null si la captura es válida.
+   */
+  private validarCaptura(): string | null {
     if (!this.clienteSeleccionado) {
-      this.mostrarError('Selecciona un cliente antes de agregar una partida');
-      return;
+      return 'Selecciona un cliente antes de capturar una partida';
     }
     if (!this.plazoSeleccionado) {
-      this.mostrarError('Selecciona un plazo antes de agregar una partida');
-      return;
+      return 'Selecciona un plazo antes de capturar una partida';
     }
-    if (this.tipoSeleccionado === 'Autos/Motos') {
-      this.mostrarError('Autos/Motos no está disponible en esta versión');
-      return;
+    // Última línea de defensa: el selector ya bloquea los tipos no admitidos, pero se
+    // revalida aquí por si el plazo cambió con una captura a medias.
+    if (!this.tipoHabilitado(this.tipoSeleccionado)) {
+      return this.motivoTipoDeshabilitado(this.tipoSeleccionado);
     }
 
     if (this.tipoSeleccionado === 'Alhajas' || this.tipoSeleccionado === 'Plata') {
-      if (this.captura.peso <= 0) {
-        this.mostrarError('Captura un peso mayor a 0');
-        return;
+      if (this.captura.pesoNeto <= 0) {
+        return 'Captura un peso neto mayor a 0';
       }
-      const esPlata = this.tipoSeleccionado === 'Plata';
-      if (esPlata && this.captura.precioXGramo <= 0) {
-        this.mostrarError(
-          `No hay precio por gramo configurado para la ley ${this.captura.ley} en este plazo. ` +
-          `Configúralo en Configuración → Plazos y periodos → pestaña Platas.`);
-        return;
+      // El peso total es opcional (0 = no capturado), pero si viene no puede ser menor que el
+      // neto: seria fisicamente imposible. El backend valida lo mismo en resolverPesoTotal.
+      if (this.captura.pesoTotal > 0 && this.captura.pesoTotal < this.captura.pesoNeto) {
+        return 'El peso total no puede ser menor que el peso neto';
       }
-      if (esPlata && this.captura.prestamo <= 0) {
-        this.mostrarError('Captura un préstamo mayor a 0');
-        return;
+      if (this.tipoSeleccionado === 'Plata') {
+        if (this.captura.precioXGramo <= 0) {
+          return `No hay precio por gramo configurado para la ley ${this.captura.ley} en este plazo. `
+            + `Configúralo en Configuración → Plazos y periodos → pestaña Platas.`;
+        }
+        if (this.captura.prestamo <= 0) {
+          return 'Captura un préstamo mayor a 0';
+        }
       }
-      const nueva: PartidaAvaluo = {
-        id: this.partidas.length + 1,
-        idTipoPrenda: this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1,
-        idValorPrenda: this.captura.idValorPrenda,
-        tipo: this.tipoSeleccionado,
-        clavePrenda: this.captura.clavePrenda || '—',
-        descripcion: this.captura.descripcion || this.captura.nombreCatalogo || (esPlata
-          ? `Plata ley ${this.captura.ley}`
-          : `${this.tipoSeleccionado} ${this.captura.kilataje}K`),
-        cantidad: this.captura.cantidad,
-        peso: this.captura.peso,
-        kilataje: esPlata ? undefined : this.captura.kilataje,
-        ley: esPlata ? +this.captura.ley : undefined,
-        hechura: esPlata ? undefined : this.captura.hechura,
-        hechuraCod: esPlata ? undefined : this.hechuraCodigo(this.captura.hechura),
-        precioXGramo: this.captura.precioXGramo,
-        avaluoReal: this.captura.avaluoReal,
-        avaluoContrato: this.captura.avaluoContrato,
-        prestamo: this.captura.prestamo,
-        vencimiento: this.calcularVencimiento(),
-        estatus: 'Capturada'
-      };
-      this.partidas = [...this.partidas, nueva];
-      this.resetCapturaAlhajas();
-    } else if (this.tipoSeleccionado === 'Varios') {
-      if (this.capturaVarios.prestamo <= 0) {
-        this.mostrarError('Captura un préstamo mayor a 0');
-        return;
-      }
-      const nueva: PartidaAvaluo = {
-        id: this.partidas.length + 1,
+    } else if (this.tipoSeleccionado === 'Varios' && this.capturaVarios.prestamo <= 0) {
+      return 'Captura un préstamo mayor a 0';
+    }
+
+    return null;
+  }
+
+  /**
+   * Arma la partida a partir de la captura en curso. Alta y edición la comparten, así que
+   * una partida editada queda idéntica a recapturarla desde cero.
+   * @param id id de la partida — uno nuevo al agregar, el existente al editar.
+   */
+  private construirPartida(id: number): PartidaAvaluo {
+    if (this.tipoSeleccionado === 'Varios') {
+      return {
+        id,
         idTipoPrenda: 3,
         idValorPrenda: this.capturaVarios.idValorPrenda,
         tipo: 'Varios',
@@ -562,7 +691,9 @@ export class AvaluoComponent implements OnInit {
           || this.capturaVarios.subtipo.substring(0, 3).toUpperCase(),
         descripcion: `${this.capturaVarios.subtipo} ${this.capturaVarios.marca} ${this.capturaVarios.modelo}`.trim(),
         cantidad: 1,
-        peso: 0,
+        // Varios no se valua por gramo: ambos pesos quedan en 0 y se omiten al enviar al backend
+        pesoNeto: 0,
+        pesoTotal: 0,
         avaluoReal: this.capturaVarios.prestamo,
         avaluoContrato: this.capturaVarios.avaluoContrato,
         prestamo: this.capturaVarios.prestamo,
@@ -574,14 +705,155 @@ export class AvaluoComponent implements OnInit {
         serie: this.capturaVarios.serie,
         estadoFisico: this.capturaVarios.estado
       };
-      this.partidas = [...this.partidas, nueva];
-      this.resetCapturaVarios();
     }
 
+    const esPlata = this.tipoSeleccionado === 'Plata';
+    return {
+      id,
+      idTipoPrenda: this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1,
+      idValorPrenda: this.captura.idValorPrenda,
+      tipo: this.tipoSeleccionado,
+      clavePrenda: this.captura.clavePrenda || '—',
+      descripcion: this.captura.descripcion || this.captura.nombreCatalogo || (esPlata
+        ? `Plata ley ${this.captura.ley}`
+        : `${this.tipoSeleccionado} ${this.captura.kilataje}K`),
+      cantidad: this.captura.cantidad,
+      pesoNeto: this.captura.pesoNeto,
+      // Sin peso total capturado se asume que la pieza es 100% metal (mismo criterio que el backend)
+      pesoTotal: this.captura.pesoTotal > 0 ? this.captura.pesoTotal : this.captura.pesoNeto,
+      kilataje: esPlata ? undefined : this.captura.kilataje,
+      ley: esPlata ? +this.captura.ley : undefined,
+      hechura: esPlata ? undefined : this.captura.hechura,
+      hechuraCod: esPlata ? undefined : this.hechuraCodigo(this.captura.hechura),
+      precioXGramo: this.captura.precioXGramo,
+      avaluoReal: this.captura.avaluoReal,
+      avaluoContrato: this.captura.avaluoContrato,
+      prestamo: this.captura.prestamo,
+      vencimiento: this.calcularVencimiento(),
+      estatus: 'Capturada'
+    };
+  }
+
+  /** Botón principal del formulario: da de alta o guarda la edición según el modo. */
+  confirmarCaptura(): void {
+    if (this.enModoEdicion) {
+      this.guardarEdicion();
+    } else {
+      this.agregarPartida();
+    }
+  }
+
+  agregarPartida(): void {
+    const error = this.validarCaptura();
+    if (error) {
+      this.mostrarError(error);
+      return;
+    }
+
+    this.partidas = [...this.partidas, this.construirPartida(this.siguienteIdPartida++)];
+    this.resetCaptura();
     this.mostrarExito('Partida agregada correctamente');
   }
 
+  /**
+   * Carga una partida ya capturada de vuelta en el formulario para modificarla sin
+   * eliminarla. El tipo se conmuta al de la partida; si el plazo vigente no lo admite no
+   * se edita, porque guardarla produciría una partida que el plazo rechaza.
+   */
+  editarPartida(partida: PartidaAvaluo): void {
+    if (!this.tipoHabilitado(partida.tipo)) {
+      this.mostrarError(`No se puede editar esta partida: ${this.motivoTipoDeshabilitado(partida.tipo)}`);
+      return;
+    }
+
+    // seleccionarTipo limpia el formulario y sale de modo edición, así que el modo se
+    // marca después de conmutar el tipo.
+    this.seleccionarTipo(partida.tipo);
+    this.partidaEnEdicion = partida.id;
+
+    if (partida.tipo === 'Varios') {
+      this.capturaVarios = {
+        subtipo: partida.subtipo ?? '',
+        idValorPrenda: partida.idValorPrenda,
+        clavePrenda: partida.clavePrenda === '—' ? '' : partida.clavePrenda,
+        marca: partida.marca ?? '',
+        modelo: partida.modelo ?? '',
+        serie: partida.serie ?? '',
+        estado: partida.estadoFisico ?? 'Bueno',
+        prestamo: partida.prestamo,
+        avaluoContrato: partida.avaluoContrato
+      };
+      this.recalcularVarios();
+      return;
+    }
+
+    this.captura = {
+      ...this.captura,
+      clavePrenda: partida.clavePrenda === '—' ? '' : partida.clavePrenda,
+      // La descripción guardada ya incluye el fallback del catálogo o el generado, así que
+      // se edita tal cual se ve en la tabla y nombreCatalogo deja de aportar.
+      nombreCatalogo: '',
+      descripcion: partida.descripcion,
+      hechura: partida.hechura ?? this.captura.hechura,
+      kilataje: partida.kilataje ?? this.captura.kilataje,
+      ley: partida.ley ?? this.captura.ley,
+      cantidad: partida.cantidad,
+      pesoNeto: partida.pesoNeto,
+      // El total se persiste igualado al neto cuando no se capturó: se reabre vacío para que
+      // "= neto" siga siendo el default y no aparezca un dato que el usuario nunca tecleó.
+      pesoTotal: partida.pesoTotal > partida.pesoNeto ? partida.pesoTotal : 0,
+      // Color y claridad no se guardan en la partida: no hay de dónde reponerlos.
+      color: '',
+      claridad: '',
+      idValorPrenda: partida.idValorPrenda
+    };
+
+    // Mismo motor de cálculo que al agregar: el préstamo/avalúo se re-derivan de los campos.
+    this.recalcularCaptura();
+
+    if (partida.tipo === 'Plata') {
+      // recalcularPlata siempre re-propone el máximo; se restaura el ajuste a la baja
+      // que el usuario hubiera hecho, revalidándolo contra el máximo vigente.
+      this.captura.prestamo = partida.prestamo;
+      this.ajustarPrestamoPlata();
+    }
+  }
+
+  /** Reemplaza la partida editada en su lugar, conservando id y posición en la tabla. */
+  guardarEdicion(): void {
+    if (this.partidaEnEdicion === null) return;
+
+    const error = this.validarCaptura();
+    if (error) {
+      this.mostrarError(error);
+      return;
+    }
+
+    const id = this.partidaEnEdicion;
+    const indice = this.partidas.findIndex(p => p.id === id);
+    if (indice === -1) {
+      // La partida desapareció mientras se editaba (cambio de plazo): no se reinserta.
+      this.cancelarEdicion();
+      return;
+    }
+
+    const actualizada = this.construirPartida(id);
+    this.partidas = this.partidas.map((p, i) => (i === indice ? actualizada : p));
+    this.partidaEnEdicion = null;
+    this.resetCaptura();
+    this.mostrarExito('Partida actualizada correctamente');
+  }
+
+  /** Descarta los cambios del formulario; la partida original queda intacta. */
+  cancelarEdicion(): void {
+    this.partidaEnEdicion = null;
+    this.resetCaptura();
+  }
+
   eliminarPartida(id: number): void {
+    if (this.partidaEnEdicion === id) {
+      this.cancelarEdicion();
+    }
     this.partidas = this.partidas.filter(p => p.id !== id);
   }
 
@@ -593,6 +865,15 @@ export class AvaluoComponent implements OnInit {
     return fecha.toLocaleDateString('es-MX');
   }
 
+  /** Limpia el formulario del tipo en curso tras agregar, guardar o cancelar. */
+  private resetCaptura(): void {
+    if (this.tipoSeleccionado === 'Varios') {
+      this.resetCapturaVarios();
+    } else {
+      this.resetCapturaAlhajas();
+    }
+  }
+
   private resetCapturaAlhajas(): void {
     this.captura = {
       ...this.captura,
@@ -600,7 +881,8 @@ export class AvaluoComponent implements OnInit {
       nombreCatalogo: '',
       descripcion: '',
       cantidad: 1,
-      peso: 0,
+      pesoNeto: 0,
+      pesoTotal: 0,
       color: '',
       claridad: '',
       precioXGramo: 0,
@@ -634,6 +916,7 @@ export class AvaluoComponent implements OnInit {
   @ViewChild('modalVencimientos') modalVencimientos!: TemplateRef<unknown>;
   @ViewChild('modalAmortizacion') modalAmortizacion!: TemplateRef<unknown>;
   @ViewChild('modalPdf')          modalPdf!: TemplateRef<unknown>;
+  @ViewChild('modalCambioPlazo')  modalCambioPlazo!: TemplateRef<unknown>;
 
   // --- Modal de cliente ---
   abrirBuscarCliente(): void {
@@ -815,6 +1098,7 @@ export class AvaluoComponent implements OnInit {
           next: (resp) => {
             this.isGuardando = false;
             this.partidas = [];
+            this.partidaEnEdicion = null;
             this.clienteSeleccionado = null;
             this.clienteBusquedaInput = '';
             this.beneficiario = '';
@@ -863,7 +1147,8 @@ export class AvaluoComponent implements OnInit {
       clavePrenda: p.clavePrenda !== '—' ? p.clavePrenda : undefined,
       descripcion: p.descripcion,
       cantidad: p.cantidad,
-      pesoGramos: p.peso > 0 ? p.peso : undefined,
+      pesoNeto: p.pesoNeto > 0 ? p.pesoNeto : undefined,
+      pesoTotal: p.pesoNeto > 0 ? p.pesoTotal : undefined,
       kilataje: p.kilataje,
       ley: p.ley,
       hechura: p.hechuraCod,

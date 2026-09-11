@@ -448,6 +448,25 @@ code {
   border-color: #2f80ed;
 }
 
+/* Tipos de prenda que el plazo no admite: grisados y no seleccionables.
+   Bootstrap pone pointer-events:none en :disabled, lo que mataría el tooltip que
+   explica el bloqueo; se reactiva el puntero (el click sigue sin dispararse). */
+.tipo-prenda-group .btn:disabled {
+  pointer-events: auto;
+  cursor: not-allowed;
+  opacity: 0.45;
+  background: #f2f2f2;
+  border-color: #d9d9d9;
+  color: #9a9a9a;
+}
+
+/* Fila cuya partida está cargada en el formulario: deja ver qué se está modificando
+   mientras el foco del usuario está arriba, en el panel de captura. */
+.avaluo-table tbody tr.partida-en-edicion > td {
+  background: #eaf2fd;
+  box-shadow: inset 2px 0 0 #2f80ed;
+}
+
 @media (max-width: 991px) {
   .avaluo-header-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .summary-card { display: block; margin-top: 16px; }

@@ -112,7 +112,8 @@
     <app-card cardTitle="Resumen rápido" class="workflow-card summary-card">
       <ul class="summary-list">
         <li><span>Partidas:</span><strong>{{ totalPartidas }}</strong></li>
-        <li><span>Peso total:</span><strong>{{ pesoTotal | number: '1.1-1' }} gr</strong></li>
+        <li><span>Peso neto total:</span><strong>{{ sumaPesoNeto | number: '1.1-1' }} gr</strong></li>
+        <li><span>Peso físico total:</span><strong>{{ sumaPesoTotal | number: '1.1-1' }} gr</strong></li>
         <li><span>Avalúo real:</span><strong>${{ avaluoTotal | number: '1.2-2' }}</strong></li>
         <li><span>Avalúo contrato:</span><strong>${{ avaluoContratoTotal | number: '1.2-2' }}</strong></li>
         <li><span>Préstamo total:</span><strong>${{ prestamoTotal | number: '1.2-2' }}</strong></li>
@@ -149,16 +150,31 @@
         </div>
         <div class="form-group col-md-7">
           <label class="form-label">Tipo de prenda</label>
-          <div class="btn-group w-100" role="group">
+          <div class="btn-group w-100 tipo-prenda-group" role="group">
             <button
               type="button"
               class="btn btn-sm"
               *ngFor="let tipo of tiposPrenda"
               [ngClass]="tipoSeleccionado === tipo ? 'btn-primary' : 'btn-outline-primary'"
+              [disabled]="!tipoHabilitado(tipo)"
+              [title]="motivoTipoDeshabilitado(tipo)"
               (click)="seleccionarTipo(tipo)"
             >{{ tipo }}</button>
           </div>
+          <small class="text-muted" *ngIf="!plazoSeleccionado">
+            Selecciona un plazo para habilitar los tipos de prenda que admite.
+          </small>
         </div>
+      </div>
+
+      <!-- Sin tipo activo no hay panel de captura (no hay plazo, o el plazo solo admite
+           tipos sin flujo implementado como Autos/Motos). -->
+      <div class="alert alert-light border text-center text-muted mb-0" *ngIf="tipoSeleccionado === ''">
+        <i class="feather icon-info me-1"></i>
+        <ng-container *ngIf="!plazoSeleccionado">Elige un plazo para comenzar la captura.</ng-container>
+        <ng-container *ngIf="plazoSeleccionado">
+          El plazo "{{ plazoSeleccionado.nombre }}" no tiene tipos de prenda capturables en esta versión.
+        </ng-container>
       </div>
 
       <!-- ─── Tab: Alhajas / Plata ─── -->
@@ -211,14 +227,24 @@
               </div>
             </div>
             <div class="form-row">
-              <div class="form-group col-md-3">
+              <div class="form-group col-md-2">
                 <label class="form-label">Cantidad</label>
                 <input class="form-control form-control-sm" type="number" min="1" [(ngModel)]="captura.cantidad" />
               </div>
-              <div class="form-group col-md-3">
-                <label class="form-label">Peso (g)</label>
+              <!-- Peso neto = solo el metal precioso. Es el UNICO que entra al calculo.
+                   Peso total = la pieza fisica completa (piedras, plastico, soldadura), informativo.
+                   Ambos son del lote cuando cantidad > 1: nunca se multiplican por cantidad. -->
+              <div class="form-group col-md-2">
+                <label class="form-label">Peso neto (g)</label>
                 <input class="form-control form-control-sm" type="number" min="0" step="0.01"
-                  [(ngModel)]="captura.peso" (input)="recalcularCaptura()" />
+                  [(ngModel)]="captura.pesoNeto" (input)="recalcularCaptura()" />
+                <small class="text-muted">Solo metal</small>
+              </div>
+              <div class="form-group col-md-2">
+                <label class="form-label">Peso total (g) <small class="text-muted">(opc.)</small></label>
+                <input class="form-control form-control-sm" type="number" min="0" step="0.01"
+                  [(ngModel)]="captura.pesoTotal" placeholder="= neto" />
+                <small class="text-muted">Con piedras</small>
               </div>
               <div class="form-group col-md-3">
                 <label class="form-label">Color <small class="text-muted">(opc.)</small></label>
@@ -337,14 +363,22 @@
         </div>
       </ng-container>
 
-      <!-- Botón agregar -->
-      <div class="d-flex justify-content-end mt-3">
+      <!-- Botón agregar / guardar cambios -->
+      <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
+        <small class="text-primary me-auto" *ngIf="enModoEdicion">
+          <i class="feather icon-edit-2 me-1"></i>
+          Editando la partida #{{ numeroPartidaEnEdicion }} — cancela para dejarla como estaba.
+        </small>
+        <button class="btn btn-outline-secondary btn-sm" *ngIf="enModoEdicion" (click)="cancelarEdicion()">
+          <i class="feather icon-x me-1"></i> Cancelar
+        </button>
         <button
           class="btn btn-primary btn-sm"
-          (click)="agregarPartida()"
+          (click)="confirmarCaptura()"
           [disabled]="!puedeAgregarPartida"
         >
-          <i class="feather icon-plus-circle me-1"></i> Agregar partida
+          <i class="feather me-1" [ngClass]="enModoEdicion ? 'icon-save' : 'icon-plus-circle'"></i>
+          {{ enModoEdicion ? 'Guardar cambios' : 'Agregar partida' }}
         </button>
       </div>
 
@@ -365,7 +399,8 @@
               <th>Clave</th>
               <th>Descripción</th>
               <th>Cant.</th>
-              <th>Peso (g)</th>
+              <th>Peso neto (g)</th>
+              <th>Peso total (g)</th>
               <th>Kil.</th>
               <th class="text-right">Precio/g</th>
               <th class="text-right">Avalúo real</th>
@@ -377,13 +412,14 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let item of partidas">
-              <td>{{ item.id }}</td>
+            <tr *ngFor="let item of partidas; let i = index" [class.partida-en-edicion]="item.id === partidaEnEdicion">
+              <td>{{ i + 1 }}</td>
               <td>{{ item.tipo }}</td>
               <td><code>{{ item.clavePrenda }}</code></td>
               <td>{{ item.descripcion }}</td>
               <td>{{ item.cantidad }}</td>
-              <td>{{ item.peso | number: '1.1-1' }}</td>
+              <td>{{ item.pesoNeto | number: '1.1-1' }}</td>
+              <td>{{ item.pesoTotal | number: '1.1-1' }}</td>
               <td>{{ item.kilataje ? item.kilataje + 'K' : (item.ley ? 'Ley ' + item.ley : '—') }}</td>
               <td class="text-right">${{ (item.precioXGramo ?? 0) | number: '1.2-2' }}</td>
               <td class="text-right">${{ item.avaluoReal | number: '1.2-2' }}</td>
@@ -391,20 +427,26 @@
               <td class="text-right">${{ item.prestamo | number: '1.2-2' }}</td>
               <td>{{ item.vencimiento }}</td>
               <td><span class="badge badge-secondary">{{ item.estatus }}</span></td>
-              <td>
-                <button class="btn btn-sm btn-outline-danger py-0 px-1" (click)="eliminarPartida(item.id)">
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Editar partida"
+                  (click)="editarPartida(item)">
+                  <i class="feather icon-edit-2"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Eliminar partida"
+                  (click)="eliminarPartida(item.id)">
                   <i class="feather icon-trash-2"></i>
                 </button>
               </td>
             </tr>
             <tr *ngIf="partidas.length === 0">
-              <td colspan="14" class="text-center text-muted py-3">Sin partidas capturadas</td>
+              <td colspan="15" class="text-center text-muted py-3">Sin partidas capturadas</td>
             </tr>
           </tbody>
           <tfoot *ngIf="partidas.length > 0">
             <tr class="fw-bold">
               <td colspan="5" class="text-right">Totales:</td>
-              <td>{{ pesoTotal | number: '1.1-1' }}</td>
+              <td>{{ sumaPesoNeto | number: '1.1-1' }}</td>
+              <td>{{ sumaPesoTotal | number: '1.1-1' }}</td>
               <td></td>
               <td></td>
               <td class="text-right">${{ avaluoTotal | number: '1.2-2' }}</td>
@@ -594,6 +636,40 @@
       <span *ngIf="isGuardando" class="spinner-border spinner-border-sm me-1"></span>
       Confirmar y generar
     </button>
+  </div>
+</ng-template>
+
+<!-- Modal: Confirmar descarte de partidas al cambiar de plazo -->
+<ng-template #modalCambioPlazo let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">El plazo nuevo no admite estas partidas</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">
+      Ya hay {{ partidasIncompatibles.length }} partida(s) capturada(s) de un tipo que el plazo
+      seleccionado no admite. Si continúas se descartarán:
+    </p>
+    <table class="table table-sm table-bordered mb-3">
+      <thead>
+        <tr><th>#</th><th>Tipo</th><th>Descripción</th><th class="text-end">Préstamo</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of partidasIncompatibles">
+          <td>{{ p.id }}</td>
+          <td>{{ p.tipo }}</td>
+          <td>{{ p.descripcion }}</td>
+          <td class="text-end">${{ p.prestamo | number: '1.2-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert alert-warning small mb-0">
+      Si cancelas, se conservan las partidas y el plazo vuelve al anterior.
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cancelar</button>
+    <button class="btn btn-danger btn-sm" (click)="modal.close('confirm')">Descartar y cambiar plazo</button>
   </div>
 </ng-template>
 
