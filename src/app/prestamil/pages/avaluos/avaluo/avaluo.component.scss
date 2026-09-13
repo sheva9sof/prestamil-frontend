@@ -123,7 +123,7 @@
 .workflow-card .form-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: flex-start;
   margin-left: -8px;
   margin-right: -8px;
 
@@ -465,6 +465,40 @@ code {
 .avaluo-table tbody tr.partida-en-edicion > td {
   background: #eaf2fd;
   box-shadow: inset 2px 0 0 #2f80ed;
+}
+
+/* Comparador de plazos: es una tabla para LEER de un vistazo con el cliente enfrente,
+   no para capturar. Cabe sin scroll horizontal y cada renglón es clickeable. */
+.comparativa-table {
+  min-width: 0;
+
+  tbody tr {
+    cursor: pointer;
+  }
+
+  tbody tr:hover > td {
+    background: #f4f8ff;
+  }
+
+  /* El plazo vigente: el punto de referencia contra el que el cliente compara. */
+  tbody tr.opcion-actual > td {
+    background: #eaf2fd;
+    box-shadow: inset 2px 0 0 #2f80ed;
+  }
+
+  /* Plazo que el backend rechazaría (préstamo bajo el mínimo o sin precios configurados). */
+  tbody tr.opcion-no-viable {
+    cursor: not-allowed;
+
+    > td {
+      opacity: 0.5;
+      background: #fafafa;
+    }
+  }
+
+  tbody tr.opcion-no-viable:hover > td {
+    background: #fafafa;
+  }
 }
 
 @media (max-width: 991px) {

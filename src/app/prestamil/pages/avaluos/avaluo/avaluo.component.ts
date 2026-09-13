@@ -13,7 +13,7 @@ import { ContratoService } from 'src/app/prestamil/core/services/contrato.servic
 import { PrendaService } from 'src/app/prestamil/core/services/prenda.service';
 import { PlazoHechuraAlhajaResponse, PlazoParametroResponse } from 'src/app/prestamil/core/models/plazo.model';
 import { ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
-import { ContratoRequest, ContratoResponse, PartidaContratoRequest } from 'src/app/prestamil/core/models/contrato.model';
+import { ContratoRequest, PartidaContratoRequest } from 'src/app/prestamil/core/models/contrato.model';
 import { environment } from 'src/environments/environment';
 
 // ---------------------------------------------------------------------------
@@ -40,13 +40,49 @@ interface PartidaAvaluo {
   avaluoReal: number;
   avaluoContrato: number;
   prestamo: number;
-  vencimiento: string;
   estatus: string;
   subtipo?: string;
   marca?: string;
   modelo?: string;
   serie?: string;
   estadoFisico?: string;
+}
+
+/**
+ * Salida de los motores de cálculo (alhajas/plata). La comparten la captura en curso y el
+ * recálculo de las partidas ya capturadas: una sola fórmula, dos consumidores.
+ */
+interface CalculoPartida {
+  precioXGramo: number;
+  avaluoReal: number;
+  avaluoContrato: number;
+  prestamo: number;
+}
+
+/** Todo lo que el servidor aporta para calcular con un plazo: precios de oro + parámetros por tipo. */
+interface DatosPlazo {
+  tablaAlhajas: PlazoHechuraAlhajaResponse[];
+  params: Record<number, PlazoParametroResponse>;
+}
+
+/**
+ * Un renglón del comparador: el MISMO contrato capturado, visto con otro plazo.
+ * Es la vista que el valuador le gira al cliente para negociar.
+ */
+interface OpcionPlazo {
+  plazo: PlazoAvaluo;
+  /** Cuánto se lleva hoy el cliente. Cambia con el plazo: el precio por gramo es por plazo. */
+  prestamo: number;
+  /** Lo que paga cada periodo para mantener vigente el contrato (refrendo: intereses + IVA). */
+  pagoPorPeriodo: number;
+  /** Lo que paga al final para recuperar la prenda (préstamo + intereses + IVA). */
+  desempeno: number;
+  /** Lo que le cuesta el crédito: desempeño − préstamo. */
+  costo: number;
+  fechaVencimiento: string;
+  esActual: boolean;
+  /** Vacío si el plazo es ofrecible; si no, por qué el sistema lo rechazaría. */
+  motivoNoViable: string;
 }
 
 // Fila de la tabla de amortización (un vencimiento por periodo), estilo COCAE
@@ -82,6 +118,7 @@ interface AmortizacionPreview {
   diasGracia: number;
   filas: FilaAmortizacion[];
   fechaLimiteExtemp: string;
+  aplicaSancion: boolean;
   porcSancionSemanal: number;
   sancionSemanal: number;
   porcReposicion: number;
@@ -244,14 +281,61 @@ export class AvaluoComponent implements OnInit {
   };
 
   // -------------------------------------------------------------------------
-  // Datos de plazo (cargados cuando se selecciona un plazo)
+  // Datos de plazo (precios y parámetros, cacheados por plazo)
   // -------------------------------------------------------------------------
-  tablaAlhajas: PlazoHechuraAlhajaResponse[] = [];
-  // Params indexados por tipo_prenda_id — cargados todos de una vez al seleccionar plazo
-  private paramsMap: Record<number, PlazoParametroResponse> = {};
+
+  /**
+   * Caché de precios/parámetros por id de plazo. El comparador necesita los datos de VARIOS
+   * plazos a la vez, así que se piden una sola vez por plazo y se reusan.
+   *
+   * Vive lo que dura la pantalla: si un gerente cambia el precio del oro mientras hay una
+   * captura abierta, hay que volver a entrar a Avalúos para verlo.
+   */
+  private datosPorPlazo: Record<number, DatosPlazo> = {};
+
+  private readonly DATOS_PLAZO_VACIO: DatosPlazo = { tablaAlhajas: [], params: {} };
+
+  /** Datos del plazo seleccionado; vacíos mientras no hay plazo o su carga no termina. */
+  private get datosPlazoActual(): DatosPlazo {
+    return this.plazoSeleccionado
+      ? (this.datosPorPlazo[this.plazoSeleccionado.id] ?? this.DATOS_PLAZO_VACIO)
+      : this.DATOS_PLAZO_VACIO;
+  }
 
   private getParams(tipoPrendaId: number): PlazoParametroResponse | null {
-    return this.paramsMap[tipoPrendaId] ?? null;
+    return this.paramsDe(this.datosPlazoActual, tipoPrendaId);
+  }
+
+  private paramsDe(datos: DatosPlazo, tipoPrendaId: number): PlazoParametroResponse | null {
+    return datos.params[tipoPrendaId] ?? null;
+  }
+
+  /**
+   * Trae precios y parámetros de un plazo en un solo golpe y los cachea. Los errores se
+   * absorben en datos vacíos: la pantalla cae a los precios demo en vez de quedarse muerta.
+   */
+  private cargarDatosPlazo(plazoId: number): Observable<DatosPlazo> {
+    const cacheado = this.datosPorPlazo[plazoId];
+    if (cacheado) {
+      return of(cacheado);
+    }
+
+    return forkJoin({
+      tabla: this.plazoService.getTablaAlhajas(plazoId, this.sucursalId).pipe(
+        catchError(() => of([] as PlazoHechuraAlhajaResponse[]))
+      ),
+      lista: this.plazoService.getParametrosBySucursal(plazoId, this.sucursalId).pipe(
+        catchError(() => of([] as PlazoParametroResponse[]))
+      )
+    }).pipe(
+      map(({ tabla, lista }) => {
+        const params: Record<number, PlazoParametroResponse> = {};
+        (lista ?? []).forEach(p => { params[p.tipoPrendaId] = p; });
+        const datos: DatosPlazo = { tablaAlhajas: tabla ?? [], params };
+        this.datosPorPlazo[plazoId] = datos;
+        return datos;
+      })
+    );
   }
 
   ngOnInit(): void {
@@ -327,8 +411,6 @@ export class AvaluoComponent implements OnInit {
 
   /** Aplica el plazo: fija los tipos capturables y carga tabla de alhajas + parámetros. */
   private aplicarPlazo(plazo: PlazoAvaluo | null): void {
-    this.tablaAlhajas = [];
-    this.paramsMap = {};
     this.plazoPrevio = plazo;
 
     if (!plazo) {
@@ -346,18 +428,14 @@ export class AvaluoComponent implements OnInit {
       this.seleccionarTipo(primerCapturable ?? '');
     }
 
-    this.plazoService.getTablaAlhajas(plazo.id, this.sucursalId).subscribe({
-      next: (tabla) => { this.tablaAlhajas = tabla; this.recalcularCaptura(); }
-    });
-
-    // Carga todos los parámetros del plazo en un solo request y los indexa por tipo
-    this.plazoService.getParametrosBySucursal(plazo.id, this.sucursalId).subscribe({
-      next: (lista) => {
-        this.paramsMap = {};
-        (lista ?? []).forEach(p => { this.paramsMap[p.tipoPrendaId] = p; });
-        this.recalcularCaptura();
-        this.recalcularVarios();
-      }
+    // Precios y parámetros del plazo (del caché si ya se visitó). Al terminar se recalcula
+    // la captura en curso y TODAS las partidas ya capturadas: cambiar de plazo no obliga a
+    // recapturar. Si el usuario alterna rápido entre plazos no hay carrera: el recálculo lee
+    // los datos del plazo vigente por su id, no los de la respuesta que acaba de llegar.
+    this.cargarDatosPlazo(plazo.id).subscribe(() => {
+      this.recalcularCaptura();
+      this.recalcularVarios();
+      this.recalcularPartidas();
     });
   }
 
@@ -436,12 +514,6 @@ export class AvaluoComponent implements OnInit {
   catalogoPrendasError = '';
 
   // -------------------------------------------------------------------------
-  // Estado — contratos del cliente (vencimientos)
-  // -------------------------------------------------------------------------
-  contratosPorCliente: ContratoResponse[] = [];
-  isLoadingContratos = false;
-
-  // -------------------------------------------------------------------------
   // Estado — captura ALHAJAS/PLATA
   // -------------------------------------------------------------------------
   captura = {
@@ -496,28 +568,37 @@ export class AvaluoComponent implements OnInit {
   }
 
   /**
-   * Preview de plata (Phase 6 — PLATA-01/PLATA-03, D-01/D-10).
-   *   avaluo         = peso x precio por gramo de la ley (ley925 / ley725 de plazo_parametro)
-   *   prestamoMaximo = peso x precio (COCAE: el precio por gramo YA es el prestamo; NO se aplica % Prestamo s/Avaluo)
+   * Motor de cálculo de plata (Phase 6 — PLATA-01/PLATA-03, D-01/D-10).
+   *   avaluo   = peso x precio por gramo de la ley (ley925 / ley725 de plazo_parametro)
+   *   prestamo = peso x precio (COCAE: el precio por gramo YA es el prestamo; NO se aplica
+   *              "% Prestamo s/Avaluo", ese recorte no aplica a plata). Es el máximo autorizado.
    * NUNCA usa tablaAlhajas ni preciosOro: esos son precios de ORO.
    * El valor persistido lo recalcula el servidor en ContratoService.buildPartida.
+   *
+   * Único lugar donde vive la fórmula: lo usan la captura en curso y el recálculo por
+   * cambio de plazo, para que una partida recalculada quede idéntica a recapturarla.
    */
+  private calcularPlata(ley: number, pesoNeto: number, datos: DatosPlazo): CalculoPartida {
+    const params = this.paramsDe(datos, this.TIPO_PRENDA_ID['Plata']);
+    const precioXGramo = +ley === 925 ? (params?.ley925 ?? 0) : (params?.ley725 ?? 0);
+    const avaluoReal = +(precioXGramo * pesoNeto).toFixed(2);
+    const prestamo = avaluoReal;
+    return { precioXGramo, avaluoReal, prestamo, avaluoContrato: this.avaluoContratoDesde(prestamo, params) };
+  }
+
+  /** Preview de plata sobre la captura en curso. */
   recalcularPlata(): void {
-    const params = this.getParams(this.TIPO_PRENDA_ID['Plata']);
-    const ley = +this.captura.ley;
-    const precioGramo = ley === 925 ? (params?.ley925 ?? 0) : (params?.ley725 ?? 0);
-    this.captura.precioXGramo = precioGramo;
-    this.captura.avaluoReal = +(precioGramo * this.captura.pesoNeto).toFixed(2);
-    // El precio por gramo YA es el precio de préstamo (COCAE): préstamo = peso × precio,
-    // SIN aplicar "% Préstamo s/Avalúo" (ese recorte no aplica a plata). Igual que el backend y que oro.
-    this.prestamoMaximoPlata = this.captura.avaluoReal;
+    const calculo = this.calcularPlata(+this.captura.ley, this.captura.pesoNeto, this.datosPlazoActual);
+    this.captura.precioXGramo = calculo.precioXGramo;
+    this.captura.avaluoReal = calculo.avaluoReal;
+    this.prestamoMaximoPlata = calculo.prestamo;
 
     // Propuesta inicial = el máximo (peso × precio). Al cambiar peso/ley/plazo SIEMPRE se re-propone
     // el máximo, para que el préstamo no se quede pegado en un valor viejo mientras escribes el peso
     // (ej. teclear "20" pasa por "2" → préstamo 13). El ajuste a la baja se hace en el campo Préstamo
     // (ajustarPrestamoPlata). Igual que oro, que también recalcula el préstamo al cambiar el peso.
-    this.captura.prestamo = this.prestamoMaximoPlata;
-    this.captura.avaluoContrato = this.avaluoContratoDesde(this.captura.prestamo, params);
+    this.captura.prestamo = calculo.prestamo;
+    this.captura.avaluoContrato = calculo.avaluoContrato;
   }
 
   /**
@@ -536,25 +617,49 @@ export class AvaluoComponent implements OnInit {
     this.captura.avaluoContrato = this.avaluoContratoDesde(valor, params);
   }
 
-  recalcularAlhajas(): void {
-    const kilataje = +this.captura.kilataje;
-    const hechuraCod = this.hechuraCodigo(this.captura.hechura);
+  /**
+   * Motor de cálculo de alhajas: el préstamo sale de la tabla de precios del plazo
+   * (kilataje + hechura), así que cambiar de plazo cambia el resultado.
+   * Único lugar donde vive la fórmula — ver calcularPlata.
+   */
+  private calcularAlhaja(
+    kilataje: number,
+    hechuraCod: string,
+    pesoNeto: number,
+    idTipoPrenda: number,
+    datos: DatosPlazo
+  ): CalculoPartida {
+    const row = datos.tablaAlhajas.find(r => r.kilataje === +kilataje && r.hechura === hechuraCod);
 
-    const row = this.tablaAlhajas.find(r => r.kilataje === kilataje && r.hechura === hechuraCod);
+    let precioXGramo: number;
+    let prestamo: number;
     if (row) {
-      this.captura.precioXGramo = row.precioBase;
-      this.captura.prestamo = +(row.precioPrestamo * this.captura.pesoNeto).toFixed(2);
+      precioXGramo = row.precioBase;
+      prestamo = +(row.precioPrestamo * pesoNeto).toFixed(2);
     } else {
       // Fallback a precios demo mientras no haya tabla real
-      const precioBase = this.preciosOro[kilataje] ?? 0;
-      this.captura.precioXGramo = precioBase;
-      this.captura.prestamo = +(precioBase * this.captura.pesoNeto * 1.03).toFixed(2);
+      const precioBase = this.preciosOro[+kilataje] ?? 0;
+      precioXGramo = precioBase;
+      prestamo = +(precioBase * pesoNeto * 1.03).toFixed(2);
     }
 
-    this.captura.avaluoReal = this.captura.prestamo;
-    const tipoPrendaId = this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1;
-    const params = this.getParams(tipoPrendaId);
-    this.captura.avaluoContrato = this.avaluoContratoDesde(this.captura.prestamo, params);
+    const params = this.paramsDe(datos, idTipoPrenda);
+    return { precioXGramo, avaluoReal: prestamo, prestamo, avaluoContrato: this.avaluoContratoDesde(prestamo, params) };
+  }
+
+  /** Preview de alhajas sobre la captura en curso. */
+  recalcularAlhajas(): void {
+    const calculo = this.calcularAlhaja(
+      +this.captura.kilataje,
+      this.hechuraCodigo(this.captura.hechura),
+      this.captura.pesoNeto,
+      this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1,
+      this.datosPlazoActual
+    );
+    this.captura.precioXGramo = calculo.precioXGramo;
+    this.captura.prestamo = calculo.prestamo;
+    this.captura.avaluoReal = calculo.avaluoReal;
+    this.captura.avaluoContrato = calculo.avaluoContrato;
   }
 
   recalcularVarios(): void {
@@ -612,6 +717,159 @@ export class AvaluoComponent implements OnInit {
   get avaluoTotal(): number         { return this.partidas.reduce((a, i) => a + i.avaluoReal, 0); }
   get avaluoContratoTotal(): number { return this.partidas.reduce((a, i) => a + i.avaluoContrato, 0); }
   get prestamoTotal(): number       { return this.partidas.reduce((a, i) => a + i.prestamo, 0); }
+
+  /**
+   * Recalcula TODAS las partidas ya capturadas con los precios y parámetros del plazo
+   * vigente, y refresca la tabla de amortización. El valuador negocia el plazo con el
+   * cliente: cambiarlo no debe obligar a recapturar las partidas.
+   *
+   * Es idempotente — cada partida se re-deriva de sus propios datos de captura (peso,
+   * kilataje, ley), nunca de un resultado anterior — así que puede correr varias veces
+   * mientras llegan las respuestas de precios y parámetros del plazo.
+   */
+  private recalcularPartidas(): void {
+    if (this.partidas.length > 0) {
+      this.partidas = this.partidas.map(partida => this.recalcularPartida(partida, this.datosPlazoActual));
+    }
+    this.onPartidasCambiaron();
+  }
+
+  /**
+   * Refresca todo lo que se deriva de las partidas: la tabla de amortización y el comparador
+   * de plazos. Se llama al agregar, editar o eliminar una partida, y tras cambiar de plazo.
+   */
+  private onPartidasCambiaron(): void {
+    this.refrescarAmortizacion();
+    this.actualizarComparativa();
+  }
+
+  /**
+   * Re-deriva préstamo y avalúos de una partida con los datos de UN plazo, reusando su motor
+   * de cálculo. No muta: devuelve una copia, así que el comparador puede evaluar la partida
+   * con plazos alternativos sin tocar la capturada.
+   */
+  private recalcularPartida(partida: PartidaAvaluo, datos: DatosPlazo): PartidaAvaluo {
+    if (partida.tipo === 'Varios') {
+      // Varios no tiene fórmula de avalúo: el préstamo lo teclea el valuador y se respeta.
+      // Del plazo solo depende el avalúo de contrato (% sobre el préstamo).
+      return {
+        ...partida,
+        avaluoContrato: this.avaluoContratoDesde(partida.prestamo, this.paramsDe(datos, partida.idTipoPrenda))
+      };
+    }
+
+    // Plata: se re-propone el máximo del plazo nuevo (peso × precio/gramo). Un ajuste a la
+    // baja que el valuador hubiera hecho con el plazo anterior se pierde, igual que al
+    // recapturar la partida desde cero; el descuento se vuelve a aplicar en el formulario.
+    const calculo = partida.tipo === 'Plata'
+      ? this.calcularPlata(partida.ley ?? 925, partida.pesoNeto, datos)
+      : this.calcularAlhaja(partida.kilataje ?? 0, partida.hechuraCod ?? 'N', partida.pesoNeto, partida.idTipoPrenda, datos);
+
+    return {
+      ...partida,
+      precioXGramo: calculo.precioXGramo,
+      avaluoReal: calculo.avaluoReal,
+      avaluoContrato: calculo.avaluoContrato,
+      prestamo: calculo.prestamo
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // Comparador de plazos (negociación con el cliente)
+  // -------------------------------------------------------------------------
+  comparativaPlazos: OpcionPlazo[] = [];
+  isLoadingComparativa = false;
+
+  /**
+   * Plazos ofrecibles: los que admiten TODOS los tipos ya capturados. Ofrecer uno que no
+   * los admita obligaría a descartar partidas, que es justo lo contrario de negociar.
+   */
+  private plazosOfrecibles(): PlazoAvaluo[] {
+    const tiposCapturados = [...new Set(this.partidas.map(p => p.idTipoPrenda))];
+    return this.plazos.filter(plazo => {
+      const admitidos = new Set((plazo.tiposPrenda ?? []).map(t => Number(t.id)));
+      return tiposCapturados.every(id => admitidos.has(id));
+    });
+  }
+
+  /**
+   * Recalcula el comparador: el mismo contrato capturado, evaluado con cada plazo ofrecible.
+   * Los precios de cada plazo se cachean, así que solo pega al servidor la primera vez que
+   * se evalúa cada uno; de ahí en adelante es cálculo local.
+   */
+  private actualizarComparativa(): void {
+    const candidatos = this.partidas.length > 0 ? this.plazosOfrecibles() : [];
+    if (candidatos.length === 0) {
+      this.comparativaPlazos = [];
+      return;
+    }
+
+    this.isLoadingComparativa = true;
+    forkJoin(candidatos.map(plazo => this.cargarDatosPlazo(plazo.id)))
+      .pipe(finalize(() => { this.isLoadingComparativa = false; }))
+      .subscribe({
+        next: (datos) => {
+          this.comparativaPlazos = candidatos.map((plazo, i) => this.evaluarPlazo(plazo, datos[i]));
+        },
+        error: () => { this.comparativaPlazos = []; }
+      });
+  }
+
+  /** Evalúa el contrato capturado con un plazo alternativo, sin tocar las partidas reales. */
+  private evaluarPlazo(plazo: PlazoAvaluo, datos: DatosPlazo): OpcionPlazo {
+    const partidas = this.partidas.map(p => this.recalcularPartida(p, datos));
+    const prestamo = partidas.reduce((a, p) => a + p.prestamo, 0);
+    const amortizacion = this.calcularAmortizacion(plazo, datos, partidas);
+    const ultima = amortizacion?.filas[amortizacion.filas.length - 1];
+    const desempeno = ultima?.desempeno ?? prestamo;
+
+    return {
+      plazo,
+      prestamo: +prestamo.toFixed(2),
+      pagoPorPeriodo: amortizacion?.totalPagoPeriodo ?? 0,
+      desempeno,
+      costo: +(desempeno - prestamo).toFixed(2),
+      fechaVencimiento: this.fechaVencimientoDe(plazo),
+      esActual: this.plazoSeleccionado?.id === plazo.id,
+      motivoNoViable: this.motivoPlazoNoViable(partidas, datos)
+    };
+  }
+
+  /**
+   * Réplica de las validaciones que el backend aplica al guardar (ContratoService.buildPartida):
+   * si el plazo produciría un contrato rechazado, se marca aquí en vez de ofrecérselo al
+   * cliente y fallar al generarlo.
+   */
+  private motivoPlazoNoViable(partidas: PartidaAvaluo[], datos: DatosPlazo): string {
+    const sinPrecio = partidas.find(p => p.prestamo <= 0);
+    if (sinPrecio) {
+      return `Sin precios configurados para ${sinPrecio.tipo} en este plazo`;
+    }
+
+    for (const partida of partidas) {
+      const minimo = this.paramsDe(datos, partida.idTipoPrenda)?.importeMinPrestamo ?? 0;
+      if (minimo > 0 && partida.prestamo < minimo) {
+        return `Una partida queda bajo el préstamo mínimo de $${minimo.toFixed(2)}`;
+      }
+    }
+
+    return '';
+  }
+
+  /** Aplica el plazo elegido en el comparador. Solo lista plazos compatibles: no descarta partidas. */
+  seleccionarPlazoComparativa(opcion: OpcionPlazo): void {
+    if (opcion.esActual || opcion.motivoNoViable) {
+      return;
+    }
+    this.plazoSeleccionado = opcion.plazo;
+    this.onPlazoChange(opcion.plazo);
+  }
+
+  /** Diferencia de préstamo contra el plazo vigente: es el argumento de venta ("te doy $X más"). */
+  diferenciaPrestamo(opcion: OpcionPlazo): number {
+    const actual = this.comparativaPlazos.find(o => o.esActual);
+    return actual ? +(opcion.prestamo - actual.prestamo).toFixed(2) : 0;
+  }
 
   // -------------------------------------------------------------------------
   // Acciones de flujo
@@ -697,7 +955,6 @@ export class AvaluoComponent implements OnInit {
         avaluoReal: this.capturaVarios.prestamo,
         avaluoContrato: this.capturaVarios.avaluoContrato,
         prestamo: this.capturaVarios.prestamo,
-        vencimiento: this.calcularVencimiento(),
         estatus: 'Capturada',
         subtipo: this.capturaVarios.subtipo,
         marca: this.capturaVarios.marca,
@@ -729,7 +986,6 @@ export class AvaluoComponent implements OnInit {
       avaluoReal: this.captura.avaluoReal,
       avaluoContrato: this.captura.avaluoContrato,
       prestamo: this.captura.prestamo,
-      vencimiento: this.calcularVencimiento(),
       estatus: 'Capturada'
     };
   }
@@ -751,6 +1007,7 @@ export class AvaluoComponent implements OnInit {
     }
 
     this.partidas = [...this.partidas, this.construirPartida(this.siguienteIdPartida++)];
+    this.onPartidasCambiaron();
     this.resetCaptura();
     this.mostrarExito('Partida agregada correctamente');
   }
@@ -840,6 +1097,7 @@ export class AvaluoComponent implements OnInit {
     const actualizada = this.construirPartida(id);
     this.partidas = this.partidas.map((p, i) => (i === indice ? actualizada : p));
     this.partidaEnEdicion = null;
+    this.onPartidasCambiaron();
     this.resetCaptura();
     this.mostrarExito('Partida actualizada correctamente');
   }
@@ -855,13 +1113,22 @@ export class AvaluoComponent implements OnInit {
       this.cancelarEdicion();
     }
     this.partidas = this.partidas.filter(p => p.id !== id);
+    this.onPartidasCambiaron();
   }
 
-  private calcularVencimiento(): string {
-    if (!this.plazoSeleccionado) return '—';
-    const dias = this.plazoSeleccionado.diasPorPeriodo * this.plazoSeleccionado.numeroPeriodos;
+  /**
+   * Fecha de vencimiento del contrato = apertura + diasPorPeriodo × numeroPeriodos.
+   * Es un dato del contrato, no de cada partida (antes se repetía igual en cada renglón de
+   * la tabla). Al ser un getter, sigue solo al plazo vigente sin recálculo explícito.
+   */
+  get fechaVencimientoContrato(): string {
+    return this.plazoSeleccionado ? this.fechaVencimientoDe(this.plazoSeleccionado) : '—';
+  }
+
+  /** La misma fecha para un plazo cualquiera: la usa el comparador en cada opción. */
+  private fechaVencimientoDe(plazo: PlazoAvaluo): string {
     const fecha = new Date();
-    fecha.setDate(fecha.getDate() + dias);
+    fecha.setDate(fecha.getDate() + plazo.diasPorPeriodo * plazo.numeroPeriodos);
     return fecha.toLocaleDateString('es-MX');
   }
 
@@ -913,7 +1180,6 @@ export class AvaluoComponent implements OnInit {
   @ViewChild('modalCliente')      modalCliente!: TemplateRef<unknown>;
   @ViewChild('modalPrenda')       modalPrenda!: TemplateRef<unknown>;
   @ViewChild('modalContrato')     modalContrato!: TemplateRef<unknown>;
-  @ViewChild('modalVencimientos') modalVencimientos!: TemplateRef<unknown>;
   @ViewChild('modalAmortizacion') modalAmortizacion!: TemplateRef<unknown>;
   @ViewChild('modalPdf')          modalPdf!: TemplateRef<unknown>;
   @ViewChild('modalCambioPlazo')  modalCambioPlazo!: TemplateRef<unknown>;
@@ -946,7 +1212,6 @@ export class AvaluoComponent implements OnInit {
 
     if (typeof valor === 'string' && this.clienteSeleccionado && valor !== this.clienteSeleccionado.nombre) {
       this.clienteSeleccionado = null;
-      this.contratosPorCliente = [];
     }
   }
 
@@ -963,7 +1228,6 @@ export class AvaluoComponent implements OnInit {
     this.clienteSeleccionado = cliente;
     this.clienteBusquedaInput = cliente;
     this.identificacionSeleccionada = cliente.identificacion;
-    this.cargarContratosPorCliente(cliente.id);
   }
 
   private mapearCliente(cliente: ClienteResponse): ClienteLocal {
@@ -976,14 +1240,6 @@ export class AvaluoComponent implements OnInit {
       telefono: cliente.telefono,
       prestamoAcumulado: 0
     };
-  }
-
-  private cargarContratosPorCliente(clienteId: number): void {
-    this.isLoadingContratos = true;
-    this.contratoService.getByCliente(clienteId).subscribe({
-      next: (contratos) => { this.contratosPorCliente = contratos; this.isLoadingContratos = false; },
-      error: () => { this.contratosPorCliente = []; this.isLoadingContratos = false; }
-    });
   }
 
   // --- Modal de prenda ---
@@ -1102,7 +1358,8 @@ export class AvaluoComponent implements OnInit {
             this.clienteSeleccionado = null;
             this.clienteBusquedaInput = '';
             this.beneficiario = '';
-            this.contratosPorCliente = [];
+            // Contrato ya generado y almacenado: el preview y el comparador se vacían.
+            this.onPartidasCambiaron();
             this.mostrarExito(`Contrato ${resp.folio} registrado exitosamente.`);
             this.abrirPdfContrato(resp.id, resp.folio);
           },
@@ -1172,15 +1429,6 @@ export class AvaluoComponent implements OnInit {
     };
   }
 
-  // --- Modal de vencimientos ---
-  verVencimientos(): void {
-    if (!this.clienteSeleccionado) {
-      this.mostrarError('Selecciona un cliente para ver sus vencimientos');
-      return;
-    }
-    this.modalService.open(this.modalVencimientos, { size: 'lg' });
-  }
-
   // --- Modal de amortización (vencimientos del contrato en curso, estilo COCAE) ---
   private nombrePeriodo(dias: number): string {
     if (dias === 1) return 'DIARIO';
@@ -1190,12 +1438,7 @@ export class AvaluoComponent implements OnInit {
     return `${dias} DÍAS`;
   }
 
-  /**
-   * Calcula la tabla de amortización del contrato en curso (préstamo total del contrato) y
-   * abre el modal estilo "Vencimientos de Contrato" de COCAE. Cálculo de referencia al vuelo:
-   * interés/almacén/IVA acumulativos por periodo, con desempeño = préstamo + acumulado.
-   * Réplica de la fórmula verificada contra COCAE (ver Cerebro: flujo-plata).
-   */
+  /** Abre el modal estilo "Vencimientos de Contrato" de COCAE con la tabla recién calculada. */
   verAmortizacion(): void {
     if (this.partidas.length === 0) {
       this.mostrarError('Agrega al menos una partida para calcular los vencimientos');
@@ -1205,11 +1448,44 @@ export class AvaluoComponent implements OnInit {
       this.mostrarError('Selecciona un plazo');
       return;
     }
-    const params = this.getParams(this.TIPO_PRENDA_ID[this.tipoSeleccionado] ?? 1);
-    const prestamo = this.prestamoTotal;
-    const avaluo = this.avaluoContratoTotal;
-    const dias = this.plazoSeleccionado.diasPorPeriodo;
-    const nPer = this.plazoSeleccionado.numeroPeriodos;
+    this.refrescarAmortizacion();
+    this.modalService.open(this.modalAmortizacion, { size: 'xl' });
+  }
+
+  /**
+   * Regenera la tabla de amortización con el plazo vigente. Se dispara también al cambiar
+   * de plazo, para que el preview nunca quede con los vencimientos del plazo anterior.
+   */
+  private refrescarAmortizacion(): void {
+    this.amortizacion = this.plazoSeleccionado
+      ? this.calcularAmortizacion(this.plazoSeleccionado, this.datosPlazoActual, this.partidas)
+      : null;
+  }
+
+  /**
+   * Calcula la tabla de amortización de un conjunto de partidas bajo un plazo dado.
+   * Cálculo de referencia al vuelo: interés/almacén/IVA acumulativos por periodo, con
+   * desempeño = préstamo + acumulado.
+   * Réplica de la fórmula verificada contra COCAE (ver Cerebro: flujo-plata).
+   *
+   * Puro respecto de sus argumentos: el comparador lo usa con plazos que NO son el
+   * seleccionado para calcular lo que pagaría el cliente con cada opción.
+   */
+  private calcularAmortizacion(
+    plazo: PlazoAvaluo,
+    datos: DatosPlazo,
+    partidas: PartidaAvaluo[]
+  ): AmortizacionPreview | null {
+    if (partidas.length === 0) {
+      return null;
+    }
+    // Los parámetros son por tipo de prenda: se toman los de las partidas capturadas, no los
+    // del tipo seleccionado en el formulario (tras un cambio de plazo puede no haber ninguno).
+    const params = this.paramsDe(datos, partidas[0].idTipoPrenda);
+    const prestamo = partidas.reduce((a, p) => a + p.prestamo, 0);
+    const avaluo = partidas.reduce((a, p) => a + p.avaluoContrato, 0);
+    const dias = plazo.diasPorPeriodo;
+    const nPer = plazo.numeroPeriodos;
 
     const porcInteres = Number(params?.porcInteres ?? 0);
     const porcAlmacen = Number(params?.porcAlmacen ?? 0);
@@ -1251,7 +1527,10 @@ export class AvaluoComponent implements OnInit {
     }
     const ult = filas[filas.length - 1];
 
-    this.amortizacion = {
+    const sancionActiva = !!params?.aplicarSancionPorPeriodo;
+    const porcSancion = sancionActiva ? Number(params?.porcSancionSemanal ?? 0) : 0;
+
+    return {
       periodoNombre: this.nombrePeriodo(dias),
       diasPorPeriodo: dias,
       numeroPeriodos: nPer,
@@ -1267,20 +1546,15 @@ export class AvaluoComponent implements OnInit {
       diasGracia: Number(params?.diasGraciaSinInteres ?? 0),
       filas,
       fechaLimiteExtemp: fechaMas(dias * nPer + dias),
-      porcSancionSemanal: Number(params?.porcSancionSemanal ?? 0),
-      sancionSemanal: r2(prestamo * Number(params?.porcSancionSemanal ?? 0) / 100),
+      // La sanción solo se informa si el plazo la tiene activada, igual que en el backend
+      // (MovimientoContratoService.refrendar) y en el PDF del contrato.
+      aplicaSancion: sancionActiva,
+      porcSancionSemanal: porcSancion,
+      sancionSemanal: r2(prestamo * porcSancion / 100),
       porcReposicion: Number(params?.porcReposicion ?? 0),
       fechaPaseVenta: fechaMas(dias * nPer + Number(params?.diasAntesPaseVenta ?? 0)),
       comisionVenta: r2(prestamo * Number(params?.comisionPorVentaPrenda ?? 0) / 100)
     };
-    this.modalService.open(this.modalAmortizacion, { size: 'xl' });
-  }
-
-  estatusContratoBadge(estatus: string): string {
-    if (estatus === 'VIGENTE')     return 'badge-success';
-    if (estatus === 'VENCIDO')     return 'badge-danger';
-    if (estatus === 'EN_VENTA')    return 'badge-warning';
-    return 'badge-secondary';
   }
 
   // -------------------------------------------------------------------------

@@ -117,14 +117,12 @@
         <li><span>Avalúo real:</span><strong>${{ avaluoTotal | number: '1.2-2' }}</strong></li>
         <li><span>Avalúo contrato:</span><strong>${{ avaluoContratoTotal | number: '1.2-2' }}</strong></li>
         <li><span>Préstamo total:</span><strong>${{ prestamoTotal | number: '1.2-2' }}</strong></li>
+        <li *ngIf="plazoSeleccionado"><span>Vencimiento:</span><strong>{{ fechaVencimientoContrato }}</strong></li>
       </ul>
       <hr />
       <div class="d-grid gap-2">
         <button class="btn btn-primary btn-sm contract-button" (click)="generarContrato()" [disabled]="partidas.length === 0">
           Generar contrato
-        </button>
-        <button class="btn btn-outline-info btn-sm" (click)="verVencimientos()" [disabled]="!clienteSeleccionado">
-          Ver vencimientos
         </button>
         <button class="btn btn-outline-secondary btn-sm" (click)="verAmortizacion()" [disabled]="partidas.length === 0">
           Tabla de amortización
@@ -406,7 +404,6 @@
               <th class="text-right">Avalúo real</th>
               <th class="text-right">Avalúo contrato</th>
               <th class="text-right">Préstamo</th>
-              <th>Vencimiento</th>
               <th>Estatus</th>
               <th></th>
             </tr>
@@ -425,7 +422,6 @@
               <td class="text-right">${{ item.avaluoReal | number: '1.2-2' }}</td>
               <td class="text-right fw-bold">${{ item.avaluoContrato | number: '1.2-2' }}</td>
               <td class="text-right">${{ item.prestamo | number: '1.2-2' }}</td>
-              <td>{{ item.vencimiento }}</td>
               <td><span class="badge badge-secondary">{{ item.estatus }}</span></td>
               <td class="text-nowrap">
                 <button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Editar partida"
@@ -439,7 +435,7 @@
               </td>
             </tr>
             <tr *ngIf="partidas.length === 0">
-              <td colspan="15" class="text-center text-muted py-3">Sin partidas capturadas</td>
+              <td colspan="14" class="text-center text-muted py-3">Sin partidas capturadas</td>
             </tr>
           </tbody>
           <tfoot *ngIf="partidas.length > 0">
@@ -452,7 +448,7 @@
               <td class="text-right">${{ avaluoTotal | number: '1.2-2' }}</td>
               <td class="text-right">${{ avaluoContratoTotal | number: '1.2-2' }}</td>
               <td class="text-right">${{ prestamoTotal | number: '1.2-2' }}</td>
-              <td colspan="3"></td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>
@@ -461,7 +457,77 @@
   </div>
 </div>
 
-<!-- ─────────────────────── 4) Pendientes (solo dev) ── -->
+<!-- ─────────────────────── 4) Comparador de plazos (negociación) ── -->
+<div class="row mb-3" *ngIf="partidas.length > 0 && comparativaPlazos.length > 1">
+  <div class="col-12">
+    <app-card cardTitle="Opciones para el cliente" class="workflow-card">
+      <p class="text-muted small mb-2">
+        El mismo empeño con cada plazo disponible. Da clic en una opción para aplicarla.
+      </p>
+
+      <div *ngIf="isLoadingComparativa" class="text-center py-2">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <span class="ms-2 text-muted small">Calculando opciones...</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 avaluo-table comparativa-table">
+          <thead>
+            <tr>
+              <th>Plazo</th>
+              <th class="text-right">Se lleva hoy</th>
+              <th class="text-right">Paga cada periodo</th>
+              <th class="text-right">Para recuperarla</th>
+              <th class="text-right">Le cuesta</th>
+              <th>Vence</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let opcion of comparativaPlazos"
+              [class.opcion-actual]="opcion.esActual"
+              [class.opcion-no-viable]="opcion.motivoNoViable"
+              [title]="opcion.motivoNoViable"
+              (click)="seleccionarPlazoComparativa(opcion)"
+            >
+              <td>
+                <strong>{{ opcion.plazo.nombre }}</strong>
+                <small class="text-muted d-block">
+                  {{ opcion.plazo.numeroPeriodos }} × {{ opcion.plazo.diasPorPeriodo }} días
+                </small>
+              </td>
+              <td class="text-right fw-bold">${{ opcion.prestamo | number: '1.2-2' }}</td>
+              <td class="text-right">${{ opcion.pagoPorPeriodo | number: '1.2-2' }}</td>
+              <td class="text-right">${{ opcion.desempeno | number: '1.2-2' }}</td>
+              <td class="text-right text-muted">${{ opcion.costo | number: '1.2-2' }}</td>
+              <td>{{ opcion.fechaVencimiento }}</td>
+              <td class="text-nowrap text-right">
+                <span *ngIf="opcion.esActual" class="badge badge-primary">Actual</span>
+                <span *ngIf="opcion.motivoNoViable" class="badge badge-danger">No disponible</span>
+                <span
+                  *ngIf="!opcion.esActual && !opcion.motivoNoViable && diferenciaPrestamo(opcion) !== 0"
+                  class="badge"
+                  [ngClass]="diferenciaPrestamo(opcion) > 0 ? 'badge-success' : 'badge-secondary'"
+                >
+                  {{ diferenciaPrestamo(opcion) > 0 ? '+' : '' }}${{ diferenciaPrestamo(opcion) | number: '1.2-2' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="text-muted small mb-0 mt-2">
+        <strong>Paga cada periodo</strong> mantiene vigente el contrato (intereses + IVA).
+        <strong>Para recuperarla</strong> es el pago al vencimiento. El detalle por periodo está
+        en "Tabla de amortización".
+      </p>
+    </app-card>
+  </div>
+</div>
+
+<!-- ─────────────────────── 5) Pendientes (solo dev) ── -->
 <div class="row mb-3" *ngIf="!environment.production">
   <div class="col-12">
     <app-card>
@@ -756,8 +822,12 @@
     <!-- Extemporáneo -->
     <div class="alert alert-warning py-1 px-2 small mb-2">
       Refrendo/finiquito <strong>extemporáneo</strong> (pagando un periodo más) hasta:
-      <strong>{{ a.fechaLimiteExtemp }}</strong>. Sanción <strong>{{ a.porcSancionSemanal | number: '1.0-2' }}%</strong>
-      por semana vencida (${{ a.sancionSemanal | number: '1.2-2' }}/semana sobre el préstamo).
+      <strong>{{ a.fechaLimiteExtemp }}</strong>.
+      <ng-container *ngIf="a.aplicaSancion">
+        Sanción <strong>{{ a.porcSancionSemanal | number: '1.0-2' }}%</strong>
+        por semana vencida (${{ a.sancionSemanal | number: '1.2-2' }}/semana sobre el préstamo).
+      </ng-container>
+      <ng-container *ngIf="!a.aplicaSancion">Este plazo no aplica sanción por extemporaneidad.</ng-container>
     </div>
     <!-- Condiciones -->
     <div class="row g-2 small text-center">
@@ -773,51 +843,5 @@
   </div>
   <div class="modal-footer">
     <button class="btn btn-secondary btn-sm" (click)="modal.close()">Cerrar</button>
-  </div>
-</ng-template>
-
-<!-- Modal: Ver vencimientos -->
-<ng-template #modalVencimientos let-modal>
-  <div class="modal-header">
-    <h5 class="modal-title">Vencimientos — {{ clienteSeleccionado?.nombre }}</h5>
-    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
-  </div>
-  <div class="modal-body">
-    <div *ngIf="isLoadingContratos" class="text-center py-3">
-      <div class="spinner-border spinner-border-sm text-primary"></div>
-      <span class="ms-2 text-muted">Cargando contratos...</span>
-    </div>
-    <div class="table-responsive" *ngIf="!isLoadingContratos">
-      <table class="table table-sm table-striped table-bordered">
-        <thead>
-          <tr>
-            <th>Folio</th>
-            <th>Apertura</th>
-            <th>Vencimiento</th>
-            <th class="text-right">Préstamo</th>
-            <th>Estatus</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let v of contratosPorCliente">
-            <td><code>{{ v.folio }}</code></td>
-            <td>{{ v.fechaApertura | date: 'dd/MM/yyyy' }}</td>
-            <td>{{ v.fechaVencimiento | date: 'dd/MM/yyyy' }}</td>
-            <td class="text-right">${{ v.montoPrestamo | number: '1.0-0' }}</td>
-            <td>
-              <span class="badge" [ngClass]="estatusContratoBadge(v.estatus)">
-                {{ v.estatus }}
-              </span>
-            </td>
-          </tr>
-          <tr *ngIf="contratosPorCliente.length === 0">
-            <td colspan="5" class="text-center text-muted">Sin contratos anteriores</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cerrar</button>
   </div>
 </ng-template>
