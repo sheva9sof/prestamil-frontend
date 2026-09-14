@@ -15,6 +15,7 @@ import { PlazoHechuraAlhajaResponse, PlazoParametroResponse } from 'src/app/pres
 import { ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
 import { ContratoRequest, PartidaContratoRequest } from 'src/app/prestamil/core/models/contrato.model';
 import { environment } from 'src/environments/environment';
+import { AvaluoDraft, AvaluoDraftService } from './avaluo-draft.service';
 
 // ---------------------------------------------------------------------------
 // Interfaces locales
@@ -175,6 +176,7 @@ export class AvaluoComponent implements OnInit {
   private prendaService  = inject(PrendaService);
   private modalService   = inject(NgbModal);
   private sanitizer      = inject(DomSanitizer);
+  private draftService   = inject(AvaluoDraftService);
 
   // -------------------------------------------------------------------------
   // Sesión / encabezado
@@ -349,9 +351,166 @@ export class AvaluoComponent implements OnInit {
           tiposPrenda: p.tiposPrenda ?? []
         }));
         if (this.plazos.length === 0) this.plazos = this.plazosDemo;
+        this.detectarBorradorPendiente();
       },
-      error: () => { this.plazos = this.plazosDemo; }
+      error: () => { this.plazos = this.plazosDemo; this.detectarBorradorPendiente(); }
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Borrador persistente (localStorage por usuario x sucursal)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Se prende una vez concluida la restauracion o la decision de descartar. Mientras esta
+   * en false, `persistirBorrador` no escribe: evita que las asignaciones que hace
+   * `restaurarBorrador` disparen un guardado con el estado a medio armar.
+   */
+  private borradorHabilitado = false;
+
+  /** Fecha del borrador restaurado (ISO); alimenta el badge "Borrador guardado hace ...". */
+  borradorGuardadoEn: string | null = null;
+
+  private snapshotBorrador(): AvaluoDraft {
+    return {
+      savedAt: new Date().toISOString(),
+      tipoSeleccionado: this.tipoSeleccionado,
+      plazoId: this.plazoSeleccionado?.id ?? null,
+      cliente: this.clienteSeleccionado,
+      beneficiario: this.beneficiario,
+      identificacionSeleccionada: this.identificacionSeleccionada,
+      partidas: this.partidas,
+      captura: this.captura,
+      capturaVarios: this.capturaVarios,
+      prestamoMaximoPlata: this.prestamoMaximoPlata,
+      siguienteIdPartida: this.siguienteIdPartida
+    };
+  }
+
+  /**
+   * Guarda el estado en curso. Solo persiste cuando hay algo capturado — un formulario en
+   * blanco no debe dejar rastro que pida restaurar en la proxima entrada.
+   */
+  persistirBorrador(): void {
+    if (!this.borradorHabilitado) return;
+    if (this.hayBorradorSignificativo()) {
+      const snap = this.snapshotBorrador();
+      this.draftService.save(this.sucursalId, snap);
+      this.borradorGuardadoEn = snap.savedAt;
+    } else {
+      this.draftService.clear(this.sucursalId);
+      this.borradorGuardadoEn = null;
+    }
+  }
+
+  /** Un borrador es "significativo" si el usuario ya tocó algo que valga la pena restaurar. */
+  private hayBorradorSignificativo(): boolean {
+    return !!this.clienteSeleccionado
+      || this.partidas.length > 0
+      || !!this.beneficiario
+      || this.captura.pesoNeto > 0
+      || this.capturaVarios.prestamo > 0
+      || !!this.captura.descripcion
+      || !!this.capturaVarios.marca
+      || !!this.capturaVarios.modelo;
+  }
+
+  /**
+   * Detecta un borrador guardado y, si existe, abre el modal de continuar/descartar. Se
+   * corre despues de que los plazos ya cargaron para poder resolver `plazoId` contra la
+   * lista actual sin depender del orden de las respuestas.
+   */
+  private detectarBorradorPendiente(): void {
+    const draft = this.draftService.load(this.sucursalId);
+    if (!draft) {
+      this.borradorHabilitado = true;
+      return;
+    }
+    this.borradorPendiente = draft;
+    // El modal se abre en ngAfterViewInit — hasta ahi los @ViewChild son null.
+    setTimeout(() => this.abrirModalBorrador(), 0);
+  }
+
+  private borradorPendiente: AvaluoDraft | null = null;
+
+  private abrirModalBorrador(): void {
+    if (!this.borradorPendiente || !this.modalBorrador) {
+      this.borradorHabilitado = true;
+      return;
+    }
+    this.modalService.open(this.modalBorrador, { size: 'md', backdrop: 'static', keyboard: false }).result.then(
+      () => {
+        this.restaurarBorrador(this.borradorPendiente!);
+        this.borradorPendiente = null;
+        this.borradorHabilitado = true;
+        this.persistirBorrador();   // refresca savedAt tras la restauracion
+      },
+      () => {
+        // Descartado desde el modal
+        this.borradorPendiente = null;
+        this.draftService.clear(this.sucursalId);
+        this.borradorGuardadoEn = null;
+        this.borradorHabilitado = true;
+      }
+    );
+  }
+
+  /**
+   * Aplica el borrador al estado del componente. Si el plazo del borrador ya no existe se
+   * restaura el resto igual y se avisa: las partidas conservan sus numeros calculados y el
+   * cajero elegira un plazo nuevo.
+   */
+  private restaurarBorrador(draft: AvaluoDraft): void {
+    this.tipoSeleccionado = draft.tipoSeleccionado ?? '';
+    this.clienteSeleccionado = draft.cliente as ClienteLocal | null;
+    this.clienteBusquedaInput = this.clienteSeleccionado ?? '';
+    this.beneficiario = draft.beneficiario ?? '';
+    this.identificacionSeleccionada = draft.identificacionSeleccionada || this.identificacionSeleccionada;
+    this.partidas = (draft.partidas as PartidaAvaluo[]) ?? [];
+    this.captura = { ...this.captura, ...(draft.captura as typeof this.captura ?? {}) };
+    this.capturaVarios = { ...this.capturaVarios, ...(draft.capturaVarios as typeof this.capturaVarios ?? {}) };
+    this.prestamoMaximoPlata = draft.prestamoMaximoPlata ?? 0;
+    // Se garantiza que el proximo id no colisione con los ya restaurados.
+    const maxId = this.partidas.reduce((m, p) => Math.max(m, p.id), 0);
+    this.siguienteIdPartida = Math.max(draft.siguienteIdPartida ?? 1, maxId + 1);
+    this.borradorGuardadoEn = draft.savedAt;
+
+    const plazo = draft.plazoId != null ? this.plazos.find(p => p.id === draft.plazoId) ?? null : null;
+    if (plazo) {
+      // aplicarPlazo carga precios y refresca amortizacion sin abrir el modal de descarte
+      // de partidas (a diferencia de onPlazoChange, que si lo hace).
+      this.plazoSeleccionado = plazo;
+      this.aplicarPlazo(plazo);
+    } else {
+      this.plazoSeleccionado = null;
+      this.tiposPermitidos = [];
+      if (draft.plazoId != null) {
+        this.mostrarError('El plazo del borrador ya no existe. Elige uno nuevo para continuar.');
+      }
+      // Sin plazo no hay recalculo automatico: la amortizacion sigue coherente en null.
+      this.amortizacion = null;
+    }
+  }
+
+  /** Botón "Descartar borrador" — limpia estado en memoria y localStorage. */
+  descartarBorrador(): void {
+    this.partidas = [];
+    this.partidaEnEdicion = null;
+    this.clienteSeleccionado = null;
+    this.clienteBusquedaInput = '';
+    this.beneficiario = '';
+    this.plazoSeleccionado = null;
+    this.plazoPrevio = null;
+    this.tiposPermitidos = [];
+    this.tipoSeleccionado = '';
+    this.resetCapturaAlhajas();
+    this.resetCapturaVarios();
+    this.prestamoMaximoPlata = 0;
+    this.amortizacion = null;
+    this.comparativaPlazos = [];
+    this.draftService.clear(this.sucursalId);
+    this.borradorGuardadoEn = null;
+    this.mostrarExito('Borrador descartado.');
   }
 
   /** Plazo vigente antes del cambio en curso: permite revertir el select si se cancela. */
@@ -436,6 +595,7 @@ export class AvaluoComponent implements OnInit {
       this.recalcularCaptura();
       this.recalcularVarios();
       this.recalcularPartidas();
+      this.persistirBorrador();
     });
   }
 
@@ -599,6 +759,7 @@ export class AvaluoComponent implements OnInit {
     // (ajustarPrestamoPlata). Igual que oro, que también recalcula el préstamo al cambiar el peso.
     this.captura.prestamo = calculo.prestamo;
     this.captura.avaluoContrato = calculo.avaluoContrato;
+    this.persistirBorrador();
   }
 
   /**
@@ -615,6 +776,7 @@ export class AvaluoComponent implements OnInit {
     }
     this.captura.prestamo = valor;
     this.captura.avaluoContrato = this.avaluoContratoDesde(valor, params);
+    this.persistirBorrador();
   }
 
   /**
@@ -660,11 +822,13 @@ export class AvaluoComponent implements OnInit {
     this.captura.prestamo = calculo.prestamo;
     this.captura.avaluoReal = calculo.avaluoReal;
     this.captura.avaluoContrato = calculo.avaluoContrato;
+    this.persistirBorrador();
   }
 
   recalcularVarios(): void {
     const params = this.getParams(this.TIPO_PRENDA_ID['Varios']);
     this.capturaVarios.avaluoContrato = this.avaluoContratoDesde(this.capturaVarios.prestamo, params);
+    this.persistirBorrador();
   }
 
   get porcIncrementoVarios(): number {
@@ -741,6 +905,7 @@ export class AvaluoComponent implements OnInit {
   private onPartidasCambiaron(): void {
     this.refrescarAmortizacion();
     this.actualizarComparativa();
+    this.persistirBorrador();
   }
 
   /**
@@ -888,6 +1053,7 @@ export class AvaluoComponent implements OnInit {
     this.prestamoMaximoPlata = 0;
     this.captura.prestamo = 0;
     this.recalcularCaptura();
+    this.persistirBorrador();
   }
 
   /**
@@ -1183,6 +1349,7 @@ export class AvaluoComponent implements OnInit {
   @ViewChild('modalAmortizacion') modalAmortizacion!: TemplateRef<unknown>;
   @ViewChild('modalPdf')          modalPdf!: TemplateRef<unknown>;
   @ViewChild('modalCambioPlazo')  modalCambioPlazo!: TemplateRef<unknown>;
+  @ViewChild('modalBorrador')     modalBorrador!: TemplateRef<unknown>;
 
   // --- Modal de cliente ---
   abrirBuscarCliente(): void {
@@ -1228,6 +1395,7 @@ export class AvaluoComponent implements OnInit {
     this.clienteSeleccionado = cliente;
     this.clienteBusquedaInput = cliente;
     this.identificacionSeleccionada = cliente.identificacion;
+    this.persistirBorrador();
   }
 
   private mapearCliente(cliente: ClienteResponse): ClienteLocal {
@@ -1358,6 +1526,9 @@ export class AvaluoComponent implements OnInit {
             this.clienteSeleccionado = null;
             this.clienteBusquedaInput = '';
             this.beneficiario = '';
+            // Contrato ya generado y almacenado: el borrador local ya no aplica.
+            this.draftService.clear(this.sucursalId);
+            this.borradorGuardadoEn = null;
             // Contrato ya generado y almacenado: el preview y el comparador se vacían.
             this.onPartidasCambiaron();
             this.mostrarExito(`Contrato ${resp.folio} registrado exitosamente.`);

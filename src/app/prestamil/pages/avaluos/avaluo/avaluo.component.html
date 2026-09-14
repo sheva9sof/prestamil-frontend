@@ -84,7 +84,7 @@
         </div>
         <div class="form-group col-md-4">
           <label class="form-label">Tipo de identificación</label>
-          <select class="form-control form-control-sm" [(ngModel)]="identificacionSeleccionada">
+          <select class="form-control form-control-sm" [(ngModel)]="identificacionSeleccionada" (ngModelChange)="persistirBorrador()">
             <option *ngFor="let id of tiposIdentificacion" [value]="id">{{ id }}</option>
           </select>
         </div>
@@ -101,7 +101,7 @@
       <div class="form-row" *ngIf="clienteSeleccionado">
         <div class="form-group col-md-6">
           <label class="form-label">Beneficiario <small class="text-muted">(opcional)</small></label>
-          <input class="form-control form-control-sm" [(ngModel)]="beneficiario" placeholder="Nombre del beneficiario" />
+          <input class="form-control form-control-sm" [(ngModel)]="beneficiario" (ngModelChange)="persistirBorrador()" placeholder="Nombre del beneficiario" />
         </div>
       </div>
 
@@ -127,7 +127,20 @@
         <button class="btn btn-outline-secondary btn-sm" (click)="verAmortizacion()" [disabled]="partidas.length === 0">
           Tabla de amortización
         </button>
+        <button
+          type="button"
+          class="btn btn-outline-danger btn-sm"
+          *ngIf="borradorGuardadoEn"
+          (click)="descartarBorrador()"
+          title="Elimina el borrador guardado localmente y limpia la pantalla"
+        >
+          <i class="feather icon-trash-2 me-1"></i>Descartar borrador
+        </button>
       </div>
+      <p class="text-muted small mt-2 mb-0" *ngIf="borradorGuardadoEn">
+        <i class="feather icon-save me-1"></i>
+        Borrador guardado {{ borradorGuardadoEn | date: 'dd/MM HH:mm' }} — se restaurará automáticamente si sales de la pantalla.
+      </p>
     </app-card>
   </div>
 </div>
@@ -843,5 +856,25 @@
   </div>
   <div class="modal-footer">
     <button class="btn btn-secondary btn-sm" (click)="modal.close()">Cerrar</button>
+  </div>
+</ng-template>
+
+<!-- ────────────────────────── Modal: restaurar borrador ── -->
+<ng-template #modalBorrador let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title"><i class="feather icon-clock me-1"></i> Avalúo en proceso</h5>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">
+      Encontramos un avalúo que dejaste a medias en esta sucursal.
+    </p>
+    <p class="text-muted small mb-0">
+      Guardado el <strong>{{ borradorGuardadoEn | date: 'dd/MM/yyyy HH:mm' }}</strong>.
+      Puedes continuar donde te quedaste o descartarlo para empezar uno nuevo.
+    </p>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-outline-danger btn-sm" (click)="modal.dismiss()">Descartar</button>
+    <button class="btn btn-primary btn-sm" (click)="modal.close()">Continuar avalúo</button>
   </div>
 </ng-template>
