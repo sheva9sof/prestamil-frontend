@@ -84,7 +84,7 @@
         </div>
         <div class="form-group col-md-4">
           <label class="form-label">Tipo de identificación</label>
-          <select class="form-control form-control-sm" [(ngModel)]="identificacionSeleccionada">
+          <select class="form-control form-control-sm" [(ngModel)]="identificacionSeleccionada" (ngModelChange)="persistirBorrador()">
             <option *ngFor="let id of tiposIdentificacion" [value]="id">{{ id }}</option>
           </select>
         </div>
@@ -101,7 +101,7 @@
       <div class="form-row" *ngIf="clienteSeleccionado">
         <div class="form-group col-md-6">
           <label class="form-label">Beneficiario <small class="text-muted">(opcional)</small></label>
-          <input class="form-control form-control-sm" [(ngModel)]="beneficiario" placeholder="Nombre del beneficiario" />
+          <input class="form-control form-control-sm" [(ngModel)]="beneficiario" (ngModelChange)="persistirBorrador()" placeholder="Nombre del beneficiario" />
         </div>
       </div>
 
@@ -112,23 +112,35 @@
     <app-card cardTitle="Resumen rápido" class="workflow-card summary-card">
       <ul class="summary-list">
         <li><span>Partidas:</span><strong>{{ totalPartidas }}</strong></li>
-        <li><span>Peso total:</span><strong>{{ pesoTotal | number: '1.1-1' }} gr</strong></li>
+        <li><span>Peso neto total:</span><strong>{{ sumaPesoNeto | number: '1.1-1' }} gr</strong></li>
+        <li><span>Peso físico total:</span><strong>{{ sumaPesoTotal | number: '1.1-1' }} gr</strong></li>
         <li><span>Avalúo real:</span><strong>${{ avaluoTotal | number: '1.2-2' }}</strong></li>
         <li><span>Avalúo contrato:</span><strong>${{ avaluoContratoTotal | number: '1.2-2' }}</strong></li>
         <li><span>Préstamo total:</span><strong>${{ prestamoTotal | number: '1.2-2' }}</strong></li>
+        <li *ngIf="plazoSeleccionado"><span>Vencimiento:</span><strong>{{ fechaVencimientoContrato }}</strong></li>
       </ul>
       <hr />
       <div class="d-grid gap-2">
         <button class="btn btn-primary btn-sm contract-button" (click)="generarContrato()" [disabled]="partidas.length === 0">
           Generar contrato
         </button>
-        <button class="btn btn-outline-info btn-sm" (click)="verVencimientos()" [disabled]="!clienteSeleccionado">
-          Ver vencimientos
-        </button>
         <button class="btn btn-outline-secondary btn-sm" (click)="verAmortizacion()" [disabled]="partidas.length === 0">
           Tabla de amortización
         </button>
+        <button
+          type="button"
+          class="btn btn-outline-danger btn-sm"
+          *ngIf="borradorGuardadoEn"
+          (click)="descartarBorrador()"
+          title="Elimina el borrador guardado localmente y limpia la pantalla"
+        >
+          <i class="feather icon-trash-2 me-1"></i>Descartar borrador
+        </button>
       </div>
+      <p class="text-muted small mt-2 mb-0" *ngIf="borradorGuardadoEn">
+        <i class="feather icon-save me-1"></i>
+        Borrador guardado {{ borradorGuardadoEn | date: 'dd/MM HH:mm' }} — se restaurará automáticamente si sales de la pantalla.
+      </p>
     </app-card>
   </div>
 </div>
@@ -149,16 +161,31 @@
         </div>
         <div class="form-group col-md-7">
           <label class="form-label">Tipo de prenda</label>
-          <div class="btn-group w-100" role="group">
+          <div class="btn-group w-100 tipo-prenda-group" role="group">
             <button
               type="button"
               class="btn btn-sm"
               *ngFor="let tipo of tiposPrenda"
               [ngClass]="tipoSeleccionado === tipo ? 'btn-primary' : 'btn-outline-primary'"
+              [disabled]="!tipoHabilitado(tipo)"
+              [title]="motivoTipoDeshabilitado(tipo)"
               (click)="seleccionarTipo(tipo)"
             >{{ tipo }}</button>
           </div>
+          <small class="text-muted" *ngIf="!plazoSeleccionado">
+            Selecciona un plazo para habilitar los tipos de prenda que admite.
+          </small>
         </div>
+      </div>
+
+      <!-- Sin tipo activo no hay panel de captura (no hay plazo, o el plazo solo admite
+           tipos sin flujo implementado como Autos/Motos). -->
+      <div class="alert alert-light border text-center text-muted mb-0" *ngIf="tipoSeleccionado === ''">
+        <i class="feather icon-info me-1"></i>
+        <ng-container *ngIf="!plazoSeleccionado">Elige un plazo para comenzar la captura.</ng-container>
+        <ng-container *ngIf="plazoSeleccionado">
+          El plazo "{{ plazoSeleccionado.nombre }}" no tiene tipos de prenda capturables en esta versión.
+        </ng-container>
       </div>
 
       <!-- ─── Tab: Alhajas / Plata ─── -->
@@ -168,19 +195,23 @@
             <div class="panel-title"><i class="feather icon-tag"></i> Datos de la prenda</div>
             <div class="form-row">
               <div class="form-group col-md-6">
-                <label class="form-label">Prenda</label>
+                <label class="form-label">Descripción</label>
                 <div class="input-group">
                   <input
                     class="form-control form-control-sm"
                     [(ngModel)]="captura.descripcion"
-                    placeholder="Descripción de la prenda"
+                    placeholder="Descripción libre de la partida (opcional)"
+                    maxlength="200"
                   />
                   <button class="btn btn-outline-secondary btn-sm" type="button"
                     *ngIf="tipoSeleccionado === 'Alhajas'" (click)="abrirBuscarPrenda()">
                     <i class="feather icon-search"></i>
                   </button>
                 </div>
-                <small class="text-muted" *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</small>
+                <small class="text-muted" *ngIf="captura.clavePrenda || captura.nombreCatalogo">
+                  <ng-container *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</ng-container>
+                  <ng-container *ngIf="captura.nombreCatalogo">{{ captura.clavePrenda ? ' — ' : '' }}{{ captura.nombreCatalogo }}</ng-container>
+                </small>
               </div>
               <ng-container *ngIf="tipoSeleccionado === 'Alhajas'">
                 <div class="form-group col-md-3">
@@ -207,14 +238,24 @@
               </div>
             </div>
             <div class="form-row">
-              <div class="form-group col-md-3">
+              <div class="form-group col-md-2">
                 <label class="form-label">Cantidad</label>
                 <input class="form-control form-control-sm" type="number" min="1" [(ngModel)]="captura.cantidad" />
               </div>
-              <div class="form-group col-md-3">
-                <label class="form-label">Peso (g)</label>
+              <!-- Peso neto = solo el metal precioso. Es el UNICO que entra al calculo.
+                   Peso total = la pieza fisica completa (piedras, plastico, soldadura), informativo.
+                   Ambos son del lote cuando cantidad > 1: nunca se multiplican por cantidad. -->
+              <div class="form-group col-md-2">
+                <label class="form-label">Peso neto (g)</label>
                 <input class="form-control form-control-sm" type="number" min="0" step="0.01"
-                  [(ngModel)]="captura.peso" (input)="recalcularCaptura()" />
+                  [(ngModel)]="captura.pesoNeto" (input)="recalcularCaptura()" />
+                <small class="text-muted">Solo metal</small>
+              </div>
+              <div class="form-group col-md-2">
+                <label class="form-label">Peso total (g) <small class="text-muted">(opc.)</small></label>
+                <input class="form-control form-control-sm" type="number" min="0" step="0.01"
+                  [(ngModel)]="captura.pesoTotal" placeholder="= neto" />
+                <small class="text-muted">Con piedras</small>
               </div>
               <div class="form-group col-md-3">
                 <label class="form-label">Color <small class="text-muted">(opc.)</small></label>
@@ -271,9 +312,24 @@
             <div class="form-row">
               <div class="form-group col-md-3">
                 <label class="form-label">Subtipo</label>
-                <select class="form-control form-control-sm" [(ngModel)]="capturaVarios.subtipo">
-                  <option *ngFor="let s of subtiposVarios" [value]="s">{{ s }}</option>
-                </select>
+                <div class="input-group">
+                  <input
+                    class="form-control form-control-sm"
+                    [(ngModel)]="capturaVarios.subtipo"
+                    (ngModelChange)="limpiarSeleccionCatalogoVarios()"
+                    list="subtiposVariosSugeridos"
+                    placeholder="Subtipo de prenda"
+                  />
+                  <button class="btn btn-outline-secondary btn-sm" type="button" (click)="abrirBuscarPrenda()">
+                    <i class="feather icon-search"></i>
+                  </button>
+                </div>
+                <datalist id="subtiposVariosSugeridos">
+                  <option *ngFor="let s of subtiposVarios" [value]="s"></option>
+                </datalist>
+                <small class="text-muted" *ngIf="capturaVarios.idValorPrenda">
+                  Seleccionada del catálogo<span *ngIf="capturaVarios.clavePrenda"> · Clave: {{ capturaVarios.clavePrenda }}</span>
+                </small>
               </div>
               <div class="form-group col-md-3">
                 <label class="form-label">Marca</label>
@@ -318,14 +374,22 @@
         </div>
       </ng-container>
 
-      <!-- Botón agregar -->
-      <div class="d-flex justify-content-end mt-3">
+      <!-- Botón agregar / guardar cambios -->
+      <div class="d-flex justify-content-end align-items-center gap-2 mt-3">
+        <small class="text-primary me-auto" *ngIf="enModoEdicion">
+          <i class="feather icon-edit-2 me-1"></i>
+          Editando la partida #{{ numeroPartidaEnEdicion }} — cancela para dejarla como estaba.
+        </small>
+        <button class="btn btn-outline-secondary btn-sm" *ngIf="enModoEdicion" (click)="cancelarEdicion()">
+          <i class="feather icon-x me-1"></i> Cancelar
+        </button>
         <button
           class="btn btn-primary btn-sm"
-          (click)="agregarPartida()"
+          (click)="confirmarCaptura()"
           [disabled]="!puedeAgregarPartida"
         >
-          <i class="feather icon-plus-circle me-1"></i> Agregar partida
+          <i class="feather me-1" [ngClass]="enModoEdicion ? 'icon-save' : 'icon-plus-circle'"></i>
+          {{ enModoEdicion ? 'Guardar cambios' : 'Agregar partida' }}
         </button>
       </div>
 
@@ -346,34 +410,39 @@
               <th>Clave</th>
               <th>Descripción</th>
               <th>Cant.</th>
-              <th>Peso (g)</th>
+              <th>Peso neto (g)</th>
+              <th>Peso total (g)</th>
               <th>Kil.</th>
               <th class="text-right">Precio/g</th>
               <th class="text-right">Avalúo real</th>
               <th class="text-right">Avalúo contrato</th>
               <th class="text-right">Préstamo</th>
-              <th>Vencimiento</th>
               <th>Estatus</th>
               <th></th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let item of partidas">
-              <td>{{ item.id }}</td>
+            <tr *ngFor="let item of partidas; let i = index" [class.partida-en-edicion]="item.id === partidaEnEdicion">
+              <td>{{ i + 1 }}</td>
               <td>{{ item.tipo }}</td>
               <td><code>{{ item.clavePrenda }}</code></td>
               <td>{{ item.descripcion }}</td>
               <td>{{ item.cantidad }}</td>
-              <td>{{ item.peso | number: '1.1-1' }}</td>
+              <td>{{ item.pesoNeto | number: '1.1-1' }}</td>
+              <td>{{ item.pesoTotal | number: '1.1-1' }}</td>
               <td>{{ item.kilataje ? item.kilataje + 'K' : (item.ley ? 'Ley ' + item.ley : '—') }}</td>
               <td class="text-right">${{ (item.precioXGramo ?? 0) | number: '1.2-2' }}</td>
               <td class="text-right">${{ item.avaluoReal | number: '1.2-2' }}</td>
               <td class="text-right fw-bold">${{ item.avaluoContrato | number: '1.2-2' }}</td>
               <td class="text-right">${{ item.prestamo | number: '1.2-2' }}</td>
-              <td>{{ item.vencimiento }}</td>
               <td><span class="badge badge-secondary">{{ item.estatus }}</span></td>
-              <td>
-                <button class="btn btn-sm btn-outline-danger py-0 px-1" (click)="eliminarPartida(item.id)">
+              <td class="text-nowrap">
+                <button class="btn btn-sm btn-outline-primary py-0 px-1 me-1" title="Editar partida"
+                  (click)="editarPartida(item)">
+                  <i class="feather icon-edit-2"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger py-0 px-1" title="Eliminar partida"
+                  (click)="eliminarPartida(item.id)">
                   <i class="feather icon-trash-2"></i>
                 </button>
               </td>
@@ -385,13 +454,14 @@
           <tfoot *ngIf="partidas.length > 0">
             <tr class="fw-bold">
               <td colspan="5" class="text-right">Totales:</td>
-              <td>{{ pesoTotal | number: '1.1-1' }}</td>
+              <td>{{ sumaPesoNeto | number: '1.1-1' }}</td>
+              <td>{{ sumaPesoTotal | number: '1.1-1' }}</td>
               <td></td>
               <td></td>
               <td class="text-right">${{ avaluoTotal | number: '1.2-2' }}</td>
               <td class="text-right">${{ avaluoContratoTotal | number: '1.2-2' }}</td>
               <td class="text-right">${{ prestamoTotal | number: '1.2-2' }}</td>
-              <td colspan="3"></td>
+              <td colspan="2"></td>
             </tr>
           </tfoot>
         </table>
@@ -400,7 +470,77 @@
   </div>
 </div>
 
-<!-- ─────────────────────── 4) Pendientes (solo dev) ── -->
+<!-- ─────────────────────── 4) Comparador de plazos (negociación) ── -->
+<div class="row mb-3" *ngIf="partidas.length > 0 && comparativaPlazos.length > 1">
+  <div class="col-12">
+    <app-card cardTitle="Opciones para el cliente" class="workflow-card">
+      <p class="text-muted small mb-2">
+        El mismo empeño con cada plazo disponible. Da clic en una opción para aplicarla.
+      </p>
+
+      <div *ngIf="isLoadingComparativa" class="text-center py-2">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <span class="ms-2 text-muted small">Calculando opciones...</span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-sm mb-0 avaluo-table comparativa-table">
+          <thead>
+            <tr>
+              <th>Plazo</th>
+              <th class="text-right">Se lleva hoy</th>
+              <th class="text-right">Paga cada periodo</th>
+              <th class="text-right">Para recuperarla</th>
+              <th class="text-right">Le cuesta</th>
+              <th>Vence</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              *ngFor="let opcion of comparativaPlazos"
+              [class.opcion-actual]="opcion.esActual"
+              [class.opcion-no-viable]="opcion.motivoNoViable"
+              [title]="opcion.motivoNoViable"
+              (click)="seleccionarPlazoComparativa(opcion)"
+            >
+              <td>
+                <strong>{{ opcion.plazo.nombre }}</strong>
+                <small class="text-muted d-block">
+                  {{ opcion.plazo.numeroPeriodos }} × {{ opcion.plazo.diasPorPeriodo }} días
+                </small>
+              </td>
+              <td class="text-right fw-bold">${{ opcion.prestamo | number: '1.2-2' }}</td>
+              <td class="text-right">${{ opcion.pagoPorPeriodo | number: '1.2-2' }}</td>
+              <td class="text-right">${{ opcion.desempeno | number: '1.2-2' }}</td>
+              <td class="text-right text-muted">${{ opcion.costo | number: '1.2-2' }}</td>
+              <td>{{ opcion.fechaVencimiento }}</td>
+              <td class="text-nowrap text-right">
+                <span *ngIf="opcion.esActual" class="badge badge-primary">Actual</span>
+                <span *ngIf="opcion.motivoNoViable" class="badge badge-danger">No disponible</span>
+                <span
+                  *ngIf="!opcion.esActual && !opcion.motivoNoViable && diferenciaPrestamo(opcion) !== 0"
+                  class="badge"
+                  [ngClass]="diferenciaPrestamo(opcion) > 0 ? 'badge-success' : 'badge-secondary'"
+                >
+                  {{ diferenciaPrestamo(opcion) > 0 ? '+' : '' }}${{ diferenciaPrestamo(opcion) | number: '1.2-2' }}
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="text-muted small mb-0 mt-2">
+        <strong>Paga cada periodo</strong> mantiene vigente el contrato (intereses + IVA).
+        <strong>Para recuperarla</strong> es el pago al vencimiento. El detalle por periodo está
+        en "Tabla de amortización".
+      </p>
+    </app-card>
+  </div>
+</div>
+
+<!-- ─────────────────────── 5) Pendientes (solo dev) ── -->
 <div class="row mb-3" *ngIf="!environment.production">
   <div class="col-12">
     <app-card>
@@ -481,7 +621,7 @@
 <!-- Modal: Buscar prenda (catálogo) -->
 <ng-template #modalPrenda let-modal>
   <div class="modal-header">
-    <h5 class="modal-title">Catálogo de prendas</h5>
+    <h5 class="modal-title">Catálogo de prendas · {{ tipoSeleccionado }}</h5>
     <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
   </div>
   <div class="modal-body">
@@ -498,12 +638,15 @@
       <div class="spinner-border spinner-border-sm text-primary"></div>
       <span class="ms-2 text-muted">Cargando catálogo...</span>
     </div>
+    <div *ngIf="catalogoPrendasError" class="alert alert-danger py-2">
+      {{ catalogoPrendasError }}
+    </div>
     <div class="table-responsive" *ngIf="!isLoadingPrendas">
       <table class="table table-sm table-hover">
         <thead>
           <tr>
             <th>Clave</th>
-            <th>Descripción</th>
+            <th>Categoría</th>
             <th>Kilataje</th>
             <th></th>
           </tr>
@@ -511,7 +654,7 @@
         <tbody>
           <tr *ngFor="let p of prendasFiltradas">
             <td><code>{{ p.clave }}</code></td>
-            <td>{{ p.descripcion }}</td>
+            <td>{{ p.categoria }}</td>
             <td>{{ p.kilataje > 0 ? p.kilataje + 'K' : '—' }}</td>
             <td>
               <button class="btn btn-sm btn-primary py-0" (click)="seleccionarPrenda(p, modal)">
@@ -572,6 +715,40 @@
       <span *ngIf="isGuardando" class="spinner-border spinner-border-sm me-1"></span>
       Confirmar y generar
     </button>
+  </div>
+</ng-template>
+
+<!-- Modal: Confirmar descarte de partidas al cambiar de plazo -->
+<ng-template #modalCambioPlazo let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">El plazo nuevo no admite estas partidas</h5>
+    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p class="mb-2">
+      Ya hay {{ partidasIncompatibles.length }} partida(s) capturada(s) de un tipo que el plazo
+      seleccionado no admite. Si continúas se descartarán:
+    </p>
+    <table class="table table-sm table-bordered mb-3">
+      <thead>
+        <tr><th>#</th><th>Tipo</th><th>Descripción</th><th class="text-end">Préstamo</th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let p of partidasIncompatibles">
+          <td>{{ p.id }}</td>
+          <td>{{ p.tipo }}</td>
+          <td>{{ p.descripcion }}</td>
+          <td class="text-end">${{ p.prestamo | number: '1.2-2' }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert alert-warning small mb-0">
+      Si cancelas, se conservan las partidas y el plazo vuelve al anterior.
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cancelar</button>
+    <button class="btn btn-danger btn-sm" (click)="modal.close('confirm')">Descartar y cambiar plazo</button>
   </div>
 </ng-template>
 
@@ -658,8 +835,12 @@
     <!-- Extemporáneo -->
     <div class="alert alert-warning py-1 px-2 small mb-2">
       Refrendo/finiquito <strong>extemporáneo</strong> (pagando un periodo más) hasta:
-      <strong>{{ a.fechaLimiteExtemp }}</strong>. Sanción <strong>{{ a.porcSancionSemanal | number: '1.0-2' }}%</strong>
-      por semana vencida (${{ a.sancionSemanal | number: '1.2-2' }}/semana sobre el préstamo).
+      <strong>{{ a.fechaLimiteExtemp }}</strong>.
+      <ng-container *ngIf="a.aplicaSancion">
+        Sanción <strong>{{ a.porcSancionSemanal | number: '1.0-2' }}%</strong>
+        por semana vencida (${{ a.sancionSemanal | number: '1.2-2' }}/semana sobre el préstamo).
+      </ng-container>
+      <ng-container *ngIf="!a.aplicaSancion">Este plazo no aplica sanción por extemporaneidad.</ng-container>
     </div>
     <!-- Condiciones -->
     <div class="row g-2 small text-center">
@@ -678,48 +859,22 @@
   </div>
 </ng-template>
 
-<!-- Modal: Ver vencimientos -->
-<ng-template #modalVencimientos let-modal>
+<!-- ────────────────────────── Modal: restaurar borrador ── -->
+<ng-template #modalBorrador let-modal>
   <div class="modal-header">
-    <h5 class="modal-title">Vencimientos — {{ clienteSeleccionado?.nombre }}</h5>
-    <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
+    <h5 class="modal-title"><i class="feather icon-clock me-1"></i> Avalúo en proceso</h5>
   </div>
   <div class="modal-body">
-    <div *ngIf="isLoadingContratos" class="text-center py-3">
-      <div class="spinner-border spinner-border-sm text-primary"></div>
-      <span class="ms-2 text-muted">Cargando contratos...</span>
-    </div>
-    <div class="table-responsive" *ngIf="!isLoadingContratos">
-      <table class="table table-sm table-striped table-bordered">
-        <thead>
-          <tr>
-            <th>Folio</th>
-            <th>Apertura</th>
-            <th>Vencimiento</th>
-            <th class="text-right">Préstamo</th>
-            <th>Estatus</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr *ngFor="let v of contratosPorCliente">
-            <td><code>{{ v.folio }}</code></td>
-            <td>{{ v.fechaApertura | date: 'dd/MM/yyyy' }}</td>
-            <td>{{ v.fechaVencimiento | date: 'dd/MM/yyyy' }}</td>
-            <td class="text-right">${{ v.montoPrestamo | number: '1.0-0' }}</td>
-            <td>
-              <span class="badge" [ngClass]="estatusContratoBadge(v.estatus)">
-                {{ v.estatus }}
-              </span>
-            </td>
-          </tr>
-          <tr *ngIf="contratosPorCliente.length === 0">
-            <td colspan="5" class="text-center text-muted">Sin contratos anteriores</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <p class="mb-2">
+      Encontramos un avalúo que dejaste a medias en esta sucursal.
+    </p>
+    <p class="text-muted small mb-0">
+      Guardado el <strong>{{ borradorGuardadoEn | date: 'dd/MM/yyyy HH:mm' }}</strong>.
+      Puedes continuar donde te quedaste o descartarlo para empezar uno nuevo.
+    </p>
   </div>
   <div class="modal-footer">
-    <button class="btn btn-secondary btn-sm" (click)="modal.dismiss()">Cerrar</button>
+    <button class="btn btn-outline-danger btn-sm" (click)="modal.dismiss()">Descartar</button>
+    <button class="btn btn-primary btn-sm" (click)="modal.close()">Continuar avalúo</button>
   </div>
 </ng-template>

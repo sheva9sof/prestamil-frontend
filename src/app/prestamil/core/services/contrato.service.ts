@@ -21,10 +21,6 @@ export class ContratoService {
     return this.http.get<ContratoResponse>(`${this.API_URL}/folio/${folio}`);
   }
 
-  getByCliente(clienteId: number): Observable<ContratoResponse[]> {
-    return this.http.get<ContratoResponse[]>(`${this.API_URL}/cliente/${clienteId}`);
-  }
-
   getVencidos(): Observable<ContratoResponse[]> {
     return this.http.get<ContratoResponse[]>(`${this.API_URL}/vencidos`);
   }

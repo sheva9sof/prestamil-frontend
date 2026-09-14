@@ -4,7 +4,10 @@ export interface PartidaContratoRequest {
   clavePrenda?: string;
   descripcion: string;
   cantidad?: number;
-  pesoGramos?: number;
+  /** Peso del metal precioso (g), del lote completo. Es el que calcula avalúo y préstamo. */
+  pesoNeto?: number;
+  /** Peso físico total (g) incluyendo piedras y soldadura. Si se omite, el servidor lo iguala al neto. */
+  pesoTotal?: number;
   kilataje?: number;
   ley?: number;
   hechura?: string;
@@ -39,7 +42,10 @@ export interface PartidaContratoResponse {
   clavePrenda?: string;
   descripcion: string;
   cantidad: number;
-  pesoGramos?: number;
+  /** Peso del metal precioso (g). Es el que se usó para calcular avalúo y préstamo. */
+  pesoNeto?: number;
+  /** Peso físico total (g) incluyendo piedras y soldadura. Informativo. */
+  pesoTotal?: number;
   kilataje?: number;
   ley?: number;
   hechura?: string;

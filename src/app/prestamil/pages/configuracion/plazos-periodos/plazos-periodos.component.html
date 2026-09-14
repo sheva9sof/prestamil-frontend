@@ -365,6 +365,19 @@
         </div>
       </div>
 
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <label class="form-label small mb-0">% Sanción / extemporáneo semanal</label>
+          <input type="number" class="form-control form-control-sm" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].porcSancionSemanal" [ngModelOptions]="{ standalone: true }"
+            title="Porcentaje aplicado por cada semana vencida en refrendo/finiquito extemporáneo (filas S5/S6 del contrato). Se cobra sobre el monto del préstamo. Se guarda por cada plazo/tipo de prenda/sucursal." />
+          <small class="form-text text-muted">
+            Si el préstamo es ${{ avaluoPreview(tipoId).prestamo | number:'1.2-2' }}
+            → sanción: ${{ sancionPreview(tipoId) | number:'1.2-2' }} por semana vencida
+          </small>
+        </div>
+      </div>
+
       <div class="d-flex align-items-center gap-2 mt-2">
         <button class="btn btn-sm btn-primary" (click)="guardarParametro(tipoId)" [disabled]="savingParam[tipoId]">
           <span *ngIf="savingParam[tipoId]" class="spinner-border spinner-border-sm me-1"></span>

@@ -50,35 +50,26 @@
             </div>
           </div>
           <div class="row">
-            <div class="col-12 mb-3">
-              <label for="modalDescripcion" class="form-label">Descripción <span class="text-danger">*</span></label>
-              <input
-                type="text"
-                id="modalDescripcion"
-                class="form-control"
-                [(ngModel)]="formData.descripcion"
-                name="modalDescripcion"
-                placeholder="Ej. 6k, 8k, descripción del valor"
-                required
-              />
-            </div>
-          </div>
-          <div class="row">
             <div class="col-md-4 mb-3">
-              <label for="modalClave" class="form-label">Clave</label>
+              <label for="modalClave" class="form-label">Clave <span class="text-danger">*</span></label>
               <input
                 type="text"
+                maxlength="20"
                 id="modalClave"
                 class="form-control"
                 [(ngModel)]="formData.clave"
                 name="modalClave"
-                placeholder="Opcional"
+                placeholder="Ej. esclava 14, pulsera oro 14k"
+                required
               />
+              <small class="text-muted d-block mt-1">Grupo estándar del catálogo. El detalle de cada pieza se captura en Avalúos.</small>
             </div>
             <div class="col-md-4 mb-3">
               <label for="modalKilataje" class="form-label">Kilataje</label>
               <input
-                type="text"
+                type="number"
+                min="0"
+                step="1"
                 id="modalKilataje"
                 class="form-control"
                 [(ngModel)]="formData.kilataje"
@@ -114,10 +105,35 @@
           type="button" 
           class="btn btn-primary"
           (click)="guardarPrenda()"
-          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !formData.descripcion.trim()"
+          [disabled]="isLoadingGuardar || !formData.tipoPrenda || !formData.categoria || !claveCapturada()"
         >
           <i class="feather icon-save"></i>
           {{ isLoadingGuardar ? 'Guardando...' : (isEditingPrenda ? 'Actualizar' : 'Guardar') }}
+        </button>
+      </div>
+    </ng-template>
+
+    <!-- Modal de confirmación de borrado físico -->
+    <ng-template #eliminarModal>
+      <div class="modal-header">
+        <h5 class="modal-title">Eliminar prenda</h5>
+        <button type="button" class="btn-close" aria-label="Close" (click)="cerrarEliminarModal()"></button>
+      </div>
+      <div class="modal-body">
+        <div *ngIf="eliminarError" class="alert alert-danger mb-3" role="alert">{{ eliminarError }}</div>
+        <p class="mb-1">Esta acción elimina la prenda del catálogo de forma permanente.</p>
+        <p class="mb-0 text-muted">
+          <strong>{{ textoCelda(prendaAEliminar?.clave) }}</strong>
+          <span *ngIf="prendaAEliminar"> · {{ prendaAEliminar.tipo }} / {{ prendaAEliminar.nombreAtributo }}</span>
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" (click)="cerrarEliminarModal()" [disabled]="isEliminando">
+          Cancelar
+        </button>
+        <button type="button" class="btn btn-danger" (click)="eliminarPrenda()" [disabled]="isEliminando">
+          <i class="feather icon-trash-2"></i>
+          {{ isEliminando ? 'Eliminando...' : 'Eliminar' }}
         </button>
       </div>
     </ng-template>
@@ -194,7 +210,6 @@
             <tr>
               <th>Tipo de prenda</th>
               <th>Categoría</th>
-              <th>Descripción</th>
               <th>Clave</th>
               <th>Kilataje</th>
               <th>Piedad</th>
@@ -203,30 +218,37 @@
           </thead>
           <tbody>
             <tr *ngIf="isLoadingPrendas">
-              <td colspan="7" class="text-center">
+              <td colspan="6" class="text-center">
                 <i class="feather icon-loader spin-icon"></i> Cargando prendas...
               </td>
             </tr>
             <tr *ngFor="let prenda of prendasPaginadas; trackBy: trackByFn">
               <td>{{ prenda.tipo }}</td>
               <td>{{ prenda.nombreAtributo }}</td>
-              <td>{{ textoPrenda(prenda) }}</td>
               <td>{{ textoCelda(prenda.clave) }}</td>
               <td>{{ textoCelda(prenda.kilataje) }}</td>
               <td>
                 <span *ngIf="prenda.contienePiedad === true" class="text-success">Sí</span>
                 <span *ngIf="prenda.contienePiedad === false" class="text-muted">No</span>
-                <span *ngIf="prenda.contienePiedad == null" class="text-muted">—</span>
+                <span *ngIf="prenda.contienePiedad !== true && prenda.contienePiedad !== false" class="text-muted">—</span>
               </td>
               <td>
                 <div class="action-buttons">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     class="btn-edit"
                     (click)="editarPrenda(prenda)"
                     title="Editar">
                     <i class="feather icon-edit-2"></i>
                     <span>Editar</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-outline-danger ms-2"
+                    (click)="confirmarEliminar(prenda)"
+                    title="Eliminar">
+                    <i class="feather icon-trash-2"></i>
+                    <span>Eliminar</span>
                   </button>
                 </div>
               </td>

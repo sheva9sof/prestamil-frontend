@@ -274,7 +274,9 @@ export class PlazosPeriodosComponent implements OnInit {
         tipos.forEach(t => {
           const existing = this.parametros.find(p => p.tipoPrendaId === t.id);
           if (existing) {
-            nuevoForm[t.id] = { ...existing } as Partial<PlazoParametroRequest>;
+            // El toggle aplicarSancionPorPeriodo ya no se expone en la UI: se fuerza siempre true
+            // para que el % Sanción / extemporáneo semanal sea editable sin depender de un flag.
+            nuevoForm[t.id] = { ...existing, aplicarSancionPorPeriodo: true } as Partial<PlazoParametroRequest>;
           } else {
             nuevoForm[t.id] = {
               porcInteres: 0,
@@ -288,6 +290,8 @@ export class PlazosPeriodosComponent implements OnInit {
               porcPrestamoSAvaluoReal: 0,  // % incremento del avalúo sobre el préstamo (campo canónico)
               ley925: 0,   // precio por gramo de plata, ley 925 (Phase 6, D-01)
               ley725: 0,   // precio por gramo de plata, ley 720 (Phase 6, D-01/D-03; columna legacy ley725)
+              aplicarSancionPorPeriodo: true,
+              porcSancionSemanal: 2,  // espeja el DEFAULT 2.0000 de plazo_parametro
               diasGraciaSinInteres: 0,
               diasAntesPaseVenta: 0,
               importeMinPrestamo: 0
@@ -517,7 +521,9 @@ export class PlazosPeriodosComponent implements OnInit {
     if (!this.selectedPlazo) return;
     this.savingParam[tipoPrendaId] = true;
     this.paramSaveError[tipoPrendaId] = '';
-    const form = this.parametrosForm[tipoPrendaId] ?? {};
+    // Se fuerza aplicarSancionPorPeriodo=true en el request: el toggle ya no vive en la UI y el
+    // % Sanción / extemporáneo semanal debe quedar activo siempre que el usuario lo configure.
+    const form = { ...(this.parametrosForm[tipoPrendaId] ?? {}), aplicarSancionPorPeriodo: true };
     this.plazoService.guardarParametro(this.selectedPlazo.id, tipoPrendaId, form as PlazoParametroRequest, this.sucursalId).subscribe({
       next: (saved) => {
         this.savingParam[tipoPrendaId] = false;
@@ -821,5 +827,21 @@ export class PlazosPeriodosComponent implements OnInit {
     if (!porc || isNaN(porc)) return { prestamo, avaluo: prestamo };
     const avaluo = prestamo * (1 + porc / 100);
     return { prestamo, avaluo };
+  }
+
+  /**
+   * Calcula la sanción de muestra por semana vencida para el preview en vivo.
+   * Usa el mismo préstamo de referencia que avaluoPreview (PREVIEW_PRESTAMO).
+   * Fórmula: sancion = prestamo × porcSancionSemanal / 100.
+   *
+   * @param tipoPrendaId id del tipo de prenda (clave de parametrosForm)
+   * @returns sanción en pesos por cada semana vencida
+   */
+  sancionPreview(tipoPrendaId: number): number {
+    const form = this.parametrosForm[tipoPrendaId];
+    if (!form) return 0;
+    const porc = Number(form.porcSancionSemanal ?? 0);
+    if (!porc || isNaN(porc)) return 0;
+    return this.PREVIEW_PRESTAMO * porc / 100;
   }
 }

@@ -1,16 +1,15 @@
 // angular import
-import { Component, OnInit, ViewChild, TemplateRef } from '@angular/core';
+import { Component, inject, OnInit, ViewChild, TemplateRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { catchError } from 'rxjs/operators';
-import { of } from 'rxjs';
+import { Observable, of } from 'rxjs';
 
 // project import
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { AuthService } from '../../../core/services/auth.service';
-import { environment } from 'src/environments/environment';
+import { CatValorPrendaRequest, PrendaService } from '../../../core/services/prenda.service';
 
 interface Prenda {
   idValorAtributo: number;
@@ -20,9 +19,9 @@ interface Prenda {
   tipo: string;
   /** Respuestas antiguas; preferir `descripcion`. */
   valor?: string | null;
-  clave?: string | null;
+  clave?: string | number | null;
   descripcion?: string | null;
-  kilataje?: string | null;
+  kilataje?: string | number | null;
   contienePiedad?: boolean | null;
 }
 
@@ -45,7 +44,12 @@ interface Categoria {
   styleUrls: ['./prendas.component.scss']
 })
 export class PrendasComponent implements OnInit {
-  @ViewChild('prendaModal') prendaModalTemplate!: TemplateRef<any>;
+  @ViewChild('prendaModal') prendaModalTemplate!: TemplateRef<unknown>;
+  @ViewChild('eliminarModal') eliminarModalTemplate!: TemplateRef<unknown>;
+
+  private prendaService = inject(PrendaService);
+  private authService = inject(AuthService);
+  private modalService = inject(NgbModal);
   
   filtroTipoPrenda: string = '';
   filtroCategoria: string = '';
@@ -68,14 +72,12 @@ export class PrendasComponent implements OnInit {
   formData: {
     tipoPrenda: string;
     categoria: string;
-    descripcion: string;
-    clave: string;
-    kilataje: string;
+    clave: string | number;
+    kilataje: string | number;
     contienePiedad: boolean;
   } = {
     tipoPrenda: '',
     categoria: '',
-    descripcion: '',
     clave: '',
     kilataje: '',
     contienePiedad: false
@@ -87,14 +89,15 @@ export class PrendasComponent implements OnInit {
   idValorAtributoEdicion: number | null = null;
   modalError = '';
 
-  constructor(
-    private http: HttpClient,
-    private authService: AuthService,
-    private modalService: NgbModal
-  ) {}
+  // Borrado físico
+  eliminarModalRef: NgbModalRef | null = null;
+  prendaAEliminar: Prenda | null = null;
+  isEliminando = false;
+  eliminarError = '';
 
   ngOnInit(): void {
     this.cargarTiposPrenda();
+    this.cargarTodasPrendas();
   }
 
   cargarTiposPrenda(): void {
@@ -106,12 +109,7 @@ export class PrendasComponent implements OnInit {
       return;
     }
 
-    this.http.get<TipoPrenda[]>(`${environment.apiUrl}/api/prendas/tipos`, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    }).pipe(
+    this.prendaService.getTipos().pipe(
       catchError(error => {
         console.error('Error al cargar tipos de prenda:', error);
         this.isLoadingTipos = false;
@@ -153,12 +151,7 @@ export class PrendasComponent implements OnInit {
       return;
     }
 
-    this.http.get<Categoria[]>(`${environment.apiUrl}/api/prendas/subtipos/${tipoId}`, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    }).pipe(
+    this.prendaService.getSubtipos(tipoId).pipe(
       catchError(error => {
         console.error('Error al cargar categorías:', error);
         this.isLoadingCategorias = false;
@@ -177,11 +170,19 @@ export class PrendasComponent implements OnInit {
   }
 
   buscar(): void {
-    // Validar que haya una categoría seleccionada
     if (!this.filtroCategoria) {
-      console.warn('Por favor seleccione una categoría para buscar');
+      this.cargarTodasPrendas();
       return;
     }
+
+    this.cargarPrendas(this.prendaService.getValores(Number(this.filtroCategoria)));
+  }
+
+  cargarTodasPrendas(): void {
+    this.cargarPrendas(this.prendaService.getAllValores());
+  }
+
+  private cargarPrendas(request$: Observable<Prenda[]>): void {
 
     this.isLoadingPrendas = true;
 
@@ -191,12 +192,7 @@ export class PrendasComponent implements OnInit {
       return;
     }
 
-    this.http.get<Prenda[]>(`${environment.apiUrl}/api/prendas/valores/${this.filtroCategoria}`, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    }).pipe(
+    request$.pipe(
       catchError(error => {
         console.error('Error al cargar prendas:', error);
         this.isLoadingPrendas = false;
@@ -224,7 +220,7 @@ export class PrendasComponent implements OnInit {
     if (this.terminoBusqueda.trim()) {
       const busqueda = this.terminoBusqueda.toLowerCase().trim();
       filtradas = this.prendas.filter((prenda) => {
-        const texto = (s: string | null | undefined) => (s ?? '').toLowerCase();
+        const texto = (s: string | number | null | undefined) => String(s ?? '').toLowerCase();
         return (
           texto(prenda.tipo).includes(busqueda) ||
           texto(prenda.nombreAtributo).includes(busqueda) ||
@@ -271,7 +267,6 @@ export class PrendasComponent implements OnInit {
     this.formData = {
       tipoPrenda: '',
       categoria: '',
-      descripcion: '',
       clave: '',
       kilataje: '',
       contienePiedad: false
@@ -300,12 +295,57 @@ export class PrendasComponent implements OnInit {
     this.formData = {
       tipoPrenda: '',
       categoria: '',
-      descripcion: '',
       clave: '',
       kilataje: '',
       contienePiedad: false
     };
     this.categoriasModal = [];
+  }
+
+  confirmarEliminar(prenda: Prenda): void {
+    this.prendaAEliminar = prenda;
+    this.eliminarError = '';
+    this.isEliminando = false;
+    this.eliminarModalRef = this.modalService.open(this.eliminarModalTemplate, {
+      backdrop: 'static',
+      keyboard: false,
+      centered: true
+    });
+  }
+
+  cerrarEliminarModal(): void {
+    if (this.eliminarModalRef) {
+      this.eliminarModalRef.close();
+      this.eliminarModalRef = null;
+    }
+    this.prendaAEliminar = null;
+    this.eliminarError = '';
+    this.isEliminando = false;
+  }
+
+  eliminarPrenda(): void {
+    if (!this.prendaAEliminar) return;
+
+    this.isEliminando = true;
+    this.eliminarError = '';
+
+    this.prendaService.deleteValor(this.prendaAEliminar.idValorAtributo).subscribe({
+      next: () => {
+        this.isEliminando = false;
+        this.cerrarEliminarModal();
+        if (this.filtroCategoria) {
+          this.buscar();
+        } else {
+          this.cargarTodasPrendas();
+        }
+      },
+      error: (err) => {
+        this.isEliminando = false;
+        // 400 = la prenda ya se usó en un contrato; el backend explica el motivo.
+        this.eliminarError = err.error?.message || 'No se pudo eliminar la prenda. Intenta de nuevo.';
+        console.error('Error al eliminar prenda:', err);
+      }
+    });
   }
 
   textoPrenda(prenda: Prenda): string {
@@ -317,8 +357,8 @@ export class PrendasComponent implements OnInit {
     return v ?? '—';
   }
 
-  textoCelda(s: string | null | undefined): string {
-    const t = (s ?? '').trim();
+  textoCelda(s: string | number | null | undefined): string {
+    const t = String(s ?? '').trim();
     return t ? t : '—';
   }
 
@@ -345,12 +385,7 @@ export class PrendasComponent implements OnInit {
       return;
     }
 
-    this.http.get<Categoria[]>(`${environment.apiUrl}/api/prendas/subtipos/${tipoId}`, {
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      withCredentials: true
-    }).pipe(
+    this.prendaService.getSubtipos(tipoId).pipe(
       catchError(error => {
         console.error('Error al cargar categorías:', error);
         this.isLoadingCategoriasModal = false;
@@ -372,7 +407,7 @@ export class PrendasComponent implements OnInit {
   }
 
   guardarPrenda(): void {
-    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.formData.descripcion.trim()) {
+    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.claveCapturada()) {
       console.warn('Por favor complete todos los campos obligatorios');
       return;
     }
@@ -389,71 +424,82 @@ export class PrendasComponent implements OnInit {
 
     const idTipoPrenda = Number(this.formData.tipoPrenda);
     const idAtributo = Number(this.formData.categoria);
-    const descripcion = this.formData.descripcion.trim();
-    const clave = this.formData.clave.trim() || null;
-    const kilataje = this.formData.kilataje.trim() || null;
+    const clave = this.parseOptionalClave(this.formData.clave);
+    const kilataje = this.parseOptionalInteger(this.formData.kilataje, 'El kilataje');
 
-    if (!Number.isFinite(idTipoPrenda) || !Number.isFinite(idAtributo)) {
+    if (!Number.isInteger(idTipoPrenda) || idTipoPrenda <= 0
+        || !Number.isInteger(idAtributo) || idAtributo <= 0) {
       this.isLoadingGuardar = false;
       this.modalError = 'Tipo o categoría no válidos.';
       return;
     }
 
-    const body = {
+    if (!clave) {
+      this.isLoadingGuardar = false;
+      this.modalError = 'La clave es obligatoria.';
+      return;
+    }
+
+    if (kilataje === undefined) {
+      this.isLoadingGuardar = false;
+      return;
+    }
+
+    // `descripcion` ya no se captura aquí: el detalle por pieza vive en Avalúos.
+    // No se envía para que el backend conserve los nombres históricos del catálogo.
+    const body: CatValorPrendaRequest = {
       idTipoPrenda,
       idAtributo,
-      descripcion,
       clave,
       kilataje,
       contienePiedad: this.formData.contienePiedad
     };
 
-    if (this.isEditingPrenda && this.idValorAtributoEdicion != null) {
-      const url = `${environment.apiUrl}/api/prendas/valores/${this.idValorAtributoEdicion}`;
-      this.http
-        .put<Prenda>(url, body, {
-          headers: { 'Content-Type': 'application/json' },
-          withCredentials: true
-        })
-        .subscribe({
-          next: () => {
-            this.isLoadingGuardar = false;
-            this.closePrendaModal();
-            if (this.filtroCategoria) {
-              this.buscar();
-            }
-          },
-          error: (err) => {
-            this.isLoadingGuardar = false;
-            this.modalError =
-              err.error?.message || 'No se pudo actualizar el valor. Intenta de nuevo.';
-            console.error('Error al actualizar prenda:', err);
-          }
-        });
-      return;
-    }
+    const editando = this.isEditingPrenda && this.idValorAtributoEdicion != null;
+    const guardar$ = editando
+      ? this.prendaService.updateValor(this.idValorAtributoEdicion!, body)
+      : this.prendaService.createValor(body);
 
-    const url = `${environment.apiUrl}/api/prendas/valores`;
-    this.http
-      .post<Prenda>(url, body, {
-        headers: { 'Content-Type': 'application/json' },
-        withCredentials: true
-      })
-      .subscribe({
+    guardar$.subscribe({
         next: () => {
           this.isLoadingGuardar = false;
           this.closePrendaModal();
           if (this.filtroCategoria) {
             this.buscar();
+          } else {
+            this.cargarTodasPrendas();
           }
         },
         error: (err) => {
           this.isLoadingGuardar = false;
           this.modalError =
-            err.error?.message || 'No se pudo crear el valor. Intenta de nuevo.';
-          console.error('Error al crear prenda:', err);
+            err.error?.message
+            || `No se pudo ${editando ? 'actualizar' : 'crear'} el valor. Intenta de nuevo.`;
+          console.error(`Error al ${editando ? 'actualizar' : 'crear'} prenda:`, err);
         }
       });
+  }
+
+  private parseOptionalInteger(value: string | number, label: string): number | null | undefined {
+    const trimmed = String(value).trim();
+    if (!trimmed) return null;
+
+    const parsed = Number(trimmed);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      this.modalError = `${label} debe ser un número entero mayor o igual a cero.`;
+      return undefined;
+    }
+    return parsed;
+  }
+
+  private parseOptionalClave(value: string | number): string | null {
+    const trimmed = String(value).trim();
+    return trimmed ? trimmed : null;
+  }
+
+  /** La clave es el identificador del ítem del catálogo, por eso es obligatoria. */
+  claveCapturada(): boolean {
+    return String(this.formData.clave ?? '').trim().length > 0;
   }
 
   editarPrenda(prenda: Prenda): void {
@@ -463,7 +509,6 @@ export class PrendasComponent implements OnInit {
     this.formData = {
       tipoPrenda: String(prenda.idTipoPrenda),
       categoria: String(prenda.idAtributo),
-      descripcion: (prenda.descripcion ?? prenda.valor ?? '').toString(),
       clave: (prenda.clave ?? '').toString(),
       kilataje: (prenda.kilataje ?? '').toString(),
       contienePiedad: !!prenda.contienePiedad
@@ -500,7 +545,7 @@ export class PrendasComponent implements OnInit {
     } else {
       // Mostrar páginas alrededor de la actual
       let inicio = Math.max(1, this.paginaActual - 2);
-      let fin = Math.min(this.totalPaginas, inicio + maxPaginas - 1);
+      const fin = Math.min(this.totalPaginas, inicio + maxPaginas - 1);
       
       if (fin - inicio < maxPaginas - 1) {
         inicio = Math.max(1, fin - maxPaginas + 1);
