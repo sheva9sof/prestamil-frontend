@@ -58,7 +58,11 @@ export interface PartidaContratoResponse {
   modelo?: string;
   serieImei?: string;
   estadoFisico?: string;
+  /** OP en operación, FIN finiquitada, VEN vendida, APA apartada. */
+  estatus: 'OP' | 'FIN' | 'VEN' | 'APA';
 }
+
+export type EstatusContrato = 'VIGENTE' | 'VENCIDO' | 'EN_VENTA' | 'VENDIDO' | 'FINIQUITADO' | 'CANCELADO';
 
 export interface ContratoResponse {
   id: number;
@@ -71,10 +75,16 @@ export interface ContratoResponse {
   numIdentificacion?: string;
   nombreBeneficiario?: string;
   fechaApertura: string;
+  /** Inicio del periodo vigente; cambia con cada refrendo. */
+  fechaContrato: string;
   fechaVencimiento: string;
+  /** Vencimiento + 15 días: desde esta fecha la prenda se puede vender. */
+  fechaComercializacion?: string;
   montoPrestamo: number;
+  /** Saldo de capital vigente (préstamo menos abonos a capital). */
+  saldoCapital: number;
   montoAvaluo: number;
-  estatus: 'VIGENTE' | 'VENCIDO' | 'DESEMPENADO' | 'EN_VENTA';
+  estatus: EstatusContrato;
   numRefrendos: number;
   creadoEn?: string;
   partidas?: PartidaContratoResponse[];
@@ -95,13 +105,21 @@ export interface VencimientoResponse {
 // Movimientos (refrendos, finiquitos, reposición)
 // ============================================================
 
+/** Código corto del movimiento (EMP empeño, RF refrendo, RPG en gracia, RC con abono, RP/RPX parcial, RX/FX extemporáneos, FI finiquito, RE reposición, PV/PVA pase a venta, RM remanente). */
 export type TipoMovimiento =
-  | 'REFRENDO'
-  | 'REFRENDO_EXTEMPORANEO'
-  | 'FINIQUITO'
-  | 'FINIQUITO_EXTEMPORANEO'
-  | 'ABONO'
-  | 'REPOSICION_CONTRATO';
+  | 'EMP'
+  | 'RF'
+  | 'RPG'
+  | 'RC'
+  | 'RP'
+  | 'RPX'
+  | 'RX'
+  | 'FI'
+  | 'FX'
+  | 'RE'
+  | 'PV'
+  | 'PVA'
+  | 'RM';
 
 export interface RefrendoRequest {
   idContrato: number;
@@ -114,12 +132,44 @@ export interface MovimientoResponse {
   idContrato: number;
   folioContrato: string;
   tipo: TipoMovimiento;
+  /** Total cobrado (en EMP, el préstamo entregado). */
   monto: number;
   interes: number;
   sancion: number;
+  abonoCapital: number;
+  /** Periodos extemporáneos cubiertos. */
   semanasVencidas: number;
+  periodosNormales?: number;
+  diasGraciaUsados: number;
+  interesPorPeriodo?: number;
+  porcDescuentoInteres: number;
+  importeDescuento: number;
+  iva: number;
   fecha: string;
   observaciones?: string;
+  nombreUsuario?: string;
   numRefrendos: number;
   nuevaFechaVencimiento?: string;
+
+  importeEfectivo?: number;
+  importeTarjeta?: number;
+  tipoTarjeta?: 'CREDITO' | 'DEBITO';
+  tarjetaUltimos4?: string;
+  bancoEmisor?: string;
+  autorizacionBanco?: string;
+  cambioEntregado?: number;
+
+  saldoAnterior?: number;
+  saldoNuevo?: number;
+  fechaContratoAnterior?: string;
+  fechaVencAnterior?: string;
+  fechaContratoNueva?: string;
+  fechaVencNueva?: string;
+  estatusAnterior?: EstatusContrato;
+  estatusNuevo?: EstatusContrato;
+
+  cancelado: boolean;
+  fechaCancelacion?: string;
+  usuarioCancela?: string;
+  motivoCancelacion?: string;
 }
