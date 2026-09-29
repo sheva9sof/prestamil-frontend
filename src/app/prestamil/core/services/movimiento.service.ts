@@ -29,6 +29,11 @@ export class MovimientoService {
     return this.http.get(`${this.API_URL}/${movimientoId}/ticket`, { responseType: 'blob' });
   }
 
+  /** Ticket del último movimiento vigente del contrato (RN-22). 404 si no hay movimiento cobrado. */
+  getTicketVigente(contratoId: number): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/contrato/${contratoId}/ticket-vigente`, { responseType: 'blob' });
+  }
+
   /** Cobra la reposición/reimpresión de un contrato y la registra en caja. */
   cobrarReposicion(contratoId: number): Observable<MovimientoResponse> {
     return this.http.post<MovimientoResponse>(`${this.API_URL}/reposicion/${contratoId}`, {});

@@ -20,7 +20,9 @@ export class TicketVisorComponent implements OnInit, OnDestroy {
   private movimientoService = inject(MovimientoService);
   private sanitizer = inject(DomSanitizer);
 
-  @Input() movimientoId!: number;
+  @Input() movimientoId?: number;
+  /** Alternativa a movimientoId: cargar el ticket del último movimiento vigente del contrato (RN-22). */
+  @Input() contratoIdVigente?: number;
   @Input() titulo = 'Nota de movimiento';
   /** Texto de confirmación arriba del ticket, p. ej. "Refrendo registrado". */
   @Input() mensaje = '';
@@ -33,15 +35,21 @@ export class TicketVisorComponent implements OnInit, OnDestroy {
   private blobUrl: string | null = null;
 
   ngOnInit(): void {
-    this.movimientoService.getTicket(this.movimientoId).subscribe({
+    const source$ = this.contratoIdVigente
+      ? this.movimientoService.getTicketVigente(this.contratoIdVigente)
+      : this.movimientoService.getTicket(this.movimientoId!);
+    source$.subscribe({
       next: (blob) => {
         this.blobUrl = URL.createObjectURL(blob);
         this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.blobUrl);
         this.isLoading = false;
       },
-      error: () => {
+      error: (err) => {
         this.isLoading = false;
-        this.errorMessage = 'No se pudo generar el ticket. El movimiento sí quedó registrado.';
+        this.errorMessage =
+          err?.status === 404
+            ? 'Este contrato aún no tiene un movimiento cobrado.'
+            : 'No se pudo generar el ticket.';
       }
     });
   }
@@ -59,9 +67,10 @@ export class TicketVisorComponent implements OnInit, OnDestroy {
 
   descargar(): void {
     if (!this.blobUrl) return;
+    const sufijo = this.movimientoId ?? `vigente-${this.contratoIdVigente}`;
     const a = document.createElement('a');
     a.href = this.blobUrl;
-    a.download = `ticket-${this.movimientoId}.pdf`;
+    a.download = `ticket-${sufijo}.pdf`;
     a.click();
   }
 

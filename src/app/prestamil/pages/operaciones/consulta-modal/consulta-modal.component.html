@@ -1,0 +1,167 @@
+<div class="consulta-modal">
+  <div class="modal-header">
+    <div>
+      <h4 class="modal-title mb-1">Consulta de partidas y movimientos</h4>
+      <p class="modal-subtitle">
+        Contrato <strong>{{ contrato.folio }}</strong>
+        <span class="separator">·</span>
+        {{ contrato.nombreCliente }}
+        <span class="separator">·</span>
+        {{ contrato.numPartidas }} {{ contrato.numPartidas === 1 ? 'partida' : 'partidas' }}
+      </p>
+    </div>
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="activeModal.dismiss()"></button>
+  </div>
+
+  <div class="modal-body">
+    <div *ngIf="isLoading" class="text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-3 text-muted mb-0">Cargando historial…</p>
+    </div>
+
+    <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+
+    <ng-container *ngIf="!isLoading && !errorMessage">
+      <!-- Movimientos -->
+      <section class="consulta-seccion">
+        <header class="consulta-seccion-header">
+          <h5 class="consulta-seccion-title">Movimientos</h5>
+          <span class="consulta-seccion-hint">
+            {{ movimientos.length }} {{ movimientos.length === 1 ? 'registro' : 'registros' }} · orden cronológico
+          </span>
+        </header>
+
+        <div *ngIf="movimientos.length === 0" class="consulta-vacia">
+          Este contrato aún no tiene movimientos registrados.
+        </div>
+
+        <div *ngIf="movimientos.length > 0" class="tabla-scroll">
+          <table class="tabla-consulta">
+            <thead>
+              <tr>
+                <th>Tipo</th>
+                <th>Fecha y hora</th>
+                <th>F. contrato</th>
+                <th>Vencimiento</th>
+                <th class="text-center">Periodos</th>
+                <th class="text-center">Días G.</th>
+                <th class="text-end">Int. / periodo</th>
+                <th class="text-end">Saldo antes → nuevo</th>
+                <th class="text-end">Abono</th>
+                <th class="text-end">Intereses</th>
+                <th class="text-end">Sanción</th>
+                <th class="text-end">IVA</th>
+                <th class="text-end">Total</th>
+                <th>Forma de pago</th>
+                <th>Usuario</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                *ngFor="let m of movimientos; trackBy: trackMov"
+                [class.cancelado]="m.cancelado"
+                [ngbTooltip]="tooltipCancelacion(m)"
+                [disableTooltip]="!m.cancelado"
+                container="body"
+              >
+                <td>
+                  <span class="tipo-badge" [style.background-color]="colorTipo(m.tipo)" [title]="etiquetaTipo(m.tipo)">
+                    {{ m.tipo }}
+                  </span>
+                </td>
+                <td>{{ m.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
+                <td>{{ m.fechaContratoAnterior ? (m.fechaContratoAnterior | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>{{ m.fechaVencAnterior ? (m.fechaVencAnterior | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td class="text-center">{{ periodos(m) }}</td>
+                <td class="text-center">{{ m.diasGraciaUsados || '—' }}</td>
+                <td class="text-end">{{ moneda(m.interesPorPeriodo) }}</td>
+                <td class="text-end">
+                  <span class="saldo-antes">{{ moneda(m.saldoAnterior) }}</span>
+                  <span class="saldo-flecha" aria-hidden="true">→</span>
+                  <span class="saldo-nuevo">{{ moneda(m.saldoNuevo) }}</span>
+                </td>
+                <td class="text-end">{{ m.abonoCapital ? moneda(m.abonoCapital) : '—' }}</td>
+                <td class="text-end">{{ moneda(m.interes) }}</td>
+                <td class="text-end">{{ moneda(m.sancion) }}</td>
+                <td class="text-end">{{ moneda(m.iva) }}</td>
+                <td class="text-end fw-semibold">{{ moneda(m.monto) }}</td>
+                <td>{{ formaPago(m) }}</td>
+                <td>{{ m.nombreUsuario ?? '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- Partidas -->
+      <section class="consulta-seccion mt-4">
+        <header class="consulta-seccion-header">
+          <h5 class="consulta-seccion-title">Partidas del contrato</h5>
+          <span class="consulta-seccion-hint">
+            {{ contrato.partidas.length }} {{ contrato.partidas.length === 1 ? 'partida' : 'partidas' }}
+          </span>
+        </header>
+
+        <div class="tabla-scroll">
+          <table class="tabla-consulta">
+            <thead>
+              <tr>
+                <th class="text-center">Partida</th>
+                <th>Clave</th>
+                <th>Descripción</th>
+                <th>Kilataje / Hechura</th>
+                <th class="text-center">Cantidad</th>
+                <th class="text-end">Peso</th>
+                <th class="text-end">Préstamo</th>
+                <th class="text-end">Avalúo</th>
+                <th>Estatus</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let p of contrato.partidas; trackBy: trackPartida">
+                <td class="text-center">{{ p.numPartida }}</td>
+                <td class="clave">{{ p.clavePrenda ?? '—' }}</td>
+                <td>
+                  <div class="descripcion-linea">{{ p.descripcion }}</div>
+                  <div class="descripcion-sub" *ngIf="p.tipoPrendaNombre">{{ p.tipoPrendaNombre }}</div>
+                </td>
+                <td>{{ kilatajeHechura(p) }}</td>
+                <td class="text-center">{{ p.cantidad }}</td>
+                <td class="text-end">{{ peso(p) }}</td>
+                <td class="text-end">{{ moneda(p.montoPrestamo) }}</td>
+                <td class="text-end">{{ moneda(p.avaluoReal) }}</td>
+                <td>
+                  <span class="estatus-partida" [attr.data-estatus]="p.estatus">
+                    {{ etiquetaEstatusPartida(p.estatus) }}
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </ng-container>
+  </div>
+
+  <div class="modal-footer">
+    <button
+      type="button"
+      class="btn btn-outline-primary"
+      [disabled]="!hayMovimientoVigente"
+      [title]="hayMovimientoVigente ? 'Reimprime el último movimiento vigente' : 'No hay movimiento cobrado que reimprimir'"
+      (click)="reimprimirTicket()"
+    >
+      <i class="feather icon-printer me-1"></i> Reimprimir ticket
+    </button>
+    <button
+      *ngIf="puedeCancelarUltimo"
+      type="button"
+      class="btn btn-outline-danger"
+      title="Disponible en F10 (cancelación de movimientos)"
+      disabled
+    >
+      <i class="feather icon-x-circle me-1"></i> Cancelar último movimiento
+    </button>
+    <button type="button" class="btn btn-secondary ms-auto" (click)="activeModal.dismiss()">Cerrar</button>
+  </div>
+</div>

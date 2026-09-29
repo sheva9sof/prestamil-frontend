@@ -21,6 +21,8 @@ import { TicketVisorComponent } from 'src/app/prestamil/core/components/ticket-v
 import { RefrendoModalComponent } from './refrendo-modal/refrendo-modal.component';
 import { FiniquitoModalComponent } from './finiquito-modal/finiquito-modal.component';
 import { AbonoModalComponent } from './abono-modal/abono-modal.component';
+import { RefrendoParcialModalComponent } from './refrendo-parcial-modal/refrendo-parcial-modal.component';
+import { ConsultaModalComponent } from './consulta-modal/consulta-modal.component';
 
 interface BotonAccion {
   accion: AccionContrato;
@@ -255,8 +257,29 @@ export class OperacionesComponent implements OnInit {
       this.abrirAbono();
       return;
     }
+    if (boton.accion === 'REFRENDO_PARCIAL') {
+      this.abrirRefrendoParcial();
+      return;
+    }
+    if (boton.accion === 'CONSULTA') {
+      this.abrirConsulta();
+      return;
+    }
     this.accionSeleccionada = boton;
     this.modalService.open(this.accionModalTemplate, { centered: true });
+  }
+
+  private abrirConsulta(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(ConsultaModalComponent, {
+      fullscreen: true,
+      scrollable: true,
+      backdrop: 'static',
+      windowClass: 'consulta-modal-window'
+    });
+    (ref.componentInstance as ConsultaModalComponent).contrato = detalle;
+    // F10 activará puedeCancelarUltimo con el rol del usuario y la fecha del último movimiento.
   }
 
   private abrirRefrendo(): void {
@@ -301,6 +324,22 @@ export class OperacionesComponent implements OnInit {
       windowClass: 'operacion-modal'
     });
     (ref.componentInstance as AbonoModalComponent).contrato = detalle;
+    ref.result.then(
+      (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
+      () => undefined
+    );
+  }
+
+  private abrirRefrendoParcial(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(RefrendoParcialModalComponent, {
+      centered: true,
+      size: 'lg',
+      backdrop: 'static',
+      windowClass: 'operacion-modal'
+    });
+    (ref.componentInstance as RefrendoParcialModalComponent).contrato = detalle;
     ref.result.then(
       (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
       () => undefined
