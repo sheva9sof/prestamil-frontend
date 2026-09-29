@@ -1,0 +1,12 @@
+.bancos-card { margin-top: 28px; padding: 20px; background: #fff; border: 1px solid #e7eaf0; border-radius: 12px; }
+.bancos-heading {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 16px;
+  h4 { margin: 0 0 4px; font-weight: 700; }
+  p { margin: 0; max-width: 560px; color: #6f7b8f; font-size: 0.85rem; }
+}
+.bancos-alta { display: flex; gap: 8px; min-width: 320px; }
+.bancos-table {
+  th { color: #2c3e50; font-size: 0.8rem; text-transform: uppercase; border-bottom: 2px solid #e0e0e0; }
+  td { vertical-align: middle; }
+  tr.inactivo td { color: #9aa3b2; }
+}

@@ -1,0 +1,34 @@
+$primary: #2c7be5;
+$primary-dark: #1a56a8;
+$muted: #6f7b8f;
+$line: #e7eaf0;
+
+.finiquito-header { padding: 18px 24px; background: linear-gradient(135deg, #f4f8ff, #fff); border-bottom: 1px solid #dbe6f8; }
+.finiquito-title { display: flex; align-items: center; gap: 14px; .modal-title { margin: 1px 0; font-weight: 750; } }
+.finiquito-eyebrow { color: $primary; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.finiquito-icon {
+  display: flex; align-items: center; justify-content: center; width: 46px; height: 46px;
+  color: $primary-dark; background: #e4efff; border-radius: 12px; font-size: 1.15rem;
+}
+.finiquito-body { padding: 22px 24px; background: #f8f9fb; }
+
+.finiquito-tiles {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 8px;
+  > div { display: flex; flex-direction: column; padding: 12px 14px; background: #fff; border: 1px solid $line; border-radius: 12px; }
+  span { color: $muted; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+  strong { font-size: 1.2rem; }
+  small { color: $muted; }
+}
+.finiquito-label { margin: 14px 0 8px; padding-bottom: 6px; color: $primary-dark; border-bottom: 1px solid #dbe6f8; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+.finiquito-lista {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; font-size: 0.9rem;
+  dt { font-weight: 600; color: $muted; } dd { margin: 0; text-align: right; }
+}
+.finiquito-advertencias { margin: 12px 0 0; color: $primary-dark; font-size: 0.85rem; }
+.finiquito-importe {
+  display: flex; align-items: baseline; justify-content: space-between; margin-top: 18px; padding: 14px 18px;
+  background: #fff; border: 2px solid $primary; border-radius: 12px;
+  span { font-weight: 800; text-transform: uppercase; color: $primary-dark; }
+  strong { font-size: 1.8rem; font-weight: 800; }
+}
+.btn-cobrar { color: #fff; background: $primary; border-color: $primary; font-weight: 700; &:hover:not(:disabled) { color: #fff; background: $primary-dark; } }

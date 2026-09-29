@@ -2,16 +2,31 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { RefrendoRequest, MovimientoResponse } from '../models/contrato.model';
+import {
+  CotizacionMovimientoResponse,
+  CotizacionRequest,
+  MovimientoRequest,
+  MovimientoResponse
+} from '../models/contrato.model';
 
 @Injectable({ providedIn: 'root' })
 export class MovimientoService {
   private readonly http = inject(HttpClient);
   private readonly API_URL = `${environment.apiUrl}/api/movimientos`;
 
-  /** Registra un refrendo (normal o extemporáneo) sobre un contrato. */
-  refrendar(request: RefrendoRequest): Observable<MovimientoResponse> {
-    return this.http.post<MovimientoResponse>(`${this.API_URL}/refrendo`, request);
+  /** Cotiza una operación a la fecha del servidor, sin registrarla. */
+  cotizar(request: CotizacionRequest): Observable<CotizacionMovimientoResponse> {
+    return this.http.post<CotizacionMovimientoResponse>(`${this.API_URL}/cotizacion`, request);
+  }
+
+  /** Registra el movimiento con su forma de pago; el backend recalcula los montos. */
+  registrar(request: MovimientoRequest): Observable<MovimientoResponse> {
+    return this.http.post<MovimientoResponse>(this.API_URL, request);
+  }
+
+  /** Nota del movimiento (ticket de ~80 mm) en PDF. */
+  getTicket(movimientoId: number): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/${movimientoId}/ticket`, { responseType: 'blob' });
   }
 
   /** Cobra la reposición/reimpresión de un contrato y la registra en caja. */

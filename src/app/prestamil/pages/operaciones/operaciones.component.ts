@@ -12,10 +12,15 @@ import {
   ContratoOperacionResponse,
   EstatusOperativo,
   FiltroEstatusOperacion,
+  MovimientoResponse,
   PartidaContratoResponse,
   TipoMovimiento
 } from 'src/app/prestamil/core/models/contrato.model';
 import { PageResponse } from 'src/app/prestamil/core/models/page.model';
+import { TicketVisorComponent } from 'src/app/prestamil/core/components/ticket-visor/ticket-visor.component';
+import { RefrendoModalComponent } from './refrendo-modal/refrendo-modal.component';
+import { FiniquitoModalComponent } from './finiquito-modal/finiquito-modal.component';
+import { AbonoModalComponent } from './abono-modal/abono-modal.component';
 
 interface BotonAccion {
   accion: AccionContrato;
@@ -237,8 +242,89 @@ export class OperacionesComponent implements OnInit {
 
   abrirAccion(boton: BotonAccion): void {
     if (!this.puede(boton.accion)) return;
+    // El backend resuelve RF/RPG/RX y FI/FX por fecha (F1): un mismo modal cubre las dos variantes.
+    if (boton.accion === 'REFRENDO' || boton.accion === 'REFRENDO_EXTEMPORANEO') {
+      this.abrirRefrendo();
+      return;
+    }
+    if (boton.accion === 'FINIQUITO' || boton.accion === 'FINIQUITO_EXTEMPORANEO') {
+      this.abrirFiniquito();
+      return;
+    }
+    if (boton.accion === 'ABONO_CAPITAL') {
+      this.abrirAbono();
+      return;
+    }
     this.accionSeleccionada = boton;
     this.modalService.open(this.accionModalTemplate, { centered: true });
+  }
+
+  private abrirRefrendo(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(RefrendoModalComponent, {
+      centered: true,
+      size: 'lg',
+      backdrop: 'static',
+      windowClass: 'operacion-modal'
+    });
+    (ref.componentInstance as RefrendoModalComponent).contrato = detalle;
+    ref.result.then(
+      (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
+      () => undefined
+    );
+  }
+
+  private abrirFiniquito(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(FiniquitoModalComponent, {
+      centered: true,
+      size: 'lg',
+      backdrop: 'static',
+      windowClass: 'operacion-modal'
+    });
+    (ref.componentInstance as FiniquitoModalComponent).contrato = detalle;
+    ref.result.then(
+      (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
+      () => undefined
+    );
+  }
+
+  private abrirAbono(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(AbonoModalComponent, {
+      centered: true,
+      size: 'lg',
+      backdrop: 'static',
+      windowClass: 'operacion-modal'
+    });
+    (ref.componentInstance as AbonoModalComponent).contrato = detalle;
+    ref.result.then(
+      (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
+      () => undefined
+    );
+  }
+
+  /** Tras cobrar: ticket para imprimir y el contrato y el listado con sus nuevas fechas. */
+  private movimientoRegistrado(contratoId: number, movimiento: MovimientoResponse): void {
+    const ticket = this.modalService.open(TicketVisorComponent, { centered: true, scrollable: true });
+    const visor = ticket.componentInstance as TicketVisorComponent;
+    visor.movimientoId = movimiento.id;
+    visor.titulo = `Nota ${movimiento.folioNota ?? ''} · Contrato ${movimiento.folioContrato}`;
+    const monto = movimiento.monto.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    visor.mensaje = `${this.etiquetaMovimiento(movimiento.tipo)} registrado por $${monto}.`;
+
+    this.recargarDetalle(contratoId);
+    this.cargarPagina();
+  }
+
+  private recargarDetalle(contratoId: number): void {
+    this.contratoService.getOperacion(contratoId).subscribe({
+      next: (detalle) => (this.detalle = detalle),
+      error: (err) => (this.detalleError = err?.error?.message ?? 'Error al actualizar el contrato.')
+    });
   }
 
   etiquetaEstatus(estatus: EstatusOperativo): string {

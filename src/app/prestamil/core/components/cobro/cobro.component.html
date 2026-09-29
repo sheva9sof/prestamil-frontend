@@ -1,0 +1,127 @@
+<div class="modal-header cobro-header">
+  <div>
+    <span class="cobro-eyebrow">Cobro · Contrato {{ folioContrato }}</span>
+    <h5 class="modal-title">{{ concepto }}</h5>
+  </div>
+  <button type="button" class="btn-close" aria-label="Cerrar" [disabled]="guardando" (click)="cancelar()"></button>
+</div>
+
+<form class="modal-body cobro-body" (ngSubmit)="guardar()">
+  <div class="cobro-total">
+    <span>Total a cobrar</span>
+    <strong>${{ total | number: '1.2-2' }}</strong>
+    <small>{{ totalConLetra }}</small>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-6">
+      <label for="cobroEfectivo" class="form-label">Efectivo</label>
+      <div class="input-group">
+        <span class="input-group-text">$</span>
+        <input
+          id="cobroEfectivo"
+          name="efectivo"
+          type="number"
+          min="0"
+          step="0.01"
+          class="form-control text-end"
+          placeholder="0.00"
+          [(ngModel)]="efectivo"
+          [disabled]="guardando"
+          ngbAutofocus
+        />
+        <button type="button" class="btn btn-outline-secondary" title="Pagar el resto en efectivo exacto" [disabled]="guardando" (click)="pagoExacto()">
+          Exacto
+        </button>
+      </div>
+    </div>
+    <div class="col-6">
+      <label for="cobroTarjeta" class="form-label">Tarjeta</label>
+      <div class="input-group">
+        <span class="input-group-text">$</span>
+        <input
+          id="cobroTarjeta"
+          name="tarjeta"
+          type="number"
+          min="0"
+          step="0.01"
+          class="form-control text-end"
+          placeholder="0.00"
+          [(ngModel)]="tarjeta"
+          [disabled]="guardando"
+        />
+      </div>
+    </div>
+  </div>
+
+  <fieldset *ngIf="usaTarjeta" class="cobro-tarjeta" [disabled]="guardando">
+    <legend>Datos de la tarjeta</legend>
+    <div class="row g-3">
+      <div class="col-6">
+        <span class="form-label d-block">Tipo</span>
+        <div class="btn-group w-100" role="radiogroup" aria-label="Tipo de tarjeta">
+          <input type="radio" class="btn-check" name="tipoTarjeta" id="tarjetaDebito" value="DEBITO" [(ngModel)]="tipoTarjeta" />
+          <label class="btn btn-outline-secondary" for="tarjetaDebito">Débito</label>
+          <input type="radio" class="btn-check" name="tipoTarjeta" id="tarjetaCredito" value="CREDITO" [(ngModel)]="tipoTarjeta" />
+          <label class="btn btn-outline-secondary" for="tarjetaCredito">Crédito</label>
+        </div>
+      </div>
+      <div class="col-6">
+        <label for="cobroUltimos4" class="form-label">Últimos 4 dígitos</label>
+        <input
+          id="cobroUltimos4"
+          name="tarjetaUltimos4"
+          class="form-control"
+          inputmode="numeric"
+          maxlength="4"
+          placeholder="1234"
+          autocomplete="off"
+          [ngModel]="tarjetaUltimos4"
+          (ngModelChange)="limpiarUltimos4($event)"
+        />
+      </div>
+      <div class="col-6">
+        <label for="cobroBanco" class="form-label">Banco emisor</label>
+        <select id="cobroBanco" name="bancoEmisorId" class="form-select" [(ngModel)]="bancoEmisorId">
+          <option [ngValue]="null" disabled>Seleccione…</option>
+          <option *ngFor="let b of bancos" [ngValue]="b.id">{{ b.nombre }}</option>
+        </select>
+        <small *ngIf="bancosError" class="text-danger">{{ bancosError }}</small>
+      </div>
+      <div class="col-6">
+        <label for="cobroAutorizacion" class="form-label">Autorización</label>
+        <input
+          id="cobroAutorizacion"
+          name="autorizacion"
+          class="form-control"
+          maxlength="30"
+          autocomplete="off"
+          [(ngModel)]="autorizacion"
+        />
+      </div>
+    </div>
+  </fieldset>
+
+  <dl class="cobro-resumen">
+    <dt>Total recibido</dt>
+    <dd>${{ totalRecibido | number: '1.2-2' }}</dd>
+    <dt>Cambio a entregar</dt>
+    <dd class="cobro-cambio">${{ cambio | number: '1.2-2' }}</dd>
+  </dl>
+
+  <p *ngIf="motivoInvalido && (efectivo !== null || tarjeta !== null)" class="cobro-aviso">
+    <i class="feather icon-info"></i> {{ motivoInvalido }}
+  </p>
+  <div *ngIf="errorMessage" class="alert alert-danger mb-0" role="alert">{{ errorMessage }}</div>
+
+  <!-- Enter en cualquier campo guarda, como en COCAE -->
+  <button type="submit" class="d-none" aria-hidden="true" tabindex="-1"></button>
+</form>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" [disabled]="guardando" (click)="cancelar()">Cancelar</button>
+  <button type="button" class="btn btn-cobrar" [disabled]="guardando || !!motivoInvalido" (click)="guardar()">
+    <span *ngIf="guardando" class="spinner-border spinner-border-sm me-1" role="status"></span>
+    {{ guardando ? 'Guardando…' : 'Guardar' }}
+  </button>
+</div>

@@ -9,6 +9,7 @@ import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { AuthService } from '../../../core/services/auth.service';
 import { environment } from 'src/environments/environment';
+import { BancosComponent } from './bancos/bancos.component';
 
 interface ParametroSistema {
   id: number;
@@ -20,7 +21,7 @@ interface ParametroSistema {
 
 @Component({
   selector: 'app-parametros-generales',
-  imports: [CommonModule, SharedModule, FormsModule],
+  imports: [CommonModule, SharedModule, FormsModule, BancosComponent],
   templateUrl: './parametros-generales.component.html',
   styleUrls: ['./parametros-generales.component.scss']
 })

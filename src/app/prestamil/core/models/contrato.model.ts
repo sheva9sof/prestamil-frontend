@@ -219,14 +219,97 @@ export type TipoMovimiento =
   | 'PVA'
   | 'RM';
 
-export interface RefrendoRequest {
-  idContrato: number;
+/** Operación que pide el cajero; el backend decide el tipo de movimiento según la fecha (RF, RPG, RX…). */
+export type TipoOperacion = 'REFRENDO' | 'FINIQUITO' | 'ABONO_CAPITAL' | 'REFRENDO_PARCIAL';
+
+export type TipoTarjeta = 'CREDITO' | 'DEBITO';
+
+export interface CotizacionRequest {
+  contratoId: number;
+  tipoOperacion: TipoOperacion;
+  /** Solo en REFRENDO_PARCIAL. */
+  periodos?: number;
+  /** Solo en ABONO_CAPITAL. */
   abonoCapital?: number;
+}
+
+/** Cotización a la fecha del servidor; al cobrar, el backend vuelve a calcular todo. */
+export interface CotizacionMovimientoResponse {
+  contratoId: number;
+  folio: string;
+  tipoOperacion: TipoOperacion;
+  tipoMovimiento: TipoMovimiento;
+
+  estatusActual: EstatusOperativo;
+  accionesDisponibles: AccionContrato[];
+  fechaContrato: string;
+  fechaVencimiento: string;
+  saldoCapital: number;
+
+  diasAtraso: number;
+  diasGraciaUsados: number;
+  periodosTranscurridos: number;
+  periodosNormales: number;
+  periodosExtemporaneos: number;
+  periodosMaximos: number;
+  periodosAplicados: number;
+  periodosNormalesAplicados: number;
+  periodosExtemporaneosAplicados: number;
+  semanasSancion: number;
+
+  interesPorPeriodo: number;
+  interes: number;
+  almacen: number;
+  /** Interés + almacenaje. */
+  interesTotal: number;
+  porcSancionSemanal: number;
+  sancion: number;
+  descuento: number;
+  /** Base del IVA: interés + almacenaje + sanción − descuento. */
+  subtotal: number;
+  porcIva: number;
+  iva: number;
+  abonoCapital: number;
+  capital: number;
+  total: number;
+  /** "NOVENTA Y CINCO PESOS 92/100 M.N.". */
+  totalConLetra: string;
+
+  saldoNuevo: number;
+  fechaContratoNueva?: string;
+  fechaVencimientoNueva?: string;
+  fechaComercializacionNueva?: string;
+  estatusNuevo: EstatusOperativo;
+  advertencias: string[];
+}
+
+/** Forma de pago de la ventana de Cobro (RN-24). De la tarjeta solo viajan los últimos 4 dígitos. */
+export interface PagoRequest {
+  efectivo: number;
+  tarjeta: number;
+  tipoTarjeta?: TipoTarjeta;
+  tarjetaUltimos4?: string;
+  bancoEmisorId?: number;
+  autorizacion?: string;
+}
+
+export interface MovimientoRequest {
+  contratoId: number;
+  tipoOperacion: TipoOperacion;
+  periodos?: number;
+  abonoCapital?: number;
+  pago: PagoRequest;
+  /** Idempotencia: el mismo id en un reintento devuelve el movimiento ya registrado. */
+  requestId: string;
+  /** Total que vio el cajero; si el recálculo del servidor difiere, el backend pide volver a cotizar. */
+  totalCotizado?: number;
   observaciones?: string;
 }
 
 export interface MovimientoResponse {
   id: number;
+  /** Folio de la nota (ticket). */
+  folioNota?: number;
   idContrato: number;
   folioContrato: string;
   tipo: TipoMovimiento;
@@ -249,9 +332,10 @@ export interface MovimientoResponse {
   numRefrendos: number;
   nuevaFechaVencimiento?: string;
 
+  /** Efectivo recibido; el cambio se entrega de aquí. */
   importeEfectivo?: number;
   importeTarjeta?: number;
-  tipoTarjeta?: 'CREDITO' | 'DEBITO';
+  tipoTarjeta?: TipoTarjeta;
   tarjetaUltimos4?: string;
   bancoEmisor?: string;
   autorizacionBanco?: string;

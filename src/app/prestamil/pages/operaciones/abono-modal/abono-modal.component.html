@@ -1,0 +1,109 @@
+<div class="modal-header abono-header">
+  <div class="abono-title">
+    <span class="abono-icon"><i class="feather icon-trending-down"></i></span>
+    <div>
+      <span class="abono-eyebrow">Contrato {{ contrato.folio }}</span>
+      <h5 class="modal-title">
+        Abono a capital
+        <span *ngIf="enGracia" class="badge-gracia ms-2">En periodo de gracia</span>
+      </h5>
+      <small class="text-muted">#{{ contrato.idCliente }} · {{ contrato.nombreCliente }}</small>
+    </div>
+  </div>
+  <button type="button" class="btn-close" aria-label="Cerrar" [disabled]="cobrando" (click)="activeModal.dismiss()"></button>
+</div>
+
+<div class="modal-body abono-body">
+  <div *ngIf="isLoading" class="text-center py-4">
+    <div class="spinner-border text-secondary" role="status"></div>
+    <p class="text-muted mt-2 mb-0">Cotizando abono…</p>
+  </div>
+  <div *ngIf="errorMessage" class="alert alert-danger mb-0" role="alert">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && cotizacionBase as c">
+    <div *ngIf="enGracia" class="alert alert-info py-2">
+      <i class="feather icon-info me-1"></i>
+      Contrato en periodo de gracia: el abono se permite y el nuevo periodo empieza el día que vencía.
+    </div>
+
+    <div class="abono-tiles">
+      <div>
+        <span>Saldo capital</span>
+        <strong>${{ c.saldoCapital | number: '1.2-2' }}</strong>
+      </div>
+      <div>
+        <span>Periodos transcurridos</span>
+        <strong>{{ c.periodosTranscurridos }}</strong>
+      </div>
+      <div>
+        <span>Interés por periodo</span>
+        <strong>${{ c.interesPorPeriodo | number: '1.2-2' }}</strong>
+      </div>
+    </div>
+
+    <div class="row g-3 mt-1">
+      <div class="col-md-6">
+        <p class="abono-label">Desglose del refrendo</p>
+        <dl class="abono-lista">
+          <dt>Total interés ({{ c.periodosAplicados }} per.)</dt>
+          <dd>${{ c.interesTotal | number: '1.2-2' }}</dd>
+          <ng-container *ngIf="c.descuento > 0">
+            <dt>Descuento s/interés</dt>
+            <dd>−${{ c.descuento | number: '1.2-2' }}</dd>
+          </ng-container>
+          <dt>IVA ({{ c.porcIva | number: '1.0-2' }}%)</dt>
+          <dd>${{ c.iva | number: '1.2-2' }}</dd>
+          <dt class="abono-lista-total">Importe por refrendo</dt>
+          <dd class="abono-lista-total">${{ importePorRefrendo | number: '1.2-2' }}</dd>
+        </dl>
+      </div>
+      <div class="col-md-6">
+        <p class="abono-label">Abono a capital</p>
+        <label for="abonoInput" class="form-label small text-muted mb-1">Importe (mínimo ${{ 20 | number: '1.2-2' }}, sin IVA)</label>
+        <div class="input-group input-group-lg">
+          <span class="input-group-text">$</span>
+          <input
+            id="abonoInput"
+            type="number"
+            class="form-control"
+            step="0.01"
+            min="20"
+            placeholder="0.00"
+            [(ngModel)]="abonoCapital"
+            (ngModelChange)="onAbonoChange()"
+            [class.is-invalid]="errorAbono"
+            [disabled]="cobrando" />
+        </div>
+        <div *ngIf="errorAbono" class="invalid-feedback d-block">{{ errorAbono }}</div>
+        <p class="abono-hint">
+          El abono no lleva IVA y no reduce el interés del periodo en que se paga (RN-13).
+        </p>
+        <dl class="abono-lista mt-2">
+          <dt>Saldo actual</dt>
+          <dd>${{ c.saldoCapital | number: '1.2-2' }}</dd>
+          <dt>Saldo que quedará</dt>
+          <dd><strong>${{ saldoQueQueda | number: '1.2-2' }}</strong></dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="abono-importe">
+      <div class="abono-importe-etiqueta">
+        <span>Importe a cobrar</span>
+        <small *ngIf="isRecotizando" class="text-muted">recalculando…</small>
+      </div>
+      <strong>${{ (cotizacion?.total ?? importePorRefrendo) | number: '1.2-2' }}</strong>
+    </div>
+  </ng-container>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" [disabled]="cobrando" (click)="activeModal.dismiss()">Cancelar</button>
+  <button
+    type="button"
+    class="btn btn-cobrar"
+    [disabled]="!cotizacionBase || isLoading || cobrando || isRecotizando || !abonoValido"
+    (click)="cobrar()">
+    <i class="feather icon-dollar-sign me-1"></i> Aceptar y cobrar
+  </button>
+</div>

@@ -1,0 +1,30 @@
+$gold: #b8860b;
+$gold-dark: #8a6508;
+$line: #e7eaf0;
+
+.cobro-header { padding: 16px 22px; background: linear-gradient(135deg, #fffaf0, #fff); border-bottom: 1px solid #eee5ca; }
+.cobro-eyebrow { color: $gold; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.cobro-body { padding: 20px 22px; background: #f8f9fb; }
+
+.cobro-total {
+  display: flex; flex-direction: column; align-items: center; margin-bottom: 18px; padding: 14px;
+  background: #fff; border: 1px solid #eee5ca; border-radius: 12px; text-align: center;
+  span { color: #6f7b8f; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+  strong { font-size: 2rem; font-weight: 800; color: #243047; }
+  small { color: $gold-dark; font-weight: 700; }
+}
+
+.form-label { font-size: 0.8rem; font-weight: 700; }
+.cobro-tarjeta {
+  margin-top: 16px; padding: 12px 14px 14px; background: #fff; border: 1px solid $line; border-radius: 12px;
+  legend { float: none; width: auto; margin: 0 0 4px; font-size: 0.78rem; font-weight: 800; color: $gold-dark; text-transform: uppercase; }
+}
+
+.cobro-resumen {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 18px 0 8px; font-size: 1rem;
+  dt { font-weight: 600; } dd { margin: 0; text-align: right; font-weight: 700; }
+}
+.cobro-cambio { color: #c0392b; font-size: 1.35rem; }
+.cobro-aviso { margin: 0 0 8px; color: #8a6508; font-size: 0.85rem; }
+
+.btn-cobrar { color: #fff; background: $gold; border-color: $gold; font-weight: 700; &:hover:not(:disabled) { color: #fff; background: $gold-dark; } }
