@@ -1,0 +1,30 @@
+$gray: #4a5568;
+$gray-dark: #2d3748;
+$muted: #6f7b8f;
+$line: #e7eaf0;
+
+.reposicion-header { padding: 18px 24px; background: linear-gradient(135deg, #f7fafc, #fff); border-bottom: 1px solid $line; }
+.reposicion-title { display: flex; align-items: center; gap: 14px; .modal-title { margin: 1px 0; font-weight: 750; } }
+.reposicion-eyebrow { color: $gray-dark; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.reposicion-icon {
+  display: flex; align-items: center; justify-content: center; width: 46px; height: 46px;
+  color: $gray-dark; background: #edf2f7; border-radius: 12px; font-size: 1.15rem;
+}
+.reposicion-body { padding: 22px 24px; background: #f8f9fb; }
+
+.reposicion-tiles {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 8px;
+  > div { display: flex; flex-direction: column; padding: 12px 14px; background: #fff; border: 1px solid $line; border-radius: 12px; }
+  span { color: $muted; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+  strong { font-size: 1.1rem; }
+}
+.reposicion-label { margin: 14px 0 8px; padding-bottom: 6px; color: $gray-dark; border-bottom: 1px solid $line; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+.reposicion-lista {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; font-size: 0.9rem;
+  dt { font-weight: 600; color: $muted; } dd { margin: 0; text-align: right; }
+}
+.reposicion-exentar {
+  padding: 12px 14px; background: #fff; border: 1px solid $line; border-radius: 12px;
+  .form-check-label { font-weight: 600; }
+}
+.btn-imprimir { color: #fff; background: $gray-dark; border-color: $gray-dark; font-weight: 700; &:hover:not(:disabled) { color: #fff; background: #1a202c; } }

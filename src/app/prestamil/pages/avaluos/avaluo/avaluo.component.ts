@@ -124,6 +124,7 @@ interface AmortizacionPreview {
   sancionSemanal: number;
   porcReposicion: number;
   fechaPaseVenta: string;
+  porcGastosOperacionVenta: number;
   comisionVenta: number;
 }
 
@@ -1661,6 +1662,7 @@ export class AvaluoComponent implements OnInit {
     const porcInteres = Number(params?.porcInteres ?? 0);
     const porcAlmacen = Number(params?.porcAlmacen ?? 0);
     const porcGastos  = Number(params?.porcGastosAdmin ?? 0);
+    const porcGastosOperacionVenta = Number(params?.comisionPorVentaPrenda ?? 0);
     // Total interés = interés + almacén + gastos (derivado; el campo porcInteresTotal puede quedar en 0)
     const porcTotal   = porcInteres + porcAlmacen + porcGastos;
     const iva         = this.IVA_PORC;
@@ -1724,7 +1726,8 @@ export class AvaluoComponent implements OnInit {
       sancionSemanal: r2(prestamo * porcSancion / 100),
       porcReposicion: Number(params?.porcReposicion ?? 0),
       fechaPaseVenta: fechaMas(dias * nPer + Number(params?.diasAntesPaseVenta ?? 0)),
-      comisionVenta: r2(prestamo * Number(params?.comisionPorVentaPrenda ?? 0) / 100)
+      porcGastosOperacionVenta,
+      comisionVenta: r2(prestamo * porcGastosOperacionVenta / 100)
     };
   }
 

@@ -23,6 +23,8 @@ import { FiniquitoModalComponent } from './finiquito-modal/finiquito-modal.compo
 import { AbonoModalComponent } from './abono-modal/abono-modal.component';
 import { RefrendoParcialModalComponent } from './refrendo-parcial-modal/refrendo-parcial-modal.component';
 import { ConsultaModalComponent } from './consulta-modal/consulta-modal.component';
+import { ReposicionModalComponent } from './reposicion-modal/reposicion-modal.component';
+import { CancelacionModalComponent } from './cancelacion-modal/cancelacion-modal.component';
 
 interface BotonAccion {
   accion: AccionContrato;
@@ -265,8 +267,32 @@ export class OperacionesComponent implements OnInit {
       this.abrirConsulta();
       return;
     }
+    if (boton.accion === 'CANCELACION') {
+      this.abrirCancelacion();
+      return;
+    }
+    if (boton.accion === 'REPOSICION') {
+      this.abrirReposicion();
+      return;
+    }
     this.accionSeleccionada = boton;
     this.modalService.open(this.accionModalTemplate, { centered: true });
+  }
+
+  private abrirReposicion(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(ReposicionModalComponent, {
+      centered: true,
+      size: 'lg',
+      backdrop: 'static',
+      windowClass: 'operacion-modal'
+    });
+    (ref.componentInstance as ReposicionModalComponent).contrato = detalle;
+    ref.result.then(
+      (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
+      () => undefined
+    );
   }
 
   private abrirConsulta(): void {
@@ -279,7 +305,27 @@ export class OperacionesComponent implements OnInit {
       windowClass: 'consulta-modal-window'
     });
     (ref.componentInstance as ConsultaModalComponent).contrato = detalle;
-    // F10 activará puedeCancelarUltimo con el rol del usuario y la fecha del último movimiento.
+    // La cancelación vive en su propio modal (F10, RN-26). La Consulta es solo lectura.
+  }
+
+  private abrirCancelacion(): void {
+    const detalle = this.detalle;
+    if (!detalle) return;
+    const ref = this.modalService.open(CancelacionModalComponent, {
+      centered: true,
+      size: 'lg',
+      backdrop: 'static',
+      windowClass: 'operacion-modal'
+    });
+    (ref.componentInstance as CancelacionModalComponent).contrato = detalle;
+    ref.result.then(
+      () => {
+        // El backend restauró el contrato al estado previo; refrescar detalle y listado
+        this.recargarDetalle(detalle.id);
+        this.cargarPagina();
+      },
+      () => undefined
+    );
   }
 
   private abrirRefrendo(): void {

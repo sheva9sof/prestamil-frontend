@@ -68,8 +68,6 @@ export class ConsultaModalComponent implements OnInit {
   private modalService = inject(NgbModal);
 
   @Input() contrato!: ContratoOperacionDetalleResponse;
-  /** Se activa en F10 (cancelación de movimientos). */
-  @Input() puedeCancelarUltimo = false;
 
   movimientos: MovimientoResponse[] = [];
   isLoading = true;

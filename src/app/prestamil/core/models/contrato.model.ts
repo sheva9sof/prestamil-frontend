@@ -186,6 +186,13 @@ export interface ContratoOperacionDetalleResponse extends ContratoOperacionRespo
   periodosExtemporaneos?: number;
   partidas: PartidaContratoResponse[];
   ultimoMovimiento?: UltimoMovimientoResponse;
+  // Reposición/reimpresión de contrato (F9). Null / false = el plazo no la habilita.
+  cobrarReposicionContrato?: boolean;
+  reposicionEsPorcentaje?: boolean;
+  porcReposicion?: number;
+  montoReposicion?: number;
+  /** Importe ya calculado por el servidor (porc × préstamo, o monto fijo). */
+  importeReposicion?: number;
 }
 
 // ============================================================
@@ -354,4 +361,24 @@ export interface MovimientoResponse {
   fechaCancelacion?: string;
   usuarioCancela?: string;
   motivoCancelacion?: string;
+}
+
+/**
+ * Reposición/reimpresión de contrato (F9). El importe lo calcula el servidor con la configuración del
+ * plazo; {@code noCobrar} solo lo aceptan los roles autorizados (por defecto Gerente y Sistemas).
+ */
+export interface ReposicionRequest {
+  noCobrar: boolean;
+  comentario?: string;
+  pago?: PagoRequest;
+  /** Idempotencia: doble clic o reintento con el mismo id devuelve el movimiento ya registrado. */
+  requestId: string;
+}
+
+/**
+ * Cuerpo de POST /api/movimientos/{id}/cancelar (F10, RN-26). El motivo es texto libre, mínimo 10
+ * caracteres: una lista cerrada haría que auditoría siempre viera lo mismo.
+ */
+export interface CancelarMovimientoRequest {
+  motivo: string;
 }

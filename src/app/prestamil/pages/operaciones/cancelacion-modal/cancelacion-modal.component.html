@@ -1,0 +1,126 @@
+<div class="cancelacion-modal">
+  <div class="modal-header">
+    <div>
+      <h4 class="modal-title mb-1">Cancelación de movimiento</h4>
+      <p class="modal-subtitle">
+        Contrato <strong>{{ contrato.folio }}</strong>
+        <span class="separator">·</span>
+        {{ contrato.nombreCliente }}
+      </p>
+    </div>
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="activeModal.dismiss()"></button>
+  </div>
+
+  <div class="modal-body">
+    <div *ngIf="isLoading" class="text-center py-4">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="mt-3 text-muted mb-0">Cargando último movimiento…</p>
+    </div>
+
+    <div *ngIf="loadError" class="alert alert-danger">{{ loadError }}</div>
+
+    <ng-container *ngIf="!isLoading && !loadError">
+      <div *ngIf="!ultimo" class="alert alert-info">
+        Este contrato no tiene un movimiento vigente que se pueda cancelar.
+      </div>
+
+      <ng-container *ngIf="ultimo as u">
+        <!-- Cabecera del movimiento -->
+        <section class="bloque">
+          <h6 class="bloque-titulo">Movimiento a cancelar</h6>
+          <dl class="row small mb-0">
+            <dt class="col-4">Tipo</dt>
+            <dd class="col-8">
+              <span class="tipo-badge" [style.background-color]="color(u.tipo)">{{ u.tipo }}</span>
+              {{ etiqueta(u.tipo) }}
+            </dd>
+            <dt class="col-4">Folio de nota</dt>
+            <dd class="col-8">{{ u.folioNota ?? '—' }}</dd>
+            <dt class="col-4">Fecha y hora</dt>
+            <dd class="col-8">{{ u.fecha | date: 'dd/MM/yyyy HH:mm' }}</dd>
+            <dt class="col-4">Usuario que cobró</dt>
+            <dd class="col-8">{{ u.nombreUsuario ?? '—' }}</dd>
+            <dt class="col-4">Total cobrado</dt>
+            <dd class="col-8"><strong>{{ moneda(u.monto) }}</strong></dd>
+          </dl>
+        </section>
+
+        <!-- Aviso si no es de hoy -->
+        <div *ngIf="!esDeHoy" class="alert alert-warning small mt-3">
+          <i class="feather icon-alert-triangle me-1"></i>
+          Este movimiento no es del día en curso. Solo Sistemas puede cancelarlo fuera del día
+          (procedimiento manual, RN-26).
+        </div>
+
+        <!-- Estado que se restaurará -->
+        <section class="bloque mt-3" [class.dim]="!esDeHoy">
+          <h6 class="bloque-titulo">Se restaurará en el contrato</h6>
+          <div class="diff">
+            <div class="diff-fila">
+              <span class="diff-label">Saldo</span>
+              <span class="diff-antes">{{ moneda(u.saldoNuevo) }}</span>
+              <span class="diff-flecha">→</span>
+              <span class="diff-despues">{{ moneda(u.saldoAnterior) }}</span>
+            </div>
+            <div class="diff-fila">
+              <span class="diff-label">Fecha de contrato</span>
+              <span class="diff-antes">{{ u.fechaContratoNueva ? (u.fechaContratoNueva | date: 'dd/MM/yyyy') : '—' }}</span>
+              <span class="diff-flecha">→</span>
+              <span class="diff-despues">{{ u.fechaContratoAnterior ? (u.fechaContratoAnterior | date: 'dd/MM/yyyy') : '—' }}</span>
+            </div>
+            <div class="diff-fila">
+              <span class="diff-label">Vencimiento</span>
+              <span class="diff-antes">{{ u.fechaVencNueva ? (u.fechaVencNueva | date: 'dd/MM/yyyy') : '—' }}</span>
+              <span class="diff-flecha">→</span>
+              <span class="diff-despues">{{ u.fechaVencAnterior ? (u.fechaVencAnterior | date: 'dd/MM/yyyy') : '—' }}</span>
+            </div>
+            <div class="diff-fila">
+              <span class="diff-label">Estatus</span>
+              <span class="diff-antes">{{ etiquetaEstatus(u.estatusNuevo) }}</span>
+              <span class="diff-flecha">→</span>
+              <span class="diff-despues">{{ etiquetaEstatus(u.estatusAnterior) }}</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- Motivo -->
+        <section class="bloque mt-3">
+          <label for="motivoCancelacion" class="form-label mb-1">
+            Motivo de la cancelación <span class="text-danger">*</span>
+          </label>
+          <div class="text-muted small mb-2">
+            Texto libre, mínimo 10 caracteres. Queda registrado en la bitácora del sistema (RN-26).
+          </div>
+          <textarea
+            id="motivoCancelacion"
+            class="form-control"
+            rows="3"
+            maxlength="300"
+            [(ngModel)]="motivo"
+            [disabled]="isCancelando || !esDeHoy"
+            placeholder="Ej. Cliente cambió de opinión; el cobro se registró por error."
+          ></textarea>
+          <div class="d-flex justify-content-between small mt-1">
+            <span class="text-danger" *ngIf="cancelarError">{{ cancelarError }}</span>
+            <span class="text-muted ms-auto">{{ motivo.length }} / 300</span>
+          </div>
+        </section>
+      </ng-container>
+    </ng-container>
+  </div>
+
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" [disabled]="isCancelando" (click)="activeModal.dismiss()">
+      No cancelar
+    </button>
+    <button
+      type="button"
+      class="btn btn-danger"
+      [disabled]="!puedeConfirmar"
+      (click)="confirmar()"
+    >
+      <span *ngIf="isCancelando" class="spinner-border spinner-border-sm me-2"></span>
+      Cancelar movimiento
+    </button>
+  </div>
+</div>

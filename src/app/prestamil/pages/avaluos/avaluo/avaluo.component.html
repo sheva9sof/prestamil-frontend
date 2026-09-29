@@ -846,7 +846,10 @@
     <div class="row g-2 small text-center">
       <div class="col"><span class="text-muted d-block">Reposición de contrato</span><strong>{{ a.porcReposicion | number: '1.0-2' }}%</strong></div>
       <div class="col"><span class="text-muted d-block">Fecha de pase a venta</span><strong>{{ a.fechaPaseVenta }}</strong></div>
-      <div class="col"><span class="text-muted d-block">Comisión por venta</span><strong>${{ a.comisionVenta | number: '1.2-2' }}</strong></div>
+      <div class="col">
+        <span class="text-muted d-block">Gastos operativos por venta ({{ a.porcGastosOperacionVenta | number: '1.2-4' }}%)</span>
+        <strong>${{ a.comisionVenta | number: '1.2-2' }}</strong>
+      </div>
     </div>
     <p class="text-muted small mt-2 mb-0">
       <strong>Refrendo</strong> = pago para extender el préstamo (solo intereses + IVA).
