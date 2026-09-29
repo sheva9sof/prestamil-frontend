@@ -75,6 +75,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Hardware': '/hardware',
       'Avaluos': '/avaluos',
       'Avaluos Prendarios': '/avaluos',
+      'Finiquitos y Refrendos': '/operaciones',
       'Prendas': '/catalogos/prendas',
       'Descuentos': '/catalogos/descuentos',
       'Sucursal': '/configuracion/sucursal',

@@ -91,6 +91,104 @@ export interface ContratoResponse {
 }
 
 // ============================================================
+// Finiquitos y Refrendos: listado y detalle para operar en caja
+// ============================================================
+
+/** Estatus derivado de las fechas a hoy (el backend lo resuelve; EN_GRACIA y APARTADO no se persisten). */
+export type EstatusOperativo =
+  | 'VIGENTE'
+  | 'EN_GRACIA'
+  | 'VENCIDO'
+  | 'EN_VENTA'
+  | 'APARTADO'
+  | 'VENDIDO'
+  | 'FINIQUITADO'
+  | 'CANCELADO';
+
+/** Botones de la pantalla; solo se habilitan los que devuelve el backend (matriz RN-16). */
+export type AccionContrato =
+  | 'REFRENDO'
+  | 'FINIQUITO'
+  | 'ABONO_CAPITAL'
+  | 'REFRENDO_PARCIAL'
+  | 'REFRENDO_EXTEMPORANEO'
+  | 'FINIQUITO_EXTEMPORANEO'
+  | 'REPOSICION'
+  | 'CONSULTA'
+  | 'CANCELACION';
+
+export type FiltroEstatusOperacion =
+  | 'TODOS'
+  | 'EN_OPERACION'
+  | 'REFRENDADOS'
+  | 'PERIODO_GRACIA'
+  | 'VENCIDOS'
+  | 'EN_VENTA'
+  | 'VENDIDOS'
+  | 'FINIQUITADOS'
+  | 'CANCELADOS';
+
+export type BuscarContratoPor = 'CONTRATO' | 'NUM_CLIENTE' | 'NOMBRE_CLIENTE' | 'FECHA_CONTRATO';
+
+export interface ContratoOperacionFiltro {
+  q?: string;
+  buscarPor: BuscarContratoPor;
+  /** Id del tipo de prenda; sin valor = todos los ramos. */
+  ramo?: number | null;
+  estatus: FiltroEstatusOperacion;
+  page: number;
+  size: number;
+}
+
+export interface ContratoOperacionResponse {
+  id: number;
+  folio: string;
+  nombrePlazo: string;
+  numeroPeriodos: number;
+  diasPorPeriodo: number;
+  /** Tipo de prenda de la primera partida. */
+  ramo?: string;
+  numPartidas: number;
+  estatus: EstatusOperativo;
+  numRefrendos: number;
+  idCliente: number;
+  nombreCliente: string;
+  /** Inicio del periodo vigente. */
+  fechaContrato: string;
+  fechaVencimiento: string;
+  diasGracia: number;
+  fechaComercializacion?: string;
+  montoPrestamo: number;
+  saldoCapital: number;
+  montoAvaluo: number;
+  /** Interés + almacenaje de un periodo sobre el saldo, sin IVA. */
+  interesPorPeriodo: number;
+  accionesDisponibles: AccionContrato[];
+}
+
+export interface UltimoMovimientoResponse {
+  id: number;
+  tipo: TipoMovimiento;
+  fecha: string;
+  monto: number;
+  nombreUsuario?: string;
+}
+
+export interface ContratoOperacionDetalleResponse extends ContratoOperacionResponse {
+  /** Fecha de empeño original; nunca cambia. */
+  fechaApertura: string;
+  telefonoCliente?: string;
+  nombreBeneficiario?: string;
+  /** Situación a hoy; sin valor si el contrato ya no se puede cobrar. */
+  diasAtraso?: number;
+  periodosTranscurridos?: number;
+  periodosNormales?: number;
+  periodosExtemporaneos?: number;
+  partidas: PartidaContratoResponse[];
+  ultimoMovimiento?: UltimoMovimientoResponse;
+}
+
+// ============================================================
 // Amortización (tabla de vencimientos calculada al vuelo)
 // ============================================================
 

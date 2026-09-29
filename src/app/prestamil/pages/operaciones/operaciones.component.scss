@@ -1,0 +1,94 @@
+@use 'sass:list';
+
+// Variables SCSS y no CSS: los modales se montan en <body>, fuera del :host
+$gold: #b8860b;
+$gold-dark: #8a6508;
+$gold-soft: #fff8e1;
+$ink: #243047;
+$muted: #6f7b8f;
+$line: #e7eaf0;
+
+.operaciones-page { color: $ink; }
+
+.page-heading {
+  padding-bottom: 20px; margin-bottom: 20px; border-bottom: 1px solid $line;
+  .eyebrow { color: $gold; font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+  h2 { margin: 3px 0 4px; font-size: 1.65rem; font-weight: 750; }
+  p { margin: 0; color: $muted; }
+}
+
+.filter-panel { padding: 18px 16px; background: #fafbfc; border: 1px solid $line; border-radius: 12px; }
+.form-control, .form-select { min-height: 42px; border-radius: 9px; }
+.btn { border-radius: 9px; font-weight: 650; }
+.btn-primary { background: $gold; border-color: $gold; &:hover { background: $gold-dark; border-color: $gold-dark; } }
+
+.estatus-filtros { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.estatus-chip {
+  padding: 6px 14px; color: $muted; background: #fff; border: 1px solid #dfe3e9; border-radius: 999px;
+  font-size: 0.8rem; font-weight: 700; cursor: pointer;
+}
+.btn-check:checked + .estatus-chip { color: #fff; background: $gold; border-color: $gold; }
+.btn-check:focus-visible + .estatus-chip { box-shadow: 0 0 0 3px rgba(184, 134, 11, 0.25); }
+
+.table-responsive { border: 1px solid $line; border-radius: 12px; }
+.operaciones-table {
+  margin: 0; font-size: 0.85rem;
+  thead th { padding: 11px 10px; color: #725509; background: $gold-soft; font-size: 0.7rem; text-transform: uppercase; white-space: nowrap; }
+  tbody td { padding: 10px; vertical-align: middle; }
+}
+// Color por estatus: vigente verde, gracia azul, vencido naranja, en venta morado, cerrados gris. La clase
+// solo define --c/--bg, así sirve igual para la fila (franja izquierda) que para el badge.
+$estatus: (vigente: #20744a #edf9f2, en-gracia: #2269bb #eef5ff, vencido: #b35c00 #fff4e5, en-venta: #6a3fa0 #f4effb,
+  apartado: #7a5b2e #f7f0e4, vendido: #7a5b2e #f7f0e4, finiquitado: #243b6b #eef1f7, cancelado: #6f7b8f #f1f3f6);
+@each $nombre, $colores in $estatus {
+  .estatus-#{$nombre} { --c: #{list.nth($colores, 1)}; --bg: #{list.nth($colores, 2)}; }
+}
+.fila-contrato {
+  cursor: pointer;
+  td:first-child { box-shadow: inset 4px 0 0 var(--c); }
+  &.estatus-vencido td, &.estatus-en-gracia td { background: #fffdf8; }
+  &:hover td, &:focus td { background: #fffcf3; }
+}
+.estatus-badge { display: inline-block; padding: 3px 10px; color: var(--c); background: var(--bg); border-radius: 999px; font-size: 0.72rem; font-weight: 800; }
+
+.pagination .page-link { color: $gold-dark; }
+.pagination .page-item.active .page-link { color: #fff; background: $gold; border-color: $gold; }
+
+// Modales
+::ng-deep .operacion-modal .modal-content { border: 0; border-radius: 16px; overflow: hidden; }
+.entity-modal-header { padding: 18px 24px; background: linear-gradient(135deg, #fffaf0, #fff); border-bottom: 1px solid #eee5ca; }
+.entity-modal-body { padding: 22px 24px; background: #f8f9fb; }
+.operacion-modal-title {
+  display: flex; align-items: center; gap: 14px;
+  .modal-eyebrow { color: $gold; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+  .modal-title { margin: 1px 0; font-weight: 750; }
+}
+.operacion-modal-icon {
+  display: flex; align-items: center; justify-content: center; width: 46px; height: 46px;
+  color: $gold-dark; background: $gold-soft; border-radius: 12px; font-size: 1.15rem;
+}
+.section-label {
+  margin: 18px 0 10px; padding-bottom: 8px; color: $gold-dark; border-bottom: 1px solid #eee5ca;
+  font-size: 0.78rem; font-weight: 800; text-transform: uppercase;
+}
+
+.resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+.resumen-tile {
+  display: flex; flex-direction: column; padding: 12px 14px; background: #fff; border: 1px solid $line; border-radius: 12px;
+  span { color: $muted; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+  strong { font-size: 1.25rem; }
+}
+
+.acciones-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.accion-btn {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px; color: $gold-dark; background: #fff;
+  border: 1px solid #d6b85b; border-radius: 10px; font-size: 0.82rem; font-weight: 700; text-align: left;
+  &:hover:not(:disabled) { color: #fff; background: $gold; }
+  &:disabled { color: #aab2bf; border-color: $line; cursor: not-allowed; }
+}
+
+.datos-lista {
+  display: grid; grid-template-columns: 150px 1fr; gap: 6px 12px; margin: 0; font-size: 0.85rem;
+  dt { color: $muted; font-weight: 600; }
+  dd { margin: 0; }
+}
