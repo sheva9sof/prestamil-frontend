@@ -1,0 +1,179 @@
+<div class="modal-header parcial-header">
+  <div class="parcial-title">
+    <span class="parcial-icon"><i class="feather icon-pie-chart"></i></span>
+    <div>
+      <span class="parcial-eyebrow">Contrato {{ contrato.folio }}</span>
+      <h5 class="modal-title">Refrendo parcial</h5>
+      <small class="text-muted">#{{ contrato.idCliente }} · {{ contrato.nombreCliente }}</small>
+    </div>
+  </div>
+  <button type="button" class="btn-close" aria-label="Cerrar" [disabled]="cobrando" (click)="activeModal.dismiss()"></button>
+</div>
+
+<div class="modal-body parcial-body">
+  <div *ngIf="isLoading" class="text-center py-4">
+    <div class="spinner-border text-secondary" role="status"></div>
+    <p class="text-muted mt-2 mb-0">Cotizando estado del contrato…</p>
+  </div>
+  <div *ngIf="errorEstado" class="alert alert-danger mb-0" role="alert">{{ errorEstado }}</div>
+
+  <ng-container *ngIf="!isLoading && estadoActual as e">
+    <!-- Bloque 1: estado actual del contrato (arriba, como COCAE "Abono parcial") -->
+    <section class="parcial-seccion">
+      <p class="parcial-label">Estado actual</p>
+
+      <div class="parcial-tiles">
+        <div>
+          <span>Saldo capital</span>
+          <strong>${{ e.saldoCapital | number: '1.2-2' }}</strong>
+        </div>
+        <div>
+          <span>Interés por periodo</span>
+          <strong>${{ e.interesPorPeriodo | number: '1.2-2' }}</strong>
+        </div>
+        <div>
+          <span>% Sanción semanal</span>
+          <strong>{{ e.porcSancionSemanal | number: '1.0-2' }}%</strong>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-md-6">
+          <dl class="parcial-lista">
+            <dt>Periodos transcurridos</dt>
+            <dd>
+              <strong>{{ e.periodosTranscurridos }}</strong>
+              <small *ngIf="e.periodosExtemporaneos" class="text-muted ms-1">
+                ({{ e.periodosNormales }} normales · {{ e.periodosExtemporaneos }} extemp.)
+              </small>
+            </dd>
+            <dt>Fecha de contrato</dt>
+            <dd>{{ e.fechaContrato | date: 'dd/MM/yyyy' }}</dd>
+            <dt>Vencimiento</dt>
+            <dd>{{ e.fechaVencimiento | date: 'dd/MM/yyyy' }}</dd>
+          </dl>
+        </div>
+        <div class="col-md-6">
+          <dl class="parcial-lista">
+            <dt>Interés total ({{ e.periodosAplicados }} per.)</dt>
+            <dd>${{ e.interesTotal | number: '1.2-2' }}</dd>
+            <ng-container *ngIf="e.sancion > 0">
+              <dt>Sanción ({{ e.semanasSancion }} sem.)</dt>
+              <dd>${{ e.sancion | number: '1.2-2' }}</dd>
+            </ng-container>
+            <ng-container *ngIf="e.descuento > 0">
+              <dt>Descuento s/interés</dt>
+              <dd>−${{ e.descuento | number: '1.2-2' }}</dd>
+            </ng-container>
+            <dt>Subtotal</dt>
+            <dd>${{ e.subtotal | number: '1.2-2' }}</dd>
+            <dt>IVA ({{ e.porcIva | number: '1.0-2' }}%)</dt>
+            <dd>${{ e.iva | number: '1.2-2' }}</dd>
+            <dt class="parcial-lista-total">Total si pagara todo</dt>
+            <dd class="parcial-lista-total">${{ e.total | number: '1.2-2' }}</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <!-- Bloque 2: captura de periodos a cubrir -->
+    <section class="parcial-captura">
+      <label for="periodosInput" class="form-label">
+        Total periodos a cubrir
+        <small class="text-muted"> (máximo {{ maxPeriodos }}; se ajusta al máximo si captura más)</small>
+      </label>
+      <div class="input-group input-group-lg parcial-input">
+        <input
+          id="periodosInput"
+          type="number"
+          class="form-control"
+          min="1"
+          step="1"
+          placeholder="0"
+          [(ngModel)]="periodosCapturados"
+          (blur)="recotizar()"
+          (keydown.enter)="onEnter($event)"
+          [disabled]="cobrando" />
+        <span class="input-group-text" *ngIf="isRecotizando"><i class="feather icon-loader spinner-border-sm"></i></span>
+      </div>
+      <p class="parcial-hint">
+        Se cubren primero los periodos extemporáneos (más antiguos). La sanción solo se cobra por los
+        extemporáneos cubiertos. Al salir del campo o con Enter se recotiza.
+      </p>
+      <ul *ngIf="advertencias.length" class="parcial-advertencias">
+        <li *ngFor="let a of advertencias"><i class="feather icon-alert-triangle me-1"></i>{{ a }}</li>
+      </ul>
+      <div *ngIf="errorCotizacion" class="alert alert-danger py-2 mt-2 mb-0">{{ errorCotizacion }}</div>
+    </section>
+
+    <!-- Bloque 3: lo que se va a cobrar (abajo, en vivo) -->
+    <section class="parcial-seccion parcial-preview" *ngIf="cotizacion as c">
+      <p class="parcial-label parcial-label-preview">A cobrar en este refrendo parcial</p>
+
+      <div class="parcial-tiles parcial-tiles-preview">
+        <div>
+          <span>Periodos normales</span>
+          <strong>{{ c.periodosNormalesAplicados }}</strong>
+        </div>
+        <div>
+          <span>Periodos extemporáneos</span>
+          <strong>{{ c.periodosExtemporaneosAplicados }}</strong>
+        </div>
+        <div>
+          <span>Total periodos</span>
+          <strong>{{ c.periodosAplicados }}</strong>
+        </div>
+      </div>
+
+      <div class="row g-3 mt-1">
+        <div class="col-md-6">
+          <dl class="parcial-lista">
+            <dt>Nueva fecha de contrato</dt>
+            <dd>{{ c.fechaContratoNueva | date: 'dd/MM/yyyy' }}</dd>
+            <dt>Nuevo vencimiento</dt>
+            <dd>{{ c.fechaVencimientoNueva | date: 'dd/MM/yyyy' }}</dd>
+            <dt>Estatus después</dt>
+            <dd>{{ c.estatusNuevo }}</dd>
+          </dl>
+        </div>
+        <div class="col-md-6">
+          <dl class="parcial-lista">
+            <dt>Interés ({{ c.periodosAplicados }} per.)</dt>
+            <dd>${{ c.interesTotal | number: '1.2-2' }}</dd>
+            <ng-container *ngIf="c.sancion > 0">
+              <dt>Sanción ({{ c.semanasSancion }} sem.)</dt>
+              <dd>${{ c.sancion | number: '1.2-2' }}</dd>
+            </ng-container>
+            <ng-container *ngIf="c.descuento > 0">
+              <dt>Descuento s/interés</dt>
+              <dd>−${{ c.descuento | number: '1.2-2' }}</dd>
+            </ng-container>
+            <dt>Subtotal</dt>
+            <dd>${{ c.subtotal | number: '1.2-2' }}</dd>
+            <dt>IVA ({{ c.porcIva | number: '1.0-2' }}%)</dt>
+            <dd>${{ c.iva | number: '1.2-2' }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="parcial-importe">
+        <div class="parcial-importe-etiqueta">
+          <span>Importe a cobrar</span>
+          <small *ngIf="isRecotizando" class="text-muted">recalculando…</small>
+        </div>
+        <strong>${{ c.total | number: '1.2-2' }}</strong>
+      </div>
+    </section>
+  </ng-container>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" [disabled]="cobrando" (click)="activeModal.dismiss()">Cancelar</button>
+  <button
+    type="button"
+    class="btn btn-cobrar"
+    [disabled]="!periodosValidos || isLoading || isRecotizando || cobrando"
+    (click)="cobrar()">
+    <i class="feather icon-dollar-sign me-1"></i> Aceptar y cobrar
+  </button>
+</div>
