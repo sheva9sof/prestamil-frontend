@@ -164,6 +164,11 @@ export interface ContratoOperacionResponse {
   /** Interés + almacenaje de un periodo sobre el saldo, sin IVA. */
   interesPorPeriodo: number;
   accionesDisponibles: AccionContrato[];
+  /**
+   * Motivo por el que una acción de cobro quedó fuera de {@link accionesDisponibles}; hoy solo lo
+   * pobla la regla "un movimiento por contrato por día" (RN-29, C-01). Null si no hubo bloqueo.
+   */
+  motivoAccionesDeshabilitadas?: string;
 }
 
 export interface UltimoMovimientoResponse {
@@ -249,6 +254,8 @@ export interface CotizacionMovimientoResponse {
 
   estatusActual: EstatusOperativo;
   accionesDisponibles: AccionContrato[];
+  /** Motivo (p. ej. "ya tuvo un movimiento hoy") cuando se bloquearon las acciones de cobro. */
+  motivoAccionesDeshabilitadas?: string;
   fechaContrato: string;
   fechaVencimiento: string;
   saldoCapital: number;

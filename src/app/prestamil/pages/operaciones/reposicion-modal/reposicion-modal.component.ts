@@ -1,10 +1,10 @@
 import { Component, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { NgbActiveModal, NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { environment } from 'src/environments/environment';
 import { CobroComponent } from 'src/app/prestamil/core/components/cobro/cobro.component';
+import { PdfVisorComponent } from 'src/app/prestamil/core/components/pdf-visor/pdf-visor.component';
+import { TicketVisorComponent } from 'src/app/prestamil/core/components/ticket-visor/ticket-visor.component';
 import { generarRequestId } from 'src/app/prestamil/core/helpers/request-id.helper';
 import {
   ContratoOperacionDetalleResponse,
@@ -13,14 +13,16 @@ import {
   ReposicionRequest
 } from 'src/app/prestamil/core/models/contrato.model';
 import { AuthService } from 'src/app/prestamil/core/services/auth.service';
+import { ContratoService } from 'src/app/prestamil/core/services/contrato.service';
 import { MovimientoService } from 'src/app/prestamil/core/services/movimiento.service';
 
 /**
- * Reposición/reimpresión de contrato (F9): muestra ramo, contrato, cliente, avalúo, préstamo, % reposición
- * e importe (calculados por el servidor). El botón "Imprimir contrato" pasa por la ventana de Cobro solo
- * si el importe {@literal >} 0 y luego descarga el PDF existente. La casilla "No cobrar la reposición del
- * contrato" solo aparece para roles autorizados (Gerente y Sistemas por defecto); el backend responde
- * 403 si otro rol la envía.
+ * Reposición/reimpresión de contrato (F9 + C-02): muestra ramo, contrato, cliente, avalúo, préstamo,
+ * % reposición e importe. Flujo secuencial cobro → ticket → contrato: tras registrar el RE se abre el
+ * ticket; solo cuando el usuario cierra el ticket se abre el visor del contrato, que lo descarga por
+ * {@code GET /api/contratos/{id}/pdf-reposicion} (exige un RE no cancelado del día). Así no se
+ * puede entregar el contrato sin que el ticket haya salido primero. La casilla "No cobrar" solo
+ * aparece para Gerente y Sistemas; el backend responde 403 si otro rol la envía.
  */
 @Component({
   selector: 'app-reposicion-modal',
@@ -34,7 +36,7 @@ export class ReposicionModalComponent {
   private modalService = inject(NgbModal);
   private movimientoService = inject(MovimientoService);
   private authService = inject(AuthService);
-  private http = inject(HttpClient);
+  private contratoService = inject(ContratoService);
 
   @Input() contrato!: ContratoOperacionDetalleResponse;
 
@@ -118,23 +120,52 @@ export class ReposicionModalComponent {
     };
   }
 
-  /** Registro OK → descarga el PDF de contrato existente y cierra el modal. */
+  /**
+   * Flujo secuencial C-02: tras registrar el RE se muestra el ticket; cuando el usuario lo cierra,
+   * recién entonces se abre el visor del contrato. El backend rechaza con 409 si el RE no está
+   * registrado, así que la primera llamada después del ticket siempre lo tendrá.
+   */
   private tras(movimiento: MovimientoResponse): void {
-    this.http
-      .get(`${environment.apiUrl}/api/contratos/${this.contrato.id}/pdf`, { responseType: 'blob' })
-      .subscribe({
-        next: (pdf) => {
-          const url = URL.createObjectURL(pdf);
-          window.open(url, '_blank');
-          // El navegador conserva la referencia mientras el visor está abierto; el revoke se puede diferir
-          setTimeout(() => URL.revokeObjectURL(url), 60_000);
-          this.activeModal.close(movimiento);
-        },
-        error: () => {
-          // El movimiento ya quedó registrado en caja aunque falle la descarga: no se cobra dos veces
-          this.errorMessage = 'La reposición se registró, pero no se pudo abrir el PDF del contrato.';
-          this.procesando = false;
-        }
-      });
+    const ticketRef = this.modalService.open(TicketVisorComponent, {
+      centered: true,
+      scrollable: true,
+      backdrop: 'static',
+      keyboard: false
+    });
+    const visor = ticketRef.componentInstance as TicketVisorComponent;
+    visor.movimientoId = movimiento.id;
+    visor.titulo = `Nota ${movimiento.folioNota ?? ''} · Reposición contrato ${movimiento.folioContrato}`;
+    visor.mensaje = movimiento.monto > 0
+      ? `Reposición cobrada por $${movimiento.monto.toFixed(2)}. Entregue el ticket al cliente antes de imprimir el contrato.`
+      : 'Reposición exenta registrada. Entregue el ticket antes de imprimir el contrato.';
+
+    ticketRef.result.then(
+      () => this.abrirContrato(movimiento),
+      () => this.abrirContrato(movimiento)
+    );
+  }
+
+  /**
+   * Muestra el PDF del contrato en un visor modal. Se llama solo tras cerrar el ticket, para que el
+   * personal no entregue el contrato antes de que el ticket salga. Al cerrar el visor se cierra también
+   * este modal, aunque la descarga haya fallado: el RE ya quedó registrado en caja y volver a pulsar
+   * "Imprimir contrato" lo cobraría dos veces (el visor tiene su propio botón de reintentar).
+   */
+  private abrirContrato(movimiento: MovimientoResponse): void {
+    const visorRef = this.modalService.open(PdfVisorComponent, {
+      size: 'xl',
+      scrollable: true,
+      backdrop: 'static',
+      keyboard: false
+    });
+    const visor = visorRef.componentInstance as PdfVisorComponent;
+    visor.pdf$ = this.contratoService.getPdfReposicion(this.contrato.id);
+    visor.titulo = `Contrato ${this.contrato.folio}`;
+    visor.nombreArchivo = `contrato-${this.contrato.folio}.pdf`;
+
+    visorRef.result.then(
+      () => this.activeModal.close(movimiento),
+      () => this.activeModal.close(movimiento)
+    );
   }
 }

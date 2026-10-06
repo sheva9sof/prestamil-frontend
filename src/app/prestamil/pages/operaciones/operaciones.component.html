@@ -57,13 +57,21 @@
 
           <!-- Acciones -->
           <p class="section-label">Acciones</p>
+          <div
+            *ngIf="detalle.motivoAccionesDeshabilitadas"
+            class="alert alert-warning d-flex gap-2 py-2 mb-2"
+            role="alert"
+          >
+            <i class="feather icon-alert-triangle"></i>
+            <span>{{ detalle.motivoAccionesDeshabilitadas }}</span>
+          </div>
           <div class="acciones-grid">
             <button
               *ngFor="let b of botonesAccion"
               type="button"
               class="accion-btn"
               [disabled]="!puede(b.accion)"
-              [title]="puede(b.accion) ? b.etiqueta : 'No disponible para un contrato ' + etiquetaEstatus(detalle.estatus).toLowerCase()"
+              [title]="tituloAccion(b)"
               (click)="abrirAccion(b)"
             >
               <i class="feather" [ngClass]="b.icono"></i>

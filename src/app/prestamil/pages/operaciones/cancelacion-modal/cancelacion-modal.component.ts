@@ -72,10 +72,11 @@ export class CancelacionModalComponent implements OnInit {
   ngOnInit(): void {
     this.movimientoService.getMovimientos(this.contrato.id).subscribe({
       next: (movs) => {
-        // Último vigente distinto de EMP (RN-22 aplica también aquí)
+        // Último vigente distinto de EMP y RE. RE queda fuera por C-03: las reposiciones no se
+        // cancelan y tampoco cuentan al decidir cuál es el último movimiento cancelable.
         for (let i = movs.length - 1; i >= 0; i--) {
           const m = movs[i];
-          if (!m.cancelado && m.tipo !== 'EMP') {
+          if (!m.cancelado && m.tipo !== 'EMP' && m.tipo !== 'RE') {
             this.ultimo = m;
             break;
           }

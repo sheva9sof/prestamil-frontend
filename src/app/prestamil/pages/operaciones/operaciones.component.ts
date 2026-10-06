@@ -244,6 +244,30 @@ export class OperacionesComponent implements OnInit {
     return this.detalle?.accionesDisponibles.includes(accion) ?? false;
   }
 
+  /** Acciones de cobro que la regla RN-29 (un movimiento por día) puede bloquear. */
+  private readonly accionesDeCobro: ReadonlySet<AccionContrato> = new Set<AccionContrato>([
+    'REFRENDO',
+    'FINIQUITO',
+    'ABONO_CAPITAL',
+    'REFRENDO_PARCIAL',
+    'REFRENDO_EXTEMPORANEO',
+    'FINIQUITO_EXTEMPORANEO'
+  ]);
+
+  /**
+   * Tooltip del botón: si está habilitado, su etiqueta; si está deshabilitado por la regla del día,
+   * el motivo que mandó el backend (RN-29, C-01); si no, el motivo genérico por estatus.
+   */
+  tituloAccion(boton: BotonAccion): string {
+    const detalle = this.detalle;
+    if (!detalle) return boton.etiqueta;
+    if (this.puede(boton.accion)) return boton.etiqueta;
+    if (detalle.motivoAccionesDeshabilitadas && this.accionesDeCobro.has(boton.accion)) {
+      return detalle.motivoAccionesDeshabilitadas;
+    }
+    return 'No disponible para un contrato ' + this.etiquetaEstatus(detalle.estatus).toLowerCase();
+  }
+
   abrirAccion(boton: BotonAccion): void {
     if (!this.puede(boton.accion)) return;
     // El backend resuelve RF/RPG/RX y FI/FX por fecha (F1): un mismo modal cubre las dos variantes.
@@ -290,7 +314,11 @@ export class OperacionesComponent implements OnInit {
     });
     (ref.componentInstance as ReposicionModalComponent).contrato = detalle;
     ref.result.then(
-      (movimiento: MovimientoResponse) => this.movimientoRegistrado(detalle.id, movimiento),
+      () => {
+        // El modal de reposición ya mostró ticket y contrato (C-02); solo refrescar detalle y listado
+        this.recargarDetalle(detalle.id);
+        this.cargarPagina();
+      },
       () => undefined
     );
   }

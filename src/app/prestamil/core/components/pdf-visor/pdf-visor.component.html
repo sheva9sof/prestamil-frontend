@@ -1,0 +1,31 @@
+<div class="modal-header">
+  <h5 class="modal-title"><i class="feather icon-file-text me-2"></i>{{ titulo }}</h5>
+  <button type="button" class="btn-close" aria-label="Cerrar" (click)="activeModal.close()"></button>
+</div>
+
+<div class="modal-body pdf-body">
+  <div *ngIf="mensaje" class="alert alert-success d-flex align-items-center gap-2 py-2">
+    <i class="feather icon-check-circle"></i> {{ mensaje }}
+  </div>
+  <div *ngIf="isLoading" class="text-center py-5">
+    <div class="spinner-border text-secondary" role="status"></div>
+    <p class="text-muted mt-2 mb-0">Generando PDF…</p>
+  </div>
+  <div *ngIf="errorMessage" class="alert alert-warning d-flex align-items-center justify-content-between gap-2 mb-0">
+    <span>{{ errorMessage }}</span>
+    <button type="button" class="btn btn-outline-secondary btn-sm" (click)="cargar()">
+      <i class="feather icon-refresh-cw me-1"></i> Reintentar
+    </button>
+  </div>
+  <iframe #visor *ngIf="pdfUrl" [src]="pdfUrl" [title]="titulo" class="pdf-iframe"></iframe>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary btn-sm" [disabled]="!pdfUrl" (click)="descargar()">
+    <i class="feather icon-download me-1"></i> Descargar
+  </button>
+  <button type="button" class="btn btn-primary btn-sm" [disabled]="!pdfUrl" (click)="imprimir()">
+    <i class="feather icon-printer me-1"></i> Imprimir
+  </button>
+  <button type="button" class="btn btn-secondary btn-sm" (click)="activeModal.close()">Cerrar</button>
+</div>

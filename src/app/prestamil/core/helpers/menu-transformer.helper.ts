@@ -6,9 +6,21 @@ function normalizeMenuUrl(url: string): string {
   return normalizedUrl === '/avaluos/mock' ? '/avaluos' : normalizedUrl;
 }
 
+export function isParametrosPrestamoMenu(title?: string | null): boolean {
+  const normalizedTitle = (title ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+
+  return normalizedTitle === 'parametros prestamo'
+    || normalizedTitle === 'parametros de prestamo';
+}
+
 function normalizeNavigationItem(item: NavigationItem): NavigationItem {
   const children = item.children
-    ?.filter(child => !['Parametros prestamo', 'Parámetros Préstamo'].includes(child.title ?? ''))
+    ?.filter(child => !isParametrosPrestamoMenu(child.title))
     .map(child => normalizeNavigationItem(child));
   const normalizedItem: NavigationItem = {
     ...item,
@@ -76,6 +88,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Avaluos': '/avaluos',
       'Avaluos Prendarios': '/avaluos',
       'Finiquitos y Refrendos': '/operaciones',
+      'Pase de almoneda': '/pase-almoneda',
       'Prendas': '/catalogos/prendas',
       'Descuentos': '/catalogos/descuentos',
       'Sucursal': '/configuracion/sucursal',

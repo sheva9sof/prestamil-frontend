@@ -617,6 +617,10 @@ export class AvaluoComponent implements OnInit {
   readonly subtiposVarios = ['Electrodoméstico', 'Celular', 'Laptop', 'Otro'];
   readonly estadosVarios  = ['Bueno', 'Regular', 'Malo'];
   readonly IVA_PORC = 16;   // IVA estándar (México); COCAE lo aplica sobre el interés total
+  // C-08 (RN-30, PLAN-CORRECCIONES-30SEP): el préstamo total de alhajas se baja al múltiplo
+  // de $5 más cercano; la diferencia se descuenta de la última partida alhaja. El backend
+  // valida la misma regla y rechaza préstamos que no la cumplan (ContratoService).
+  private readonly MULTIPLO_REDONDEO_PRESTAMO = 5;
 
   // Preview de la tabla de amortización del contrato en curso (modal estilo COCAE)
   amortizacion: AmortizacionPreview | null = null;
@@ -904,9 +908,68 @@ export class AvaluoComponent implements OnInit {
    * de plazos. Se llama al agregar, editar o eliminar una partida, y tras cambiar de plazo.
    */
   private onPartidasCambiaron(): void {
+    this.partidas = this.aplicarRedondeoMultiploDe5(this.partidas, this.datosPlazoActual);
     this.refrescarAmortizacion();
     this.actualizarComparativa();
     this.persistirBorrador();
+  }
+
+  /**
+   * ¿Al tipo de prenda le aplica el redondeo del total a múltiplo de $5 (C-08 / RN-30)?
+   * Único lugar donde vive la regla por tipo: tanto el preview como el pay­load al
+   * backend se derivan de aquí.
+   *
+   * TODO G-04: hoy aplica solo a alhajas; pendiente de validar con Jorge si extender
+   * a plata, relojes o electrónicos.
+   */
+  private aplicaRedondeoMultiploDe5(tipo: string): boolean {
+    return tipo === 'Alhajas';
+  }
+
+  private redondearAMultiploDe5(valor: number): number {
+    return Math.floor(valor / this.MULTIPLO_REDONDEO_PRESTAMO) * this.MULTIPLO_REDONDEO_PRESTAMO;
+  }
+
+  /**
+   * C-08 (RN-30): el préstamo total de partidas sujetas al redondeo se baja al múltiplo
+   * de $5 más cercano; la diferencia se descuenta de la ÚLTIMA partida redondeable. Las
+   * partidas se re-derivan de sus datos naturales (peso × precio) antes de aplicar el
+   * ajuste, para que la reducción no se compounde cuando cambia la última.
+   */
+  private aplicarRedondeoMultiploDe5(partidas: PartidaAvaluo[], datos: DatosPlazo): PartidaAvaluo[] {
+    const esRedondeable = (p: PartidaAvaluo) => this.aplicaRedondeoMultiploDe5(p.tipo);
+    if (!partidas.some(esRedondeable)) {
+      return partidas;
+    }
+
+    // Re-propuesta natural de las partidas redondeables, para que el ajuste siempre
+    // se calcule sobre el total "bruto" y no sobre un total que ya tiene recortes.
+    const normalizadas = partidas.map(p =>
+      esRedondeable(p) ? this.recalcularPartida(p, datos) : p);
+
+    let indiceUltima = -1;
+    for (let i = normalizadas.length - 1; i >= 0; i--) {
+      if (esRedondeable(normalizadas[i])) { indiceUltima = i; break; }
+    }
+    if (indiceUltima === -1) {
+      return normalizadas;
+    }
+
+    const total = normalizadas
+      .filter(esRedondeable)
+      .reduce((acc, p) => acc + p.prestamo, 0);
+    const totalRedondeado = this.redondearAMultiploDe5(total);
+    const ajuste = +(total - totalRedondeado).toFixed(2);
+    if (ajuste <= 0) {
+      return normalizadas;
+    }
+
+    const ultima = normalizadas[indiceUltima];
+    const prestamoAjustado = +(ultima.prestamo - ajuste).toFixed(2);
+    const params = this.paramsDe(datos, ultima.idTipoPrenda);
+    return normalizadas.map((p, i) => (i === indiceUltima
+      ? { ...p, prestamo: prestamoAjustado, avaluoContrato: this.avaluoContratoDesde(prestamoAjustado, params) }
+      : p));
   }
 
   /**
@@ -983,7 +1046,12 @@ export class AvaluoComponent implements OnInit {
 
   /** Evalúa el contrato capturado con un plazo alternativo, sin tocar las partidas reales. */
   private evaluarPlazo(plazo: PlazoAvaluo, datos: DatosPlazo): OpcionPlazo {
-    const partidas = this.partidas.map(p => this.recalcularPartida(p, datos));
+    // Mismo redondeo que para el plazo vigente: el comparador debe mostrarle al cliente
+    // el préstamo efectivo (múltiplo de $5), no la suma bruta.
+    const partidas = this.aplicarRedondeoMultiploDe5(
+      this.partidas.map(p => this.recalcularPartida(p, datos)),
+      datos
+    );
     const prestamo = partidas.reduce((a, p) => a + p.prestamo, 0);
     const amortizacion = this.calcularAmortizacion(plazo, datos, partidas);
     const ultima = amortizacion?.filas[amortizacion.filas.length - 1];

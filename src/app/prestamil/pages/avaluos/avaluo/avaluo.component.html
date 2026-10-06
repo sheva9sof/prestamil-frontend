@@ -475,7 +475,7 @@
   <div class="col-12">
     <app-card cardTitle="Opciones para el cliente" class="workflow-card">
       <p class="text-muted small mb-2">
-        El mismo empeño con cada plazo disponible. Da clic en una opción para aplicarla.
+        El mismo empeño con cada plazo disponible. Da doble clic en una opción para aplicarla.
       </p>
 
       <div *ngIf="isLoadingComparativa" class="text-center py-2">
@@ -502,7 +502,7 @@
               [class.opcion-actual]="opcion.esActual"
               [class.opcion-no-viable]="opcion.motivoNoViable"
               [title]="opcion.motivoNoViable"
-              (click)="seleccionarPlazoComparativa(opcion)"
+              (dblclick)="seleccionarPlazoComparativa(opcion)"
             >
               <td>
                 <strong>{{ opcion.plazo.nombre }}</strong>

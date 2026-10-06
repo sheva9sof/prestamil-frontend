@@ -63,4 +63,9 @@ export class ContratoService {
   getPdf(id: number): Observable<Blob> {
     return this.http.get(`${this.API_URL}/${id}/pdf`, { responseType: 'blob' });
   }
+
+  /** PDF del contrato para reposición: el backend exige un RE no cancelado del día (409 si no hay). */
+  getPdfReposicion(id: number): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/${id}/pdf-reposicion`, { responseType: 'blob' });
+  }
 }
