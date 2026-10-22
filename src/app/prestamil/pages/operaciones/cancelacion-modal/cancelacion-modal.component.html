@@ -1,7 +1,9 @@
 <div class="cancelacion-modal">
   <div class="modal-header">
     <div>
-      <h4 class="modal-title mb-1">Cancelación de movimiento</h4>
+      <h4 class="modal-title mb-1">
+        {{ modo === 'CONTRATO' ? 'Cancelación de contrato' : 'Cancelación de movimiento' }}
+      </h4>
       <p class="modal-subtitle">
         Contrato <strong>{{ contrato.folio }}</strong>
         <span class="separator">·</span>
@@ -25,9 +27,18 @@
       </div>
 
       <ng-container *ngIf="ultimo as u">
+        <!-- Aviso en modo "contrato": lo que se cancela es el empeño, no un cobro -->
+        <div *ngIf="modo === 'CONTRATO'" class="alert alert-warning small">
+          <i class="feather icon-alert-triangle me-1"></i>
+          Esta operación <strong>cancela el contrato</strong>: las prendas se devuelven al cliente, el
+          contrato queda en CANCELADO y el préstamo regresa a caja. Solo aplica a contratos del día.
+        </div>
+
         <!-- Cabecera del movimiento -->
         <section class="bloque">
-          <h6 class="bloque-titulo">Movimiento a cancelar</h6>
+          <h6 class="bloque-titulo">
+            {{ modo === 'CONTRATO' ? 'Empeño a cancelar' : 'Movimiento a cancelar' }}
+          </h6>
           <dl class="row small mb-0">
             <dt class="col-4">Tipo</dt>
             <dd class="col-8">
@@ -48,8 +59,8 @@
         <!-- Aviso si no es de hoy -->
         <div *ngIf="!esDeHoy" class="alert alert-warning small mt-3">
           <i class="feather icon-alert-triangle me-1"></i>
-          Este movimiento no es del día en curso. Solo Sistemas puede cancelarlo fuera del día
-          (procedimiento manual, RN-26).
+          Este movimiento no es del día en curso y no se puede cancelar desde el sistema. Para
+          cancelaciones de días anteriores contacte al área de Sistemas (procedimiento manual, RN-26).
         </div>
 
         <!-- Estado que se restaurará -->
@@ -120,7 +131,7 @@
       (click)="confirmar()"
     >
       <span *ngIf="isCancelando" class="spinner-border spinner-border-sm me-2"></span>
-      Cancelar movimiento
+      {{ modo === 'CONTRATO' ? 'Cancelar contrato' : 'Cancelar movimiento' }}
     </button>
   </div>
 </div>

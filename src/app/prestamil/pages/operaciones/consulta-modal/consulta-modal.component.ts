@@ -106,6 +106,14 @@ export class ConsultaModalComponent implements OnInit {
     visor.titulo = `Ticket vigente · Contrato ${this.contrato.folio}`;
   }
 
+  /** D-10: ticket de bolsa del contrato, el mismo que se imprimió al generarlo. */
+  reimprimirTicketBolsa(): void {
+    const ref = this.modalService.open(TicketVisorComponent, { centered: true, scrollable: true });
+    const visor = ref.componentInstance as TicketVisorComponent;
+    visor.contratoIdBolsa = this.contrato.id;
+    visor.titulo = `Ticket de bolsa · Contrato ${this.contrato.folio}`;
+  }
+
   colorTipo(tipo: TipoMovimiento): string {
     return COLOR_MOVIMIENTO[tipo] ?? '#212529';
   }
@@ -162,11 +170,12 @@ export class ConsultaModalComponent implements OnInit {
     return '$' + v.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
+  /** D-02: pagados = normales + extemporáneos, con el desglose entre paréntesis. */
   periodos(m: MovimientoResponse): string {
-    const n = m.periodosNormales ?? 0;
+    if (m.tipo === 'EMP' || m.periodosNormales == null) return '—';
+    const n = m.periodosNormales;
     const e = m.semanasVencidas ?? 0;
-    if (m.tipo === 'EMP') return '—';
-    return n + ' N / ' + e + ' E';
+    return n + e + ' (' + n + 'N / ' + e + 'E)';
   }
 
   trackMov(_: number, m: MovimientoResponse): number {

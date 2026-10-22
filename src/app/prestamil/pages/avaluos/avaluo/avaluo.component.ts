@@ -14,6 +14,7 @@ import { PrendaService } from 'src/app/prestamil/core/services/prenda.service';
 import { PlazoHechuraAlhajaResponse, PlazoParametroResponse } from 'src/app/prestamil/core/models/plazo.model';
 import { ClienteResponse } from 'src/app/prestamil/core/models/cliente.model';
 import { ContratoRequest, PartidaContratoRequest } from 'src/app/prestamil/core/models/contrato.model';
+import { TicketVisorComponent } from 'src/app/prestamil/core/components/ticket-visor/ticket-visor.component';
 import { environment } from 'src/environments/environment';
 import { AvaluoDraft, AvaluoDraftService } from './avaluo-draft.service';
 
@@ -27,6 +28,9 @@ interface PartidaAvaluo {
   idValorPrenda?: number;
   tipo: string;
   clavePrenda: string;
+  /** Descripción general del catálogo (solo lectura). Vacía si la partida no se ligó al catálogo. */
+  descripcionGeneral?: string;
+  /** Descripción específica de la pieza, capturada por el valuador (D-09, mínimo 10 caracteres). */
   descripcion: string;
   cantidad: number;
   /** Peso del metal precioso (g), del lote completo. Alimenta el cálculo de avalúo y préstamo. */
@@ -122,7 +126,15 @@ interface AmortizacionPreview {
   aplicaSancion: boolean;
   porcSancionSemanal: number;
   sancionSemanal: number;
+  // Reposición de contrato: PlazoParametro trae tres campos relacionados y un switch que decide
+  // cuál aplica (igual que el backend en MovimientoContratoService.calcularImporteReposicion y
+  // ContratoPdfService.resolverComisionReposicion). El preview debe mostrar el VALOR EFECTIVO,
+  // no solo `porcReposicion` como "%" (que es 0 cuando el modo es Monto fijo).
+  cobrarReposicion: boolean;
+  reposicionEsPorcentaje: boolean;
   porcReposicion: number;
+  montoReposicion: number;
+  importeReposicion: number; // valor cobrado (porcentaje aplicado al préstamo o monto fijo)
   fechaPaseVenta: string;
   porcGastosOperacionVenta: number;
   comisionVenta: number;
@@ -412,6 +424,7 @@ export class AvaluoComponent implements OnInit {
       || this.captura.pesoNeto > 0
       || this.capturaVarios.prestamo > 0
       || !!this.captura.descripcion
+      || !!this.capturaVarios.descripcion
       || !!this.capturaVarios.marca
       || !!this.capturaVarios.modelo;
   }
@@ -625,10 +638,11 @@ export class AvaluoComponent implements OnInit {
   // Preview de la tabla de amortización del contrato en curso (modal estilo COCAE)
   amortizacion: AmortizacionPreview | null = null;
 
-  // Visor del PDF del contrato generado
+  // Visor de los PDF que se imprimen al generar el contrato (contrato y carta responsiva)
   pdfUrl: SafeResourceUrl | null = null;
   private pdfBlobUrl: string | null = null;
-  contratoPdfFolio = '';
+  pdfTitulo = '';
+  private pdfNombreArchivo = '';
 
   // -------------------------------------------------------------------------
   // Estado — cliente seleccionado
@@ -701,6 +715,9 @@ export class AvaluoComponent implements OnInit {
     idValorPrenda: undefined as number | undefined
   };
 
+  /** D-09 / Q4: mínimo de caracteres de la descripción específica (mismo valor que el backend). */
+  readonly MIN_DESCRIPCION_ESPECIFICA = 10;
+
   /** Prestamo maximo autorizado por el servidor para la captura de plata (avaluo x % / 100). */
   prestamoMaximoPlata = 0;
 
@@ -711,6 +728,8 @@ export class AvaluoComponent implements OnInit {
     subtipo: 'Celular',
     idValorPrenda: undefined as number | undefined,
     clavePrenda: '',
+    nombreCatalogo: '',
+    descripcion: '',
     marca: '',
     modelo: '',
     serie: '',
@@ -786,7 +805,9 @@ export class AvaluoComponent implements OnInit {
 
   /**
    * Motor de cálculo de alhajas: el préstamo sale de la tabla de precios del plazo
-   * (kilataje + hechura), así que cambiar de plazo cambia el resultado.
+   * (kilataje + hechura), así que cambiar de plazo cambia el resultado. El avalúo real es
+   * el valor de la prenda (precioAvaluo × peso), no el préstamo: la columna PRÉSTAMO ya
+   * trae descontado el %Préstamo de la tabla de oro. Mismo cálculo que el servidor.
    * Único lugar donde vive la fórmula — ver calcularPlata.
    */
   private calcularAlhaja(
@@ -800,18 +821,21 @@ export class AvaluoComponent implements OnInit {
 
     let precioXGramo: number;
     let prestamo: number;
+    let avaluoReal: number;
     if (row) {
       precioXGramo = row.precioBase;
       prestamo = +(row.precioPrestamo * pesoNeto).toFixed(2);
+      avaluoReal = row.precioAvaluo != null ? +(row.precioAvaluo * pesoNeto).toFixed(2) : prestamo;
     } else {
       // Fallback a precios demo mientras no haya tabla real
       const precioBase = this.preciosOro[+kilataje] ?? 0;
       precioXGramo = precioBase;
       prestamo = +(precioBase * pesoNeto * 1.03).toFixed(2);
+      avaluoReal = prestamo;
     }
 
     const params = this.paramsDe(datos, idTipoPrenda);
-    return { precioXGramo, avaluoReal: prestamo, prestamo, avaluoContrato: this.avaluoContratoDesde(prestamo, params) };
+    return { precioXGramo, avaluoReal, prestamo, avaluoContrato: this.avaluoContratoDesde(prestamo, params) };
   }
 
   /** Preview de alhajas sobre la captura en curso. */
@@ -1143,6 +1167,26 @@ export class AvaluoComponent implements OnInit {
       return this.motivoTipoDeshabilitado(this.tipoSeleccionado);
     }
 
+    // D-09: la descripción específica identifica la pieza real (antifraude). El backend
+    // aplica la misma regla; aquí se valida para no esperar al "Generar contrato".
+    const especifica = (this.tipoSeleccionado === 'Varios'
+      ? this.capturaVarios.descripcion
+      : this.captura.descripcion).trim();
+    if (especifica.length < this.MIN_DESCRIPCION_ESPECIFICA) {
+      return `Captura la descripción específica de la pieza (mínimo ${this.MIN_DESCRIPCION_ESPECIFICA} caracteres)`;
+    }
+    // TODO Q4: confirmar con Jorge si marca/modelo/serie aplican a todo VARIOS o solo a electrónicos.
+    if (this.tipoSeleccionado === 'Varios') {
+      const faltantes = [
+        !this.capturaVarios.marca.trim() ? 'marca' : null,
+        !this.capturaVarios.modelo.trim() ? 'modelo' : null,
+        !this.capturaVarios.serie.trim() ? 'serie/IMEI' : null
+      ].filter(Boolean);
+      if (faltantes.length > 0) {
+        return `Falta capturar ${faltantes.join(', ')}`;
+      }
+    }
+
     if (this.tipoSeleccionado === 'Alhajas' || this.tipoSeleccionado === 'Plata') {
       if (this.captura.pesoNeto <= 0) {
         return 'Captura un peso neto mayor a 0';
@@ -1182,7 +1226,8 @@ export class AvaluoComponent implements OnInit {
         tipo: 'Varios',
         clavePrenda: this.capturaVarios.clavePrenda
           || this.capturaVarios.subtipo.substring(0, 3).toUpperCase(),
-        descripcion: `${this.capturaVarios.subtipo} ${this.capturaVarios.marca} ${this.capturaVarios.modelo}`.trim(),
+        descripcionGeneral: this.capturaVarios.nombreCatalogo || undefined,
+        descripcion: this.capturaVarios.descripcion.trim(),
         cantidad: 1,
         // Varios no se valua por gramo: ambos pesos quedan en 0 y se omiten al enviar al backend
         pesoNeto: 0,
@@ -1206,9 +1251,9 @@ export class AvaluoComponent implements OnInit {
       idValorPrenda: this.captura.idValorPrenda,
       tipo: this.tipoSeleccionado,
       clavePrenda: this.captura.clavePrenda || '—',
-      descripcion: this.captura.descripcion || this.captura.nombreCatalogo || (esPlata
-        ? `Plata ley ${this.captura.ley}`
-        : `${this.tipoSeleccionado} ${this.captura.kilataje}K`),
+      descripcionGeneral: this.captura.nombreCatalogo || undefined,
+      // D-09: ya no se rellena con el nombre del catálogo; la específica es obligatoria.
+      descripcion: this.captura.descripcion.trim(),
       cantidad: this.captura.cantidad,
       pesoNeto: this.captura.pesoNeto,
       // Sin peso total capturado se asume que la pieza es 100% metal (mismo criterio que el backend)
@@ -1268,6 +1313,8 @@ export class AvaluoComponent implements OnInit {
         subtipo: partida.subtipo ?? '',
         idValorPrenda: partida.idValorPrenda,
         clavePrenda: partida.clavePrenda === '—' ? '' : partida.clavePrenda,
+        nombreCatalogo: partida.descripcionGeneral ?? '',
+        descripcion: partida.descripcion,
         marca: partida.marca ?? '',
         modelo: partida.modelo ?? '',
         serie: partida.serie ?? '',
@@ -1282,9 +1329,7 @@ export class AvaluoComponent implements OnInit {
     this.captura = {
       ...this.captura,
       clavePrenda: partida.clavePrenda === '—' ? '' : partida.clavePrenda,
-      // La descripción guardada ya incluye el fallback del catálogo o el generado, así que
-      // se edita tal cual se ve en la tabla y nombreCatalogo deja de aportar.
-      nombreCatalogo: '',
+      nombreCatalogo: partida.descripcionGeneral ?? '',
       descripcion: partida.descripcion,
       hechura: partida.hechura ?? this.captura.hechura,
       kilataje: partida.kilataje ?? this.captura.kilataje,
@@ -1400,6 +1445,8 @@ export class AvaluoComponent implements OnInit {
       subtipo: 'Celular',
       idValorPrenda: undefined,
       clavePrenda: '',
+      nombreCatalogo: '',
+      descripcion: '',
       marca: '',
       modelo: '',
       serie: '',
@@ -1523,13 +1570,14 @@ export class AvaluoComponent implements OnInit {
     const clave = p.clave === '—' ? '' : p.clave;
     if (this.tipoSeleccionado === 'Alhajas') {
       this.captura.clavePrenda = clave;
+      // La descripción específica es otro campo: elegir del catálogo no la borra.
       this.captura.nombreCatalogo = p.descripcion;
-      this.captura.descripcion = '';
       this.captura.idValorPrenda = p.idValorAtributo;
       this.aplicarAtributosCatalogoAlhaja(p);
       this.recalcularAlhajas();
     } else if (this.tipoSeleccionado === 'Varios') {
       this.capturaVarios.clavePrenda = clave;
+      this.capturaVarios.nombreCatalogo = p.descripcion;
       this.capturaVarios.subtipo = p.descripcion;
       this.capturaVarios.idValorPrenda = p.idValorAtributo;
       this.recalcularVarios();
@@ -1540,6 +1588,19 @@ export class AvaluoComponent implements OnInit {
   limpiarSeleccionCatalogoVarios(): void {
     this.capturaVarios.idValorPrenda = undefined;
     this.capturaVarios.clavePrenda = '';
+    this.capturaVarios.nombreCatalogo = '';
+  }
+
+  /** Quita la prenda del catálogo de la captura de alhajas (la descripción específica se conserva). */
+  limpiarSeleccionCatalogoAlhaja(): void {
+    this.captura.idValorPrenda = undefined;
+    this.captura.clavePrenda = '';
+    this.captura.nombreCatalogo = '';
+  }
+
+  /** "CLAVE - Descripción general" para el campo de solo lectura del avalúo. */
+  textoCatalogo(clave: string, nombre: string): string {
+    return [clave, nombre].filter(parte => !!parte?.trim()).join(' - ');
   }
 
   private aplicarAtributosCatalogoAlhaja(prenda: PrendaCatalogo): void {
@@ -1601,7 +1662,7 @@ export class AvaluoComponent implements OnInit {
             // Contrato ya generado y almacenado: el preview y el comparador se vacían.
             this.onPartidasCambiaron();
             this.mostrarExito(`Contrato ${resp.folio} registrado exitosamente.`);
-            this.abrirPdfContrato(resp.id, resp.folio);
+            this.imprimirDocumentosContrato(resp.id, resp.folio);
           },
           error: (err) => {
             this.isGuardando = false;
@@ -1614,26 +1675,57 @@ export class AvaluoComponent implements OnInit {
     );
   }
 
-  /** Descarga el PDF del contrato recién creado y lo muestra en un visor modal. */
-  private abrirPdfContrato(id: number, folio: string): void {
+  /**
+   * D-10: documentos del contrato recién creado, en el orden de COCAE: contrato → carta responsiva →
+   * ticket de bolsa. Cada uno se abre al cerrar el anterior; si uno falla se avisa y se sigue con el
+   * siguiente, para que el ticket de bolsa siempre salga.
+   */
+  private imprimirDocumentosContrato(id: number, folio: string): void {
     this.contratoService.getPdf(id).subscribe({
-      next: (blob) => {
-        if (this.pdfBlobUrl) URL.revokeObjectURL(this.pdfBlobUrl);
-        this.pdfBlobUrl = URL.createObjectURL(blob);
-        this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfBlobUrl);
-        this.contratoPdfFolio = folio;
-        this.modalService.open(this.modalPdf, { size: 'xl', scrollable: true });
-      },
-      error: () => this.mostrarError('El contrato se guardó, pero no se pudo generar el PDF.')
+      next: (blob) => this.mostrarPdf(blob, `Contrato ${folio}`, `contrato-${folio}`,
+        () => this.abrirCartaResponsiva(id, folio)),
+      error: () => {
+        this.mostrarError('El contrato se guardó, pero no se pudo generar el PDF.');
+        this.abrirCartaResponsiva(id, folio);
+      }
     });
   }
 
+  /** Carta responsiva (D-12): modal propio entre el contrato y el ticket de bolsa. */
+  private abrirCartaResponsiva(id: number, folio: string): void {
+    this.contratoService.getCartaResponsiva(id).subscribe({
+      next: (blob) => this.mostrarPdf(blob, `Carta responsiva · Contrato ${folio}`, `carta-responsiva-${folio}`,
+        () => this.abrirTicketBolsa(id, folio)),
+      error: () => {
+        this.mostrarError('No se pudo generar la carta responsiva.');
+        this.abrirTicketBolsa(id, folio);
+      }
+    });
+  }
+
+  private abrirTicketBolsa(id: number, folio: string): void {
+    const ref = this.modalService.open(TicketVisorComponent, { centered: true, scrollable: true });
+    const visor = ref.componentInstance as TicketVisorComponent;
+    visor.contratoIdBolsa = id;
+    visor.titulo = `Ticket de bolsa · Contrato ${folio}`;
+  }
+
+  /** Muestra un PDF en el visor modal; al cerrarlo (con el botón o la X) ejecuta `alCerrar`. */
+  private mostrarPdf(blob: Blob, titulo: string, nombreArchivo: string, alCerrar: () => void): void {
+    if (this.pdfBlobUrl) URL.revokeObjectURL(this.pdfBlobUrl);
+    this.pdfBlobUrl = URL.createObjectURL(blob);
+    this.pdfUrl = this.sanitizer.bypassSecurityTrustResourceUrl(this.pdfBlobUrl);
+    this.pdfTitulo = titulo;
+    this.pdfNombreArchivo = nombreArchivo;
+    this.modalService.open(this.modalPdf, { size: 'xl', scrollable: true }).result.then(alCerrar, alCerrar);
+  }
+
   /** Descarga el PDF actualmente mostrado en el visor. */
-  descargarPdfContrato(): void {
+  descargarPdf(): void {
     if (!this.pdfBlobUrl) return;
     const a = document.createElement('a');
     a.href = this.pdfBlobUrl;
-    a.download = `contrato-${this.contratoPdfFolio || 'sin-folio'}.pdf`;
+    a.download = `${this.pdfNombreArchivo || 'documento'}.pdf`;
     a.click();
   }
 
@@ -1768,8 +1860,10 @@ export class AvaluoComponent implements OnInit {
     }
     const ult = filas[filas.length - 1];
 
-    const sancionActiva = !!params?.aplicarSancionPorPeriodo;
-    const porcSancion = sancionActiva ? Number(params?.porcSancionSemanal ?? 0) : 0;
+    // D-14 (2026-10-08): el preview usa el % configurado directamente, sin gate aplicarSancion
+    // (que ya no influye en el cálculo del backend). Si quieren "sin sanción", se configura 0.
+    const porcSancion = Number(params?.porcSancionSemanal ?? 0);
+    const sancionActiva = porcSancion > 0;
 
     return {
       periodoNombre: this.nombrePeriodo(dias),
@@ -1792,7 +1886,17 @@ export class AvaluoComponent implements OnInit {
       aplicaSancion: sancionActiva,
       porcSancionSemanal: porcSancion,
       sancionSemanal: r2(prestamo * porcSancion / 100),
+      cobrarReposicion: !!params?.cobrarReposicionContrato,
+      reposicionEsPorcentaje: !!params?.reposicionEsPorcentaje,
       porcReposicion: Number(params?.porcReposicion ?? 0),
+      montoReposicion: Number(params?.montoReposicion ?? 0),
+      // Mismo cálculo que el backend (MovimientoContratoService.calcularImporteReposicion):
+      // en modo porcentaje = préstamo × %; en modo monto fijo = monto. Si está apagado, 0.
+      importeReposicion: !params?.cobrarReposicionContrato
+        ? 0
+        : (params?.reposicionEsPorcentaje
+            ? r2(prestamo * Number(params?.porcReposicion ?? 0) / 100)
+            : r2(Number(params?.montoReposicion ?? 0))),
       fechaPaseVenta: fechaMas(dias * nPer + Number(params?.diasAntesPaseVenta ?? 0)),
       porcGastosOperacionVenta,
       comisionVenta: r2(prestamo * porcGastosOperacionVenta / 100)

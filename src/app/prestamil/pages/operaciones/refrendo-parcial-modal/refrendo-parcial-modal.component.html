@@ -80,20 +80,28 @@
     <section class="parcial-captura">
       <label for="periodosInput" class="form-label">
         Total periodos a cubrir
-        <small class="text-muted"> (máximo {{ maxPeriodos }}; se ajusta al máximo si captura más)</small>
+        <small *ngIf="campoEditable" class="text-muted">
+          (mínimo <strong>{{ minPeriodos }}</strong>, máximo <strong>{{ maxPeriodos }}</strong>;
+          se ajusta si captura fuera del rango)
+        </small>
+        <small *ngIf="!campoEditable" class="text-muted">
+          (solo puede cubrir {{ maxPeriodos }} periodo{{ maxPeriodos === 1 ? '' : 's' }})
+        </small>
       </label>
       <div class="input-group input-group-lg parcial-input">
         <input
           id="periodosInput"
           type="number"
           class="form-control"
-          min="1"
+          [attr.min]="minPeriodos"
+          [attr.max]="maxPeriodos"
           step="1"
           placeholder="0"
           [(ngModel)]="periodosCapturados"
           (blur)="recotizar()"
           (keydown.enter)="onEnter($event)"
-          [disabled]="cobrando" />
+          [disabled]="cobrando || !campoEditable"
+          [readonly]="!campoEditable" />
         <span class="input-group-text" *ngIf="isRecotizando"><i class="feather icon-loader spinner-border-sm"></i></span>
       </div>
       <p class="parcial-hint">

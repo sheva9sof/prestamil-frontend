@@ -3,11 +3,13 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import {
+  CancelarMovimientoRequest,
   ContratoOperacionDetalleResponse,
   ContratoOperacionFiltro,
   ContratoOperacionResponse,
   ContratoRequest,
   ContratoResponse,
+  MovimientoResponse,
   VencimientoResponse
 } from '../models/contrato.model';
 import { PageResponse } from '../models/page.model';
@@ -64,8 +66,29 @@ export class ContratoService {
     return this.http.get(`${this.API_URL}/${id}/pdf`, { responseType: 'blob' });
   }
 
+  /** Ticket de bolsa (D-10): PDF angosto para la impresora térmica. */
+  getTicketBolsa(id: number): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/${id}/ticket-bolsa`, { responseType: 'blob' });
+  }
+
+  /** Carta responsiva (D-12): PDF tamaño carta que firma el cliente. */
+  getCartaResponsiva(id: number): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/${id}/carta-responsiva`, { responseType: 'blob' });
+  }
+
   /** PDF del contrato para reposición: el backend exige un RE no cancelado del día (409 si no hay). */
   getPdfReposicion(id: number): Observable<Blob> {
     return this.http.get(`${this.API_URL}/${id}/pdf-reposicion`, { responseType: 'blob' });
+  }
+
+  /**
+   * Cancela un contrato del día (C-06, D-11): contrato CANCELADO con saldo 0, partidas CAN, EMP
+   * cancelado y ENTRADA de caja por el préstamo. El backend responde con mensajes específicos para
+   * cada motivo de rechazo (ya cancelado, sin EMP, con cobros vigentes, día anterior, turno cerrado,
+   * rol no permitido, motivo inválido). Devuelve el EMP cancelado; su id sirve para pedir el
+   * comprobante en {@code GET /api/movimientos/{id}/ticket-cancelacion}.
+   */
+  cancelarContrato(id: number, request: CancelarMovimientoRequest): Observable<MovimientoResponse> {
+    return this.http.post<MovimientoResponse>(`${this.API_URL}/${id}/cancelar`, request);
   }
 }

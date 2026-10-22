@@ -2,6 +2,8 @@ import { Component, Input, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { Observable } from 'rxjs';
+import { ContratoService } from 'src/app/prestamil/core/services/contrato.service';
 import { MovimientoService } from 'src/app/prestamil/core/services/movimiento.service';
 import {
   ContratoOperacionDetalleResponse,
@@ -58,12 +60,26 @@ const COLOR_MOVIMIENTO: Record<TipoMovimiento, string> = {
 export class CancelacionModalComponent implements OnInit {
   readonly activeModal = inject(NgbActiveModal);
   private movimientoService = inject(MovimientoService);
+  private contratoService = inject(ContratoService);
 
   @Input() contrato!: ContratoOperacionDetalleResponse;
 
   ultimo: MovimientoResponse | null = null;
   isLoading = true;
   loadError = '';
+
+  /**
+   * El modal cubre dos flujos (D-11 / C-06):
+   *  - 'MOVIMIENTO': cancela el último cobro vigente (F10, RN-26). Se envía por
+   *    {@code POST /api/movimientos/{id}/cancelar}.
+   *  - 'CONTRATO': cancela el contrato recién creado (solo tiene el EMP vigente). Se envía por
+   *    {@code POST /api/contratos/{id}/cancelar}, que marca el contrato CANCELADO, saldo 0,
+   *    partidas CAN y registra la ENTRADA de caja por el préstamo devuelto.
+   * La diferencia la decide la lista de movimientos: si hay un cobro vigente (RF, RPG, RC, RP,
+   * RPX, RX, FI o FX) se cancela ese cobro; si solo queda el EMP vigente se cancela el contrato.
+   * Las reposiciones (RE) se ignoran en ambos casos (C-03).
+   */
+  modo: 'MOVIMIENTO' | 'CONTRATO' = 'MOVIMIENTO';
 
   motivo = '';
   isCancelando = false;
@@ -72,14 +88,21 @@ export class CancelacionModalComponent implements OnInit {
   ngOnInit(): void {
     this.movimientoService.getMovimientos(this.contrato.id).subscribe({
       next: (movs) => {
-        // Último vigente distinto de EMP y RE. RE queda fuera por C-03: las reposiciones no se
-        // cancelan y tampoco cuentan al decidir cuál es el último movimiento cancelable.
+        // Último cobro vigente (ni EMP ni RE). Si existe, el modal cancela ese cobro.
         for (let i = movs.length - 1; i >= 0; i--) {
           const m = movs[i];
           if (!m.cancelado && m.tipo !== 'EMP' && m.tipo !== 'RE') {
             this.ultimo = m;
-            break;
+            this.modo = 'MOVIMIENTO';
+            this.isLoading = false;
+            return;
           }
+        }
+        // Sin cobro vigente: buscar EMP vigente para ofrecer cancelación de contrato (C-06).
+        const emp = movs.find(m => m.tipo === 'EMP' && !m.cancelado) ?? null;
+        if (emp) {
+          this.ultimo = emp;
+          this.modo = 'CONTRATO';
         }
         this.isLoading = false;
       },
@@ -110,14 +133,19 @@ export class CancelacionModalComponent implements OnInit {
     if (!this.puedeConfirmar || !this.ultimo) return;
     this.isCancelando = true;
     this.cancelarError = '';
-    this.movimientoService.cancelar(this.ultimo.id, { motivo: this.motivo.trim() }).subscribe({
+    const req = { motivo: this.motivo.trim() };
+    const call$: Observable<MovimientoResponse> = this.modo === 'CONTRATO'
+      ? this.contratoService.cancelarContrato(this.contrato.id, req)
+      : this.movimientoService.cancelar(this.ultimo.id, req);
+    call$.subscribe({
       next: (movimiento) => {
         this.isCancelando = false;
         this.activeModal.close(movimiento);
       },
       error: (err) => {
         this.isCancelando = false;
-        this.cancelarError = err?.error?.message ?? 'No se pudo cancelar el movimiento.';
+        this.cancelarError = err?.error?.message
+          ?? (this.modo === 'CONTRATO' ? 'No se pudo cancelar el contrato.' : 'No se pudo cancelar el movimiento.');
       }
     });
   }

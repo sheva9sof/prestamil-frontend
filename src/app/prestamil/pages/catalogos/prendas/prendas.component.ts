@@ -22,7 +22,8 @@ interface Prenda {
   clave?: string | number | null;
   descripcion?: string | null;
   kilataje?: string | number | null;
-  contienePiedad?: boolean | null;
+  contienePiedra?: boolean | null;
+  pendienteRevision?: boolean | null;
 }
 
 interface TipoPrenda {
@@ -50,6 +51,9 @@ export class PrendasComponent implements OnInit {
   private prendaService = inject(PrendaService);
   private authService = inject(AuthService);
   private modalService = inject(NgbModal);
+
+  /** Roles que administran el catálogo (debe coincidir con ROLES_PERMITIDOS_CATALOGO_PRENDAS). */
+  private readonly ROLES_ADMINISTRAN_CATALOGO = [1 /* Sistemas */];
   
   filtroTipoPrenda: string = '';
   filtroCategoria: string = '';
@@ -73,20 +77,16 @@ export class PrendasComponent implements OnInit {
     tipoPrenda: string;
     categoria: string;
     clave: string | number;
+    descripcion: string;
     kilataje: string | number;
-    contienePiedad: boolean;
-  } = {
-    tipoPrenda: '',
-    categoria: '',
-    clave: '',
-    kilataje: '',
-    contienePiedad: false
-  };
+    contienePiedra: boolean;
+  } = this.formularioVacio();
   categoriasModal: Categoria[] = [];
   isLoadingCategoriasModal: boolean = false;
   isLoadingGuardar: boolean = false;
   isEditingPrenda = false;
   idValorAtributoEdicion: number | null = null;
+  prendaEnEdicionPendiente = false;
   modalError = '';
 
   // Borrado físico
@@ -98,6 +98,30 @@ export class PrendasComponent implements OnInit {
   ngOnInit(): void {
     this.cargarTiposPrenda();
     this.cargarTodasPrendas();
+  }
+
+  /**
+   * D-09: el catálogo es estándar para todas las sucursales; solo Sistemas lo modifica.
+   * El backend responde 403 al resto, aquí solo se ocultan las acciones.
+   */
+  get puedeAdministrar(): boolean {
+    const idRol = this.authService.getUser()?.idRol;
+    return idRol != null && this.ROLES_ADMINISTRAN_CATALOGO.includes(Number(idRol));
+  }
+
+  get totalPendientesRevision(): number {
+    return this.prendas.filter(p => p.pendienteRevision).length;
+  }
+
+  private formularioVacio() {
+    return {
+      tipoPrenda: '',
+      categoria: '',
+      clave: '' as string | number,
+      descripcion: '',
+      kilataje: '' as string | number,
+      contienePiedra: false
+    };
   }
 
   cargarTiposPrenda(): void {
@@ -264,15 +288,9 @@ export class PrendasComponent implements OnInit {
     this.isEditingPrenda = false;
     this.idValorAtributoEdicion = null;
     this.modalError = '';
-    this.formData = {
-      tipoPrenda: '',
-      categoria: '',
-      clave: '',
-      kilataje: '',
-      contienePiedad: false
-    };
+    this.formData = this.formularioVacio();
     this.categoriasModal = [];
-    
+
     if (this.prendaModalTemplate) {
       this.prendaModalRef = this.modalService.open(this.prendaModalTemplate, {
         backdrop: 'static',
@@ -292,13 +310,7 @@ export class PrendasComponent implements OnInit {
     this.isEditingPrenda = false;
     this.idValorAtributoEdicion = null;
     this.modalError = '';
-    this.formData = {
-      tipoPrenda: '',
-      categoria: '',
-      clave: '',
-      kilataje: '',
-      contienePiedad: false
-    };
+    this.formData = this.formularioVacio();
     this.categoriasModal = [];
   }
 
@@ -341,7 +353,7 @@ export class PrendasComponent implements OnInit {
       },
       error: (err) => {
         this.isEliminando = false;
-        // 400 = la prenda ya se usó en un contrato; el backend explica el motivo.
+        // 400 = la prenda ya se usó en un contrato; 403 = rol sin permiso. El backend explica el motivo.
         this.eliminarError = err.error?.message || 'No se pudo eliminar la prenda. Intenta de nuevo.';
         console.error('Error al eliminar prenda:', err);
       }
@@ -407,7 +419,8 @@ export class PrendasComponent implements OnInit {
   }
 
   guardarPrenda(): void {
-    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.claveCapturada()) {
+    if (!this.formData.tipoPrenda || !this.formData.categoria || !this.claveCapturada()
+        || !this.descripcionCapturada()) {
       console.warn('Por favor complete todos los campos obligatorios');
       return;
     }
@@ -445,14 +458,15 @@ export class PrendasComponent implements OnInit {
       return;
     }
 
-    // `descripcion` ya no se captura aquí: el detalle por pieza vive en Avalúos.
-    // No se envía para que el backend conserve los nombres históricos del catálogo.
+    // D-09: la descripción general vuelve a ser obligatoria; el detalle de cada pieza
+    // (descripción específica) se sigue capturando en Avalúos.
     const body: CatValorPrendaRequest = {
       idTipoPrenda,
       idAtributo,
       clave,
+      descripcion: this.formData.descripcion.trim(),
       kilataje,
-      contienePiedad: this.formData.contienePiedad
+      contienePiedra: this.formData.contienePiedra
     };
 
     const editando = this.isEditingPrenda && this.idValorAtributoEdicion != null;
@@ -502,16 +516,23 @@ export class PrendasComponent implements OnInit {
     return String(this.formData.clave ?? '').trim().length > 0;
   }
 
+  /** Descripción general estandarizada ("ESCLAVA 14K"), obligatoria desde D-09. */
+  descripcionCapturada(): boolean {
+    return (this.formData.descripcion ?? '').trim().length > 0;
+  }
+
   editarPrenda(prenda: Prenda): void {
     this.modalError = '';
     this.isEditingPrenda = true;
     this.idValorAtributoEdicion = prenda.idValorAtributo;
+    this.prendaEnEdicionPendiente = !!prenda.pendienteRevision;
     this.formData = {
       tipoPrenda: String(prenda.idTipoPrenda),
       categoria: String(prenda.idAtributo),
       clave: (prenda.clave ?? '').toString(),
+      descripcion: (prenda.descripcion ?? '').toString(),
       kilataje: (prenda.kilataje ?? '').toString(),
-      contienePiedad: !!prenda.contienePiedad
+      contienePiedra: !!prenda.contienePiedra
     };
     this.categoriasModal = [];
     this.cargarCategoriasModal(prenda.idTipoPrenda, {

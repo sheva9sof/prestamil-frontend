@@ -12,11 +12,12 @@ export interface TipoPrendaResponse {
 export interface CatValorPrendaRequest {
   idTipoPrenda: number;
   idAtributo: number;
-  /** Nombre histórico del catálogo. Ya no se captura en el modal; si se omite, el backend conserva el existente. */
-  descripcion?: string;
+  /** Descripción general estandarizada ("ESCLAVA 14K"). Obligatoria (D-09). */
+  descripcion: string;
+  /** Obligatoria; puede repetirse entre prendas con distinta descripción o kilataje. */
   clave: string;
   kilataje: number | null;
-  contienePiedad: boolean;
+  contienePiedra: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -48,7 +49,7 @@ export class PrendaService {
     return this.http.put<CatValorPrendaResponse>(`${this.API_URL}/valores/${idValorAtributo}`, request);
   }
 
-  /** Borrado físico. El backend responde 400 si la prenda ya se usó en un contrato. */
+  /** Borrado físico. 400 si la prenda ya se usó en un contrato; 403 si el rol no es Sistemas. */
   deleteValor(idValorAtributo: number): Observable<void> {
     return this.http.delete<void>(`${this.API_URL}/valores/${idValorAtributo}`);
   }

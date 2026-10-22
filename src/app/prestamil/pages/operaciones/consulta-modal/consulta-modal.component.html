@@ -5,6 +5,8 @@
       <p class="modal-subtitle">
         Contrato <strong>{{ contrato.folio }}</strong>
         <span class="separator">·</span>
+        Bolsa <strong>{{ contrato.numBolsa ?? '—' }}</strong>
+        <span class="separator">·</span>
         {{ contrato.nombreCliente }}
         <span class="separator">·</span>
         {{ contrato.numPartidas }} {{ contrato.numPartidas === 1 ? 'partida' : 'partidas' }}
@@ -70,8 +72,22 @@
                   </span>
                 </td>
                 <td>{{ m.fecha | date: 'dd/MM/yyyy HH:mm' }}</td>
-                <td>{{ m.fechaContratoAnterior ? (m.fechaContratoAnterior | date: 'dd/MM/yyyy') : '—' }}</td>
-                <td>{{ m.fechaVencAnterior ? (m.fechaVencAnterior | date: 'dd/MM/yyyy') : '—' }}</td>
+                <td>
+                  <ng-container *ngIf="m.fechaContratoNueva; else contratoSimple">
+                    <span class="saldo-antes">{{ m.fechaContratoAnterior ? (m.fechaContratoAnterior | date: 'dd/MM/yyyy') : '—' }}</span>
+                    <span class="saldo-flecha" aria-hidden="true">→</span>
+                    <span class="saldo-nuevo">{{ m.fechaContratoNueva | date: 'dd/MM/yyyy' }}</span>
+                  </ng-container>
+                  <ng-template #contratoSimple>{{ m.fechaContratoAnterior ? (m.fechaContratoAnterior | date: 'dd/MM/yyyy') : '—' }}</ng-template>
+                </td>
+                <td>
+                  <ng-container *ngIf="m.fechaVencNueva; else vencSimple">
+                    <span class="saldo-antes">{{ m.fechaVencAnterior ? (m.fechaVencAnterior | date: 'dd/MM/yyyy') : '—' }}</span>
+                    <span class="saldo-flecha" aria-hidden="true">→</span>
+                    <span class="saldo-nuevo">{{ m.fechaVencNueva | date: 'dd/MM/yyyy' }}</span>
+                  </ng-container>
+                  <ng-template #vencSimple>{{ m.fechaVencAnterior ? (m.fechaVencAnterior | date: 'dd/MM/yyyy') : '—' }}</ng-template>
+                </td>
                 <td class="text-center">{{ periodos(m) }}</td>
                 <td class="text-center">{{ m.diasGraciaUsados || '—' }}</td>
                 <td class="text-end">{{ moneda(m.interesPorPeriodo) }}</td>
@@ -107,6 +123,7 @@
             <thead>
               <tr>
                 <th class="text-center">Partida</th>
+                <th>Código de barras</th>
                 <th>Clave</th>
                 <th>Descripción</th>
                 <th>Kilataje / Hechura</th>
@@ -120,8 +137,10 @@
             <tbody>
               <tr *ngFor="let p of contrato.partidas; trackBy: trackPartida">
                 <td class="text-center">{{ p.numPartida }}</td>
+                <td class="codigo-barras">{{ p.codigoBarras ?? '—' }}</td>
                 <td class="clave">{{ p.clavePrenda ?? '—' }}</td>
                 <td>
+                  <div class="descripcion-sub" *ngIf="p.descripcionGeneral">{{ p.descripcionGeneral }}</div>
                   <div class="descripcion-linea">{{ p.descripcion }}</div>
                   <div class="descripcion-sub" *ngIf="p.tipoPrendaNombre">{{ p.tipoPrendaNombre }}</div>
                 </td>
@@ -152,6 +171,9 @@
       (click)="reimprimirTicket()"
     >
       <i class="feather icon-printer me-1"></i> Reimprimir ticket
+    </button>
+    <button type="button" class="btn btn-outline-secondary" (click)="reimprimirTicketBolsa()">
+      <i class="feather icon-package me-1"></i> Reimprimir ticket de bolsa
     </button>
     <button type="button" class="btn btn-secondary ms-auto" (click)="activeModal.dismiss()">Cerrar</button>
   </div>

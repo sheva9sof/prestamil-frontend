@@ -48,15 +48,39 @@ export class RefrendoParcialModalComponent implements OnInit {
     return Math.max(0, (this.estadoActual?.periodosTranscurridos ?? 0) - 1);
   }
 
+  /**
+   * D-03 (RN-31): mínimo capturable. En VIGENTE/EN_GRACIA es 1; en VENCIDO/EN_VENTA es
+   * extemporáneos + 1 (el backend lo devuelve en {@code periodosMinimos} de la cotización del parcial;
+   * mientras no haya cotización usamos la derivación local sobre el estado actual).
+   */
+  get minPeriodos(): number {
+    if (this.cotizacion?.periodosMinimos != null) {
+      return this.cotizacion.periodosMinimos;
+    }
+    const e = this.estadoActual;
+    if (!e) return 1;
+    const esExtemporaneo =
+      e.estatusActual === 'VENCIDO' || e.estatusActual === 'EN_VENTA';
+    return esExtemporaneo ? (e.periodosExtemporaneos ?? 0) + 1 : 1;
+  }
+
+  /** El campo deja de ser editable solo cuando únicamente cabe un valor (maximo = minimo). */
+  get campoEditable(): boolean {
+    return this.maxPeriodos > this.minPeriodos;
+  }
+
   get advertencias(): string[] {
     return this.cotizacion?.advertencias ?? [];
   }
 
+  /** El n mostrado y el n cotizado coinciden: condición para habilitar "Aceptar". */
   get periodosValidos(): boolean {
     return (
       this.cotizacion !== null &&
       this.periodosCapturados !== null &&
-      this.periodosCapturados >= 1
+      this.periodosCapturados === this.cotizacion.periodosAplicados &&
+      this.periodosCapturados >= this.minPeriodos &&
+      this.periodosCapturados <= this.maxPeriodos
     );
   }
 
@@ -78,6 +102,12 @@ export class RefrendoParcialModalComponent implements OnInit {
         next: (cot) => {
           this.estadoActual = cot;
           this.isLoading = false;
+          // D-01: el campo no puede verse "readonly" al abrir; sembramos el máximo y recotizamos
+          // para que el cajero vea el preview sin tener que teclear.
+          if (this.periodosCapturados === null && this.maxPeriodos >= this.minPeriodos) {
+            this.periodosCapturados = this.maxPeriodos;
+            this.recotizar();
+          }
         },
         error: (err) => {
           this.isLoading = false;
@@ -133,6 +163,9 @@ export class RefrendoParcialModalComponent implements OnInit {
     // Un mismo id para todos los reintentos de esta ventana de Cobro: si la respuesta se pierde y el
     // cajero vuelve a guardar, el backend devuelve el parcial ya registrado en vez de cobrar dos veces
     const requestId = generarRequestId();
+    // D-01: enviamos el n mostrado (= cotizacion.periodosAplicados, verificado por periodosValidos).
+    // Si el usuario cambia el input sin recotizar, periodosValidos vuelve a false y Aceptar queda
+    // deshabilitado; si llega al backend un n distinto, responde 409.
     const periodos = cotizacion.periodosAplicados;
     const ref = this.modalService.open(CobroComponent, {
       centered: true,

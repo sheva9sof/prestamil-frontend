@@ -157,7 +157,10 @@
                 <tr *ngFor="let p of detalle.partidas">
                   <td class="text-center">{{ p.numPartida }}</td>
                   <td>{{ p.clavePrenda ?? '—' }}</td>
-                  <td>{{ p.descripcion }}</td>
+                  <td>
+                    <div class="small text-muted" *ngIf="p.descripcionGeneral">{{ p.descripcionGeneral }}</div>
+                    <div>{{ p.descripcion }}</div>
+                  </td>
                   <td>{{ p.tipoPrendaNombre }}</td>
                   <td class="text-center">{{ kilatajeHechura(p) }}</td>
                   <td class="text-end">{{ p.pesoNeto ? (p.pesoNeto | number: '1.2-2') + ' g' : '—' }}</td>

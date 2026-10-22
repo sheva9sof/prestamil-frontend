@@ -1,7 +1,9 @@
 export interface PartidaContratoRequest {
   idTipoPrenda: number;
   idValorPrenda?: number;
+  /** Informativo: con idValorPrenda el servidor toma clave y descripción general del catálogo. */
   clavePrenda?: string;
+  /** Descripción específica de la pieza; obligatoria, mínimo 10 caracteres (D-09). */
   descripcion: string;
   cantidad?: number;
   /** Peso del metal precioso (g), del lote completo. Es el que calcula avalúo y préstamo. */
@@ -36,10 +38,15 @@ export interface ContratoRequest {
 export interface PartidaContratoResponse {
   id: number;
   numPartida: number;
+  /** Código de barras único global de la partida (D-10). */
+  codigoBarras: string | null;
   idTipoPrenda: number;
   tipoPrendaNombre?: string;
   idValorPrenda?: number;
   clavePrenda?: string;
+  /** Descripción general del catálogo copiada al empeñar (D-09). Vacía en partidas sin catálogo. */
+  descripcionGeneral?: string;
+  /** Descripción específica de la pieza. */
   descripcion: string;
   cantidad: number;
   /** Peso del metal precioso (g). Es el que se usó para calcular avalúo y préstamo. */
@@ -67,6 +74,8 @@ export type EstatusContrato = 'VIGENTE' | 'VENCIDO' | 'EN_VENTA' | 'VENDIDO' | '
 export interface ContratoResponse {
   id: number;
   folio: string;
+  /** Número de bolsa, consecutivo por sucursal (D-10). */
+  numBolsa: number | null;
   idCliente: number;
   nombreCliente?: string;
   idPlazo: number;
@@ -143,6 +152,8 @@ export interface ContratoOperacionFiltro {
 export interface ContratoOperacionResponse {
   id: number;
   folio: string;
+  /** Número de bolsa, consecutivo por sucursal (D-10). */
+  numBolsa: number | null;
   nombrePlazo: string;
   numeroPeriodos: number;
   diasPorPeriodo: number;
@@ -266,6 +277,11 @@ export interface CotizacionMovimientoResponse {
   periodosNormales: number;
   periodosExtemporaneos: number;
   periodosMaximos: number;
+  /**
+   * Mínimo capturable en REFRENDO_PARCIAL (D-03, RN-31): 1 en VIGENTE/EN_GRACIA, extemporáneos + 1 en
+   * VENCIDO/EN_VENTA. En las demás operaciones es igual a {@code periodosAplicados}.
+   */
+  periodosMinimos: number;
   periodosAplicados: number;
   periodosNormalesAplicados: number;
   periodosExtemporaneosAplicados: number;

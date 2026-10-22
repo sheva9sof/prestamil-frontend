@@ -194,23 +194,35 @@
           <div class="item-fields-panel">
             <div class="panel-title"><i class="feather icon-tag"></i> Datos de la prenda</div>
             <div class="form-row">
-              <div class="form-group col-md-6">
-                <label class="form-label">Descripción</label>
+              <div class="form-group col-md-6" *ngIf="tipoSeleccionado === 'Alhajas'">
+                <label class="form-label">Descripción general (catálogo)</label>
                 <div class="input-group">
                   <input
                     class="form-control form-control-sm"
-                    [(ngModel)]="captura.descripcion"
-                    placeholder="Descripción libre de la partida (opcional)"
-                    maxlength="200"
+                    [value]="textoCatalogo(captura.clavePrenda, captura.nombreCatalogo)"
+                    placeholder="Busca la prenda en el catálogo"
+                    readonly
                   />
-                  <button class="btn btn-outline-secondary btn-sm" type="button"
-                    *ngIf="tipoSeleccionado === 'Alhajas'" (click)="abrirBuscarPrenda()">
+                  <button class="btn btn-outline-secondary btn-sm" type="button" title="Buscar en catálogo"
+                    (click)="abrirBuscarPrenda()">
                     <i class="feather icon-search"></i>
                   </button>
+                  <button class="btn btn-outline-secondary btn-sm" type="button" title="Quitar prenda del catálogo"
+                    *ngIf="captura.idValorPrenda" (click)="limpiarSeleccionCatalogoAlhaja()">
+                    <i class="feather icon-x"></i>
+                  </button>
                 </div>
-                <small class="text-muted" *ngIf="captura.clavePrenda || captura.nombreCatalogo">
-                  <ng-container *ngIf="captura.clavePrenda">Clave: {{ captura.clavePrenda }}</ng-container>
-                  <ng-container *ngIf="captura.nombreCatalogo">{{ captura.clavePrenda ? ' — ' : '' }}{{ captura.nombreCatalogo }}</ng-container>
+              </div>
+              <div class="form-group" [class.col-md-6]="tipoSeleccionado === 'Alhajas'" [class.col-md-12]="tipoSeleccionado !== 'Alhajas'">
+                <label class="form-label">Descripción específica <span class="text-danger">*</span></label>
+                <input
+                  class="form-control form-control-sm"
+                  [(ngModel)]="captura.descripcion"
+                  placeholder="Detalle real de la pieza: ej. esclava con mariposa, broche roto"
+                  maxlength="200"
+                />
+                <small class="text-muted" [class.text-danger]="captura.descripcion.trim().length > 0 && captura.descripcion.trim().length < MIN_DESCRIPCION_ESPECIFICA">
+                  {{ captura.descripcion.trim().length }}/200 · mínimo {{ MIN_DESCRIPCION_ESPECIFICA }} caracteres
                 </small>
               </div>
               <ng-container *ngIf="tipoSeleccionado === 'Alhajas'">
@@ -327,21 +339,39 @@
                 <datalist id="subtiposVariosSugeridos">
                   <option *ngFor="let s of subtiposVarios" [value]="s"></option>
                 </datalist>
-                <small class="text-muted" *ngIf="capturaVarios.idValorPrenda">
-                  Seleccionada del catálogo<span *ngIf="capturaVarios.clavePrenda"> · Clave: {{ capturaVarios.clavePrenda }}</span>
-                </small>
               </div>
               <div class="form-group col-md-3">
-                <label class="form-label">Marca</label>
+                <label class="form-label">Marca <span class="text-danger">*</span></label>
                 <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.marca" placeholder="Marca" />
               </div>
               <div class="form-group col-md-3">
-                <label class="form-label">Modelo</label>
+                <label class="form-label">Modelo <span class="text-danger">*</span></label>
                 <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.modelo" placeholder="Modelo" />
               </div>
               <div class="form-group col-md-3">
-                <label class="form-label">Serie / IMEI</label>
+                <label class="form-label">Serie / IMEI <span class="text-danger">*</span></label>
                 <input class="form-control form-control-sm" [(ngModel)]="capturaVarios.serie" placeholder="Serie o IMEI" />
+              </div>
+              <div class="form-group col-md-6">
+                <label class="form-label">Descripción general (catálogo)</label>
+                <input
+                  class="form-control form-control-sm"
+                  [value]="textoCatalogo(capturaVarios.clavePrenda, capturaVarios.nombreCatalogo)"
+                  placeholder="Busca la prenda en el catálogo"
+                  readonly
+                />
+              </div>
+              <div class="form-group col-md-6">
+                <label class="form-label">Descripción específica <span class="text-danger">*</span></label>
+                <input
+                  class="form-control form-control-sm"
+                  [(ngModel)]="capturaVarios.descripcion"
+                  placeholder="Detalle real del artículo: color, accesorios, daños"
+                  maxlength="200"
+                />
+                <small class="text-muted" [class.text-danger]="capturaVarios.descripcion.trim().length > 0 && capturaVarios.descripcion.trim().length < MIN_DESCRIPCION_ESPECIFICA">
+                  {{ capturaVarios.descripcion.trim().length }}/200 · mínimo {{ MIN_DESCRIPCION_ESPECIFICA }} caracteres
+                </small>
               </div>
               <div class="form-group col-md-4">
                 <label class="form-label">Estado</label>
@@ -426,7 +456,10 @@
               <td>{{ i + 1 }}</td>
               <td>{{ item.tipo }}</td>
               <td><code>{{ item.clavePrenda }}</code></td>
-              <td>{{ item.descripcion }}</td>
+              <td>
+                <div class="small text-muted" *ngIf="item.descripcionGeneral">{{ item.descripcionGeneral }}</div>
+                <div>{{ item.descripcion }}</div>
+              </td>
               <td>{{ item.cantidad }}</td>
               <td>{{ item.pesoNeto | number: '1.1-1' }}</td>
               <td>{{ item.pesoTotal | number: '1.1-1' }}</td>
@@ -646,6 +679,7 @@
         <thead>
           <tr>
             <th>Clave</th>
+            <th>Descripción general</th>
             <th>Categoría</th>
             <th>Kilataje</th>
             <th></th>
@@ -654,6 +688,7 @@
         <tbody>
           <tr *ngFor="let p of prendasFiltradas">
             <td><code>{{ p.clave }}</code></td>
+            <td>{{ p.descripcion || '—' }}</td>
             <td>{{ p.categoria }}</td>
             <td>{{ p.kilataje > 0 ? p.kilataje + 'K' : '—' }}</td>
             <td>
@@ -663,7 +698,7 @@
             </td>
           </tr>
           <tr *ngIf="prendasFiltradas.length === 0">
-            <td colspan="4" class="text-center text-muted">Sin resultados en catálogo</td>
+            <td colspan="5" class="text-center text-muted">Sin resultados en catálogo</td>
           </tr>
         </tbody>
       </table>
@@ -752,18 +787,18 @@
   </div>
 </ng-template>
 
-<!-- Modal: Visor del PDF del contrato generado -->
+<!-- Modal: Visor de los PDF del contrato generado (contrato y carta responsiva) -->
 <ng-template #modalPdf let-modal>
   <div class="modal-header">
-    <h5 class="modal-title">Contrato {{ contratoPdfFolio }}</h5>
+    <h5 class="modal-title">{{ pdfTitulo }}</h5>
     <button type="button" class="btn-close" (click)="modal.dismiss()"></button>
   </div>
   <div class="modal-body p-0">
-    <iframe *ngIf="pdfUrl" [src]="pdfUrl" title="Contrato PDF" style="width: 100%; height: 78vh; border: 0;"></iframe>
+    <iframe *ngIf="pdfUrl" [src]="pdfUrl" [title]="pdfTitulo" style="width: 100%; height: 78vh; border: 0;"></iframe>
     <div *ngIf="!pdfUrl" class="text-center text-muted py-5">No hay PDF para mostrar.</div>
   </div>
   <div class="modal-footer">
-    <button class="btn btn-outline-secondary btn-sm" (click)="descargarPdfContrato()">
+    <button class="btn btn-outline-secondary btn-sm" (click)="descargarPdf()">
       <i class="feather icon-download me-1"></i> Descargar
     </button>
     <button class="btn btn-secondary btn-sm" (click)="modal.close()">Cerrar</button>
@@ -844,7 +879,16 @@
     </div>
     <!-- Condiciones -->
     <div class="row g-2 small text-center">
-      <div class="col"><span class="text-muted d-block">Reposición de contrato</span><strong>{{ a.porcReposicion | number: '1.0-2' }}%</strong></div>
+      <div class="col">
+        <span class="text-muted d-block">Reposición de contrato</span>
+        <ng-container *ngIf="a.cobrarReposicion; else sinRepo">
+          <strong *ngIf="a.reposicionEsPorcentaje">
+            {{ a.porcReposicion | number: '1.0-2' }}% = ${{ a.importeReposicion | number: '1.2-2' }}
+          </strong>
+          <strong *ngIf="!a.reposicionEsPorcentaje">${{ a.montoReposicion | number: '1.2-2' }}</strong>
+        </ng-container>
+        <ng-template #sinRepo><strong class="text-muted">No se cobra</strong></ng-template>
+      </div>
       <div class="col"><span class="text-muted d-block">Fecha de pase a venta</span><strong>{{ a.fechaPaseVenta }}</strong></div>
       <div class="col">
         <span class="text-muted d-block">Gastos operativos por venta ({{ a.porcGastosOperacionVenta | number: '1.2-4' }}%)</span>
