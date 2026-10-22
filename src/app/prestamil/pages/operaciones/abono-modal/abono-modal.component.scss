@@ -1,0 +1,36 @@
+$gold: #b8860b;
+$gold-dark: #8a6508;
+$muted: #6f7b8f;
+$line: #e7eaf0;
+
+.abono-header { padding: 18px 24px; background: linear-gradient(135deg, #fdf6ff, #fff); border-bottom: 1px solid #ecdff0; }
+.abono-title { display: flex; align-items: center; gap: 14px; .modal-title { margin: 1px 0; font-weight: 750; } }
+.abono-eyebrow { color: #7c3aed; font-size: 0.65rem; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; }
+.abono-icon {
+  display: flex; align-items: center; justify-content: center; width: 46px; height: 46px;
+  color: #6d28d9; background: #f2ebff; border-radius: 12px; font-size: 1.15rem;
+}
+.badge-gracia { padding: 3px 10px; color: #2269bb; background: #eef5ff; border-radius: 999px; font-size: 0.72rem; font-weight: 800; vertical-align: middle; }
+.abono-body { padding: 22px 24px; background: #f8f9fb; }
+
+.abono-tiles {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 8px;
+  > div { display: flex; flex-direction: column; padding: 12px 14px; background: #fff; border: 1px solid $line; border-radius: 12px; }
+  span { color: $muted; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; }
+  strong { font-size: 1.2rem; }
+}
+.abono-label { margin: 14px 0 8px; padding-bottom: 6px; color: #6d28d9; border-bottom: 1px solid #ecdff0; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; }
+.abono-lista {
+  display: grid; grid-template-columns: 1fr auto; gap: 6px 12px; margin: 0; font-size: 0.9rem;
+  dt { font-weight: 600; color: $muted; } dd { margin: 0; text-align: right; }
+  .abono-lista-total { padding-top: 6px; margin-top: 4px; border-top: 1px solid $line; font-weight: 700; color: #21252d; }
+}
+.abono-hint { margin: 6px 0 0; color: $muted; font-size: 0.8rem; }
+.abono-importe {
+  display: flex; align-items: baseline; justify-content: space-between; margin-top: 18px; padding: 14px 18px;
+  background: #fff; border: 2px solid #7c3aed; border-radius: 12px;
+  .abono-importe-etiqueta { display: flex; flex-direction: column; gap: 2px; }
+  span { font-weight: 800; text-transform: uppercase; color: #6d28d9; }
+  strong { font-size: 1.8rem; font-weight: 800; }
+}
+.btn-cobrar { color: #fff; background: #7c3aed; border-color: #7c3aed; font-weight: 700; &:hover:not(:disabled) { color: #fff; background: #6d28d9; border-color: #6d28d9; } }

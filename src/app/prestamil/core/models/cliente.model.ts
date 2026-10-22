@@ -38,9 +38,12 @@ export interface CatValorPrendaResponse {
   nombreAtributo: string;
   idTipoPrenda: number;
   tipo: string;
+  /** Clave estándar; puede repetirse entre prendas con distinta descripción o kilataje (D-09). */
   clave?: string;
-  /** Nombre histórico del catálogo. Puede venir vacío: los ítems nuevos se identifican por clave. */
+  /** Descripción general estandarizada ("ESCLAVA 14K"). Obligatoria desde D-09. */
   descripcion?: string;
   kilataje?: number;
-  contienePiedad?: boolean;
+  contienePiedra?: boolean;
+  /** La migración D-09 le puso clave o descripción provisional; Sistemas debe completarla. */
+  pendienteRevision?: boolean;
 }

@@ -5,7 +5,7 @@ import { tap, switchMap } from 'rxjs/operators';
 import { Router } from '@angular/router';
 import { LoginResponse } from '../models/auth-response.model';
 import { NavigationItem } from '../../../theme/layout/admin/navigation/navigation';
-import { transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
+import { isParametrosPrestamoMenu, transformOpcionesToNavigationItems } from '../helpers/menu-transformer.helper';
 import { environment } from 'src/environments/environment';
 import { AuthStreamService } from './auth-stream.service';
 import { SessionWarningService } from './session-warning.service';
@@ -115,7 +115,7 @@ export class AuthService {
     const normalizeItem = (item: NavigationItem): NavigationItem => {
       const url = normalizeUrl(item.url);
       const children = item.children
-        ?.filter(child => !['Parametros prestamo', 'Parámetros Préstamo'].includes(child.title ?? ''))
+        ?.filter(child => !isParametrosPrestamoMenu(child.title))
         .map(child => normalizeItem(child));
       return {
         ...item,

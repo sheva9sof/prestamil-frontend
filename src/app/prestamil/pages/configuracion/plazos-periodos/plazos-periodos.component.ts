@@ -282,6 +282,7 @@ export class PlazosPeriodosComponent implements OnInit {
               porcInteres: 0,
               porcAlmacen: 0,
               porcGastosAdmin: 0,
+              comisionPorVentaPrenda: 0,
               cat: 0,
               numMaxRefrendos: 0,
               porcPrestamoSAvaluo: 0,
@@ -292,6 +293,11 @@ export class PlazosPeriodosComponent implements OnInit {
               ley725: 0,   // precio por gramo de plata, ley 720 (Phase 6, D-01/D-03; columna legacy ley725)
               aplicarSancionPorPeriodo: true,
               porcSancionSemanal: 2,  // espeja el DEFAULT 2.0000 de plazo_parametro
+              // Reposición de contrato (F9): deshabilitada por defecto; el usuario la activa aquí y captura porc/monto
+              cobrarReposicionContrato: false,
+              reposicionEsPorcentaje: false,
+              porcReposicion: 0,
+              montoReposicion: 0,
               diasGraciaSinInteres: 0,
               diasAntesPaseVenta: 0,
               importeMinPrestamo: 0

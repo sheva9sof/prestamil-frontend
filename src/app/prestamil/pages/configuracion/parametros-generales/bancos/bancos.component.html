@@ -1,0 +1,80 @@
+<section class="bancos-card">
+  <div class="bancos-heading">
+    <div>
+      <h4>Bancos emisores</h4>
+      <p>Bancos que ofrece la ventana de Cobro para pagos con tarjeta. Un banco que ya no se usa se desactiva; no se borra para conservar el historial.</p>
+    </div>
+    <form class="bancos-alta" (ngSubmit)="agregar()">
+      <input
+        name="nuevoNombre"
+        class="form-control"
+        maxlength="60"
+        placeholder="Nombre del banco"
+        aria-label="Nombre del nuevo banco"
+        [(ngModel)]="nuevoNombre"
+        [disabled]="isSaving"
+      />
+      <button type="submit" class="btn btn-primary text-nowrap" [disabled]="!nuevoNombre.trim() || isSaving">
+        <i class="feather icon-plus"></i> Agregar
+      </button>
+    </form>
+  </div>
+
+  <div *ngIf="successMessage" class="alert alert-success py-2">{{ successMessage }}</div>
+  <div *ngIf="errorMessage" class="alert alert-danger py-2 alert-dismissible">
+    {{ errorMessage }}
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="errorMessage = ''"></button>
+  </div>
+
+  <div *ngIf="isLoadingData" class="text-center py-3 text-muted">Cargando bancos…</div>
+
+  <div *ngIf="!isLoadingData" class="table-responsive">
+    <table class="table bancos-table mb-0">
+      <thead>
+        <tr>
+          <th>Nombre</th>
+          <th class="text-center">Estatus</th>
+          <th class="text-end">Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let b of bancos; trackBy: trackById" [class.inactivo]="!b.activo">
+          <td>
+            <input
+              *ngIf="editandoId === b.id; else nombre"
+              class="form-control form-control-sm"
+              maxlength="60"
+              aria-label="Nombre del banco"
+              [(ngModel)]="nombreEditado"
+              (keydown.enter)="guardarEdicion(b)"
+              (keydown.escape)="cancelarEdicion()"
+            />
+            <ng-template #nombre>{{ b.nombre }}</ng-template>
+          </td>
+          <td class="text-center">
+            <span class="badge" [ngClass]="b.activo ? 'bg-success' : 'bg-secondary'">{{ b.activo ? 'Activo' : 'Inactivo' }}</span>
+          </td>
+          <td class="text-end text-nowrap">
+            <ng-container *ngIf="editandoId === b.id; else acciones">
+              <button type="button" class="btn btn-sm btn-success me-1" [disabled]="!nombreEditado.trim() || isSaving" (click)="guardarEdicion(b)">
+                <i class="feather icon-check"></i> Guardar
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="isSaving" (click)="cancelarEdicion()">Cancelar</button>
+            </ng-container>
+            <ng-template #acciones>
+              <button type="button" class="btn btn-sm btn-outline-primary me-1" [disabled]="isSaving" (click)="iniciarEdicion(b)">
+                <i class="feather icon-edit-2"></i> Editar
+              </button>
+              <button type="button" class="btn btn-sm" [ngClass]="b.activo ? 'btn-outline-danger' : 'btn-outline-success'" [disabled]="isSaving" (click)="cambiarActivo(b)">
+                {{ b.activo ? 'Desactivar' : 'Activar' }}
+              </button>
+            </ng-template>
+          </td>
+        </tr>
+        <tr *ngIf="bancos.length === 0">
+          <td colspan="3" class="text-center text-muted">No hay bancos registrados.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>

@@ -59,6 +59,16 @@ const routes: Routes = [
           import('./prestamil/pages/avaluos/avaluo/avaluo.component').then((c) => c.AvaluoComponent)
       },
       {
+        path: 'operaciones',
+        loadComponent: () =>
+          import('./prestamil/pages/operaciones/operaciones.component').then((c) => c.OperacionesComponent)
+      },
+      {
+        path: 'pase-almoneda',
+        loadComponent: () =>
+          import('./prestamil/pages/pase-almoneda/pase-almoneda.component').then((c) => c.PaseAlmonedaComponent)
+      },
+      {
         path: 'catalogos',
         children: [
           {

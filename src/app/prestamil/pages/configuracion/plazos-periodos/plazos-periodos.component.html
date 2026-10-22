@@ -291,20 +291,26 @@
     <ng-container *ngIf="parametrosForm[tipoId]">
       <div class="parameters-panel">
       <div class="row g-2 mb-2">
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label small mb-0">% Interés</label>
           <input type="number" class="form-control form-control-sm" step="0.0001"
             [(ngModel)]="parametrosForm[tipoId].porcInteres" [ngModelOptions]="{ standalone: true }" />
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label small mb-0">% Almacén</label>
           <input type="number" class="form-control form-control-sm" step="0.0001"
             [(ngModel)]="parametrosForm[tipoId].porcAlmacen" [ngModelOptions]="{ standalone: true }" />
         </div>
-        <div class="col-md-4">
+        <div class="col-md-3">
           <label class="form-label small mb-0">% G. Admin</label>
           <input type="number" class="form-control form-control-sm" step="0.0001"
             [(ngModel)]="parametrosForm[tipoId].porcGastosAdmin" [ngModelOptions]="{ standalone: true }" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small mb-0">% G. Oper. x Vta.</label>
+          <input type="number" class="form-control form-control-sm" min="0" max="100" step="0.0001"
+            [(ngModel)]="parametrosForm[tipoId].comisionPorVentaPrenda" [ngModelOptions]="{ standalone: true }"
+            title="Porcentaje de gastos operativos aplicado al comercializar la prenda. No se cobra por periodo." />
         </div>
       </div>
 
@@ -375,6 +381,48 @@
             Si el préstamo es ${{ avaluoPreview(tipoId).prestamo | number:'1.2-2' }}
             → sanción: ${{ sancionPreview(tipoId) | number:'1.2-2' }} por semana vencida
           </small>
+        </div>
+      </div>
+
+      <!-- Reposición / reimpresión de contrato (F9). El importe se calcula al vuelo cuando se abre el
+           modal de Reposición desde Finiquitos y Refrendos; aquí solo se decide si se cobra y cómo. -->
+      <hr class="my-3" />
+      <h6 class="small text-uppercase text-muted fw-bold mb-2">Reposición de contrato</h6>
+      <div class="row g-2 mb-2">
+        <div class="col-md-4 d-flex align-items-end">
+          <div class="form-check">
+            <input type="checkbox" class="form-check-input"
+              [id]="'repo-cobrar-' + tipoId"
+              [(ngModel)]="parametrosForm[tipoId].cobrarReposicionContrato" [ngModelOptions]="{ standalone: true }" />
+            <label class="form-check-label" [for]="'repo-cobrar-' + tipoId">Cobrar reposición</label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small mb-0">Modo</label>
+          <select class="form-select form-select-sm"
+            [(ngModel)]="parametrosForm[tipoId].reposicionEsPorcentaje" [ngModelOptions]="{ standalone: true }"
+            [disabled]="!parametrosForm[tipoId].cobrarReposicionContrato">
+            <option [ngValue]="true">% sobre el préstamo</option>
+            <option [ngValue]="false">Monto fijo</option>
+          </select>
+        </div>
+        <div class="col-md-4" *ngIf="parametrosForm[tipoId].reposicionEsPorcentaje">
+          <label class="form-label small mb-0">% Reposición</label>
+          <div class="input-group input-group-sm">
+            <input type="number" class="form-control" min="0" step="0.0001"
+              [(ngModel)]="parametrosForm[tipoId].porcReposicion" [ngModelOptions]="{ standalone: true }"
+              [disabled]="!parametrosForm[tipoId].cobrarReposicionContrato" />
+            <span class="input-group-text">%</span>
+          </div>
+        </div>
+        <div class="col-md-4" *ngIf="!parametrosForm[tipoId].reposicionEsPorcentaje">
+          <label class="form-label small mb-0">Monto fijo</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text">$</span>
+            <input type="number" class="form-control" min="0" step="0.01"
+              [(ngModel)]="parametrosForm[tipoId].montoReposicion" [ngModelOptions]="{ standalone: true }"
+              [disabled]="!parametrosForm[tipoId].cobrarReposicionContrato" />
+          </div>
         </div>
       </div>
 

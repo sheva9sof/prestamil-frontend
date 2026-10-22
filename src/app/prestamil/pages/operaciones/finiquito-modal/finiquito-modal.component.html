@@ -1,0 +1,102 @@
+<div class="modal-header finiquito-header">
+  <div class="finiquito-title">
+    <span class="finiquito-icon"><i class="feather icon-check-square"></i></span>
+    <div>
+      <span class="finiquito-eyebrow">Contrato {{ contrato.folio }}</span>
+      <h5 class="modal-title">
+        {{ extemporaneo ? 'Finiquito extemporáneo' : 'Finiquitar contrato' }}
+      </h5>
+      <small class="text-muted">#{{ contrato.idCliente }} · {{ contrato.nombreCliente }}</small>
+    </div>
+  </div>
+  <button type="button" class="btn-close" aria-label="Cerrar" [disabled]="cobrando" (click)="activeModal.dismiss()"></button>
+</div>
+
+<div class="modal-body finiquito-body">
+  <div *ngIf="isLoading" class="text-center py-4">
+    <div class="spinner-border text-secondary" role="status"></div>
+    <p class="text-muted mt-2 mb-0">Cotizando finiquito…</p>
+  </div>
+  <div *ngIf="errorMessage" class="alert alert-danger mb-0" role="alert">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && cotizacion as c">
+    <div *ngIf="extemporaneo" class="alert alert-warning py-2 mb-3">
+      <i class="feather icon-alert-triangle me-1"></i>
+      El contrato ya rebasó la gracia: se cobra como finiquito extemporáneo, con sanción.
+    </div>
+    <div *ngIf="c.estatusActual === 'EN_VENTA'" class="alert alert-danger py-2 mb-3">
+      <i class="feather icon-alert-octagon me-1"></i>
+      Contrato en venta: acumula {{ c.semanasSancion }} {{ c.semanasSancion === 1 ? 'semana' : 'semanas' }}
+      de sanción. Se puede recuperar mientras ninguna prenda esté vendida o apartada.
+    </div>
+    <div class="alert alert-info py-2 mb-3">
+      <i class="feather icon-info me-1"></i>
+      Al confirmar, el contrato se cierra y las prendas se entregan al cliente.
+    </div>
+
+    <div class="finiquito-tiles">
+      <div>
+        <span>Préstamo original</span>
+        <strong>${{ contrato.montoPrestamo | number: '1.2-2' }}</strong>
+      </div>
+      <div>
+        <span>Saldo capital</span>
+        <strong>${{ c.saldoCapital | number: '1.2-2' }}</strong>
+      </div>
+      <div>
+        <span>Periodos transcurridos</span>
+        <strong>{{ c.periodosTranscurridos }}</strong>
+        <small *ngIf="c.periodosExtemporaneos">{{ c.periodosNormales }} normales · {{ c.periodosExtemporaneos }} extemp.</small>
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-6">
+        <p class="finiquito-label">Desglose</p>
+        <dl class="finiquito-lista">
+          <dt>Capital a liquidar</dt>
+          <dd>${{ c.capital | number: '1.2-2' }}</dd>
+          <dt>Interés total ({{ c.periodosAplicados }} per.)</dt>
+          <dd>${{ c.interesTotal | number: '1.2-2' }}</dd>
+          <ng-container *ngIf="c.sancion > 0">
+            <dt>Sanción ({{ c.semanasSancion }} sem. × {{ c.porcSancionSemanal | number: '1.0-2' }}%)</dt>
+            <dd>${{ c.sancion | number: '1.2-2' }}</dd>
+          </ng-container>
+          <ng-container *ngIf="c.descuento > 0">
+            <dt>Descuento s/interés</dt>
+            <dd>−${{ c.descuento | number: '1.2-2' }}</dd>
+          </ng-container>
+          <dt>IVA ({{ c.porcIva | number: '1.0-2' }}%)</dt>
+          <dd>${{ c.iva | number: '1.2-2' }}</dd>
+        </dl>
+      </div>
+      <div class="col-md-6">
+        <p class="finiquito-label">Contrato</p>
+        <dl class="finiquito-lista">
+          <dt>Fecha de contrato</dt>
+          <dd>{{ c.fechaContrato | date: 'dd/MM/yyyy' }}</dd>
+          <dt>Vencimiento</dt>
+          <dd>{{ c.fechaVencimiento | date: 'dd/MM/yyyy' }}</dd>
+          <dt>Saldo después</dt>
+          <dd><strong>$0.00</strong></dd>
+        </dl>
+      </div>
+    </div>
+
+    <ul *ngIf="c.advertencias.length" class="finiquito-advertencias">
+      <li *ngFor="let a of c.advertencias">{{ a }}</li>
+    </ul>
+
+    <div class="finiquito-importe">
+      <span>Importe a cobrar</span>
+      <strong>${{ c.total | number: '1.2-2' }}</strong>
+    </div>
+  </ng-container>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary" [disabled]="cobrando" (click)="activeModal.dismiss()">Cancelar</button>
+  <button type="button" class="btn btn-cobrar" [disabled]="!cotizacion || isLoading || cobrando" (click)="cobrar()">
+    <i class="feather icon-dollar-sign me-1"></i> Cobrar
+  </button>
+</div>

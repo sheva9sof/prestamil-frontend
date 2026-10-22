@@ -124,4 +124,6 @@ export interface PlazoHechuraAlhajaResponse {
   precioBase: number;
   porcAumento: number;
   precioPrestamo: number;
+  /** Valor de la prenda por gramo (oro del kilataje × factor de hechura). Solo en GET /plazos/{id}/alhajas. */
+  precioAvaluo?: number;
 }
