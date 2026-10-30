@@ -22,7 +22,10 @@ export interface PaseAVentaRow {
 }
 
 export interface ResultadosPaseAlmoneda {
+  /** Fecha realmente consultada: para quien no puede elegir otra (OTR-01) es la de hoy del servidor. */
   fecha: string;
+  /** Solo Sistemas (ROLES_PERMITIDOS_PASE_ALMONEDA_OTRA_FECHA) puede consultar otra fecha. */
+  puedeElegirFecha: boolean;
   carteraVencida: CarteraVencidaRow[];
   paseAVenta: PaseAVentaRow[];
 }

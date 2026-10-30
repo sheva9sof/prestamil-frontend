@@ -12,7 +12,9 @@
           type="date"
           class="form-control"
           [(ngModel)]="fecha"
+          [readonly]="!puedeElegirFecha"
           (change)="consultar()" />
+        <div *ngIf="!puedeElegirFecha" class="form-text">Solo se puede consultar el pase de hoy.</div>
       </div>
       <div class="col-auto">
         <button type="button" class="btn btn-primary" (click)="consultar()" [disabled]="cargando">
