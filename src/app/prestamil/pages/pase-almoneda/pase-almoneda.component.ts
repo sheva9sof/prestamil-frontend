@@ -14,6 +14,8 @@ import {
 /**
  * Pantalla "Resultados del pase de almoneda" (C-11). Selector de fecha + dos pestañas (Cartera
  * vencida / Pase a venta) con exportacion a PDF (reporte Jasper en visor modal) y a Excel (CSV UTF-8 BOM).
+ * OTR-01: solo Sistemas cambia la fecha; para el resto el campo queda en solo lectura con la fecha
+ * de hoy del servidor (el backend la impone aunque se mande otra).
  */
 @Component({
   selector: 'app-pase-almoneda',
@@ -24,6 +26,8 @@ import {
 })
 export class PaseAlmonedaComponent implements OnInit {
   fecha = this.hoyIso();
+  // Hasta que el servidor responda, nadie elige fecha; la respuesta dice si este usuario puede.
+  puedeElegirFecha = false;
   activeTab = 1;
   cargando = false;
   errorMessage = '';
@@ -49,6 +53,11 @@ export class PaseAlmonedaComponent implements OnInit {
         this.carteraVencida = res.carteraVencida ?? [];
         this.paseAVenta = res.paseAVenta ?? [];
         this.fechaConsultada = res.fecha;
+        this.puedeElegirFecha = res.puedeElegirFecha;
+        // Para quien no elige fecha, el campo muestra la fecha que usó el servidor (su "hoy").
+        if (!res.puedeElegirFecha) {
+          this.fecha = res.fecha;
+        }
         this.cargando = false;
       },
       error: (err) => {
