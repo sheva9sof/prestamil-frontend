@@ -8,3 +8,8 @@ export interface Turno {
 }
 
 export interface TurnoResponse extends Turno {}
+
+/** GET /api/turnos/apertura: lo que impide abrir turno por el cierre de caja (CAJ-06); null si nada. */
+export interface AperturaTurno {
+  motivoBloqueo: string | null;
+}

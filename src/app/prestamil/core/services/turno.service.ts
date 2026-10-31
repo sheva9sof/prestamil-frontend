@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { BehaviorSubject, Observable, tap } from 'rxjs';
 import { environment } from 'src/environments/environment';
-import { Turno } from '../models/turno.model';
+import { AperturaTurno, Turno } from '../models/turno.model';
 import { AuthService } from './auth.service';
 
 @Injectable({ providedIn: 'root' })
@@ -40,6 +40,11 @@ export class TurnoService {
     return this.http.get<Turno>(`${this.API}/activo`, this.getAuthHeaders()).pipe(
       tap(t => this.currentTurnoSubject.next(t))
     );
+  }
+
+  /** Si el cierre de caja impide abrir turno hoy (día pendiente o caja de hoy ya cerrada). */
+  apertura(): Observable<AperturaTurno> {
+    return this.http.get<AperturaTurno>(`${this.API}/apertura`, this.getAuthHeaders());
   }
 
   refreshActivo(): void {

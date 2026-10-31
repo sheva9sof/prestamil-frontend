@@ -1,7 +1,8 @@
 import { Component, OnInit, TemplateRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
+import { Observable } from 'rxjs';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { DenominacionesModalComponent } from '../../../core/components/denominaciones-modal/denominaciones-modal.component';
 import { PdfVisorComponent } from '../../../core/components/pdf-visor/pdf-visor.component';
@@ -11,6 +12,13 @@ import { CajaService } from '../../../core/services/caja.service';
 
 /** Las diferencias de ±0.01–0.03 son normales por redondeo (RC-07). */
 const TOLERANCIA_REDONDEO_CENTAVOS = 3;
+
+/** Un PDF que se abre en el visor. */
+interface ReporteVisor {
+  titulo: string;
+  pdf$: Observable<Blob>;
+  nombreArchivo: string;
+}
 
 /**
  * Pantalla del corte de caja (CAJ-07a) con el cierre de día (CAJ-06). Muestra los dos bloques de
@@ -24,10 +32,13 @@ const TOLERANCIA_REDONDEO_CENTAVOS = 3;
  * "Imprimir corte" y "Exportar Excel" sacan el reporte REP-04 del día que está en pantalla, con las mismas
  * cifras (las calcula el servidor con el mismo motor). Sin cifras, el PDF sale con el aviso.
  *
- * "Cerrar día" (CAJ-06, B-04) congela el corte: el gerente cierra el día en curso y Sistemas un día que
- * quedó pendiente. El servidor dice si el usuario puede cerrar y, si algo lo impide (un turno abierto, un
- * día anterior pendiente, el arranque sin capturar), el botón queda deshabilitado con el motivo. Un día
- * cerrado se muestra con quién y cuándo lo cerró. La impresión del corte al cerrar queda para CAJ-07b.
+ * "Cerrar día" (CAJ-06, CAJ-07b, B-04) congela el corte: el gerente cierra el día en curso y Sistemas un
+ * día que quedó pendiente; el cajero nunca. Quién puede cerrar lo decide el servidor (`puedeCerrar`); si
+ * algo lo impide (un turno abierto, un día anterior pendiente, el arranque sin capturar), el botón queda
+ * deshabilitado con el motivo. Antes de cerrar se confirma con el resumen del día y, si se hizo, el arqueo.
+ * Al cerrar se abre el corte (REP-04) para imprimirlo. Un día cerrado queda en modo lectura: sin cerrar ni
+ * arqueo, pero con imprimir y exportar. Si hay un día pendiente de cierre, se avisa arriba y Sistemas puede
+ * ir a él con un clic.
  */
 @Component({
   selector: 'app-corte',
@@ -52,9 +63,12 @@ export class CorteComponent implements OnInit {
 
   // Cierre de día (CAJ-06), tal como lo manda el servidor
   cierre: CierreCaja | null = null;
+  cerrado = false;
   diaPendiente = false;
   puedeCerrar = false;
   avisoCierre: string | null = null;
+  primerDiaPendiente: string | null = null;
+  puedeCerrarPendiente = false;
   @ViewChild('confirmarCierre') confirmarCierreTpl!: TemplateRef<unknown>;
 
   isLoading = false;
@@ -81,9 +95,12 @@ export class CorteComponent implements OnInit {
         this.puedeElegirFecha = res.puedeElegirFecha;
         this.corte = res.corte;
         this.cierre = res.cierre;
+        this.cerrado = res.cerrado;
         this.diaPendiente = res.diaPendiente;
         this.puedeCerrar = res.puedeCerrar;
         this.avisoCierre = res.avisoCierre;
+        this.primerDiaPendiente = res.primerDiaPendiente;
+        this.puedeCerrarPendiente = res.puedeCerrarPendiente;
         this.isLoading = false;
       },
       error: (err) => {
@@ -95,7 +112,18 @@ export class CorteComponent implements OnInit {
     });
   }
 
-  /** Pide confirmación y cierra el día que está en pantalla; el corte queda congelado. */
+  /** Lleva la pantalla al día pendiente de cierre (solo se ofrece a quien puede cerrarlo). */
+  irAlDiaPendiente(): void {
+    if (!this.primerDiaPendiente || !this.puedeElegirFecha) return;
+    this.fecha = this.primerDiaPendiente;
+    this.successMessage = '';
+    this.cargar();
+  }
+
+  /**
+   * Pide confirmación con el resumen del día y lo cierra; el corte queda congelado. Al cerrar se abren los
+   * reportes del cierre para imprimirlos.
+   */
   cerrarDia(): void {
     const fecha = this.corte?.fecha;
     if (!fecha || !this.puedeCerrar || this.avisoCierre || this.isCerrando) return;
@@ -110,7 +138,10 @@ export class CorteComponent implements OnInit {
           next: (cierre) => {
             this.isCerrando = false;
             this.successMessage = `Se cerró la caja del ${this.fechaCorta(cierre.fecha)}.`;
+            // El conteo era de la gaveta abierta; el día ya queda en modo lectura
+            this.conteo = null;
             this.cargar();
+            this.abrirReportes(this.reportesDelCierre(cierre.fecha), this.successMessage);
           },
           error: (err) => {
             this.isCerrando = false;
@@ -127,11 +158,41 @@ export class CorteComponent implements OnInit {
   imprimirCorte(): void {
     const fecha = this.corte?.fecha;
     if (!fecha) return;
+    this.abrirVisor(this.reporteCorte(fecha));
+  }
+
+  /**
+   * Reportes que se imprimen al cerrar el día, en el orden en que se abren. El resumen de operación diaria
+   * (REP-05) se agrega aquí cuando exista su endpoint; mientras tanto solo sale el corte (REP-04).
+   */
+  private reportesDelCierre(fecha: string): ReporteVisor[] {
+    return [this.reporteCorte(fecha)];
+  }
+
+  private reporteCorte(fecha: string): ReporteVisor {
+    return {
+      titulo: `Corte de caja · ${this.fechaCorta(fecha)}`,
+      pdf$: this.cajaService.cortePdf(fecha),
+      nombreArchivo: `corte-caja-${fecha}.pdf`
+    };
+  }
+
+  /** Abre los reportes uno tras otro: el siguiente cuando se cierra el visor del anterior. */
+  private abrirReportes(reportes: ReporteVisor[], mensaje = ''): void {
+    const [primero, ...resto] = reportes;
+    if (!primero) return;
+    const siguiente = () => this.abrirReportes(resto);
+    this.abrirVisor(primero, mensaje).result.then(siguiente, siguiente);
+  }
+
+  private abrirVisor(reporte: ReporteVisor, mensaje = ''): NgbModalRef {
     const ref = this.modalService.open(PdfVisorComponent, { size: 'xl', scrollable: true });
     const visor = ref.componentInstance as PdfVisorComponent;
-    visor.pdf$ = this.cajaService.cortePdf(fecha);
-    visor.titulo = `Corte de caja · ${this.fechaCorta(fecha)}`;
-    visor.nombreArchivo = `corte-caja-${fecha}.pdf`;
+    visor.pdf$ = reporte.pdf$;
+    visor.titulo = reporte.titulo;
+    visor.nombreArchivo = reporte.nombreArchivo;
+    visor.mensaje = mensaje;
+    return ref;
   }
 
   /** Descarga el corte del día en pantalla en Excel (REP-04). */
@@ -174,6 +235,17 @@ export class CorteComponent implements OnInit {
     return !!this.corte && this.corte.fecha === this.hoy;
   }
 
+  /** El arqueo solo se hace con la gaveta de hoy y mientras el día siga abierto. */
+  get puedeArquear(): boolean {
+    return this.esHoy && !this.cerrado;
+  }
+
+  /** El día en pantalla no se puede cerrar porque antes hay uno pendiente: el aviso de arriba ya lo dice. */
+  get bloqueadoPorPendiente(): boolean {
+    const fecha = this.corte?.fecha;
+    return !!this.primerDiaPendiente && !!fecha && this.primerDiaPendiente < fecha;
+  }
+
   get renglonesTarjeta(): CorteCajaRenglon[] {
     return this.corte?.renglones.filter((r) => r.tarjeta !== 0) ?? [];
   }
@@ -206,7 +278,7 @@ export class CorteComponent implements OnInit {
   }
 
   contarGaveta(): void {
-    if (!this.conCifras || !this.esHoy) return;
+    if (!this.conCifras || !this.puedeArquear) return;
     const ref = this.modalService.open(DenominacionesModalComponent, { size: 'lg', centered: true, scrollable: true });
     const modal = ref.componentInstance as DenominacionesModalComponent;
     modal.titulo = 'Arqueo de la gaveta';

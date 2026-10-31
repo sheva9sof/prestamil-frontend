@@ -159,14 +159,20 @@ export interface CorteCajaRespuesta {
   hoy: string;
   puedeElegirFecha: boolean;
   corte: CorteCaja;
-  /** null mientras el día siga abierto; si viene, el corte es el congelado al cerrar. */
+  /** null mientras el día siga abierto o si lo congeló el cierre de un día posterior. */
   cierre: CierreCaja | null;
+  /** El día ya no admite operaciones: se muestra en modo lectura. */
+  cerrado: boolean;
   /** El día ya pasó, tuvo movimientos y nadie lo cerró: solo Sistemas puede cerrarlo. */
   diaPendiente: boolean;
-  /** El rol del usuario puede cerrar este día y el día no está cerrado. */
+  /** El usuario puede cerrar este día (gerente hoy; Sistemas también un día pendiente) y no está cerrado. */
   puedeCerrar: boolean;
   /** Lo que hoy impide cerrarlo (turno abierto, día anterior pendiente, arranque sin capturar). */
   avisoCierre: string | null;
+  /** El día pendiente de cierre más antiguo de la sucursal, aunque se vea otro día; null si no hay. */
+  primerDiaPendiente: string | null;
+  /** El usuario puede cerrar días pendientes (Sistemas). */
+  puedeCerrarPendiente: boolean;
 }
 
 // ── Saldo de arranque (CAJ-06) ─────────────────────────────────────────────
