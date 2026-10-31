@@ -4,6 +4,9 @@ import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { reporteFiltroParams } from '../helpers/reporte.helper';
 import {
+  ArranqueCaja,
+  ArranqueCajaRequest,
+  CierreCaja,
   CorteCajaRespuesta,
   Denominacion,
   TipoTraspasoCaja,
@@ -14,7 +17,7 @@ import {
 
 /**
  * Traspasos entre cajas (CAJ-02, CAJ-03), catálogo de denominaciones, corte de caja (CAJ-07a) y su
- * reporte en PDF y Excel (REP-04).
+ * reporte en PDF y Excel (REP-04), cierre de día y saldo de arranque (CAJ-06).
  */
 @Injectable({ providedIn: 'root' })
 export class CajaService {
@@ -72,5 +75,19 @@ export class CajaService {
       params: reporteFiltroParams({ ramo: null, desde: fecha, hasta: fecha }),
       responseType: 'blob'
     });
+  }
+
+  /** Cierra el día de caja (CAJ-06): el gerente el de hoy, Sistemas uno pendiente. */
+  cerrarDia(fecha: string): Observable<CierreCaja> {
+    return this.http.post<CierreCaja>(`${this.API_URL}/cierre`, { fecha });
+  }
+
+  arranque(): Observable<ArranqueCaja> {
+    return this.http.get<ArranqueCaja>(`${this.API_URL}/arranque`);
+  }
+
+  /** Captura del saldo de arranque y los folios de COCAE; solo Sistemas y una sola vez. */
+  capturarArranque(request: ArranqueCajaRequest): Observable<ArranqueCaja> {
+    return this.http.put<ArranqueCaja>(`${this.API_URL}/arranque`, request);
   }
 }

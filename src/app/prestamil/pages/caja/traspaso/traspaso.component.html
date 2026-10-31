@@ -17,11 +17,15 @@
     <div *ngIf="errorMessage" class="alert alert-danger py-2">{{ errorMessage }}</div>
 
     <ng-container *ngIf="contexto as ctx">
-      <div *ngIf="!ctx.puedeRegistrar" class="alert alert-info py-2">
+      <div *ngIf="ctx.diaCerrado" class="alert alert-warning d-flex align-items-center gap-2 py-2">
+        <i class="feather icon-lock"></i>
+        La caja del {{ fechaCorta(ctx.fechaOperacion) }} ya se cerró: no se pueden registrar ni cancelar traspasos.
+      </div>
+      <div *ngIf="!ctx.puedeRegistrar && !ctx.diaCerrado" class="alert alert-info py-2">
         Tu rol no puede registrar {{ plural.toLowerCase() }}; solo puedes consultar las del día.
       </div>
 
-      <form *ngIf="ctx.puedeRegistrar" class="row g-3 align-items-end" (ngSubmit)="guardar()">
+      <form *ngIf="ctx.puedeRegistrar && !ctx.diaCerrado" class="row g-3 align-items-end" (ngSubmit)="guardar()">
         <div class="col-md-3">
           <label class="form-label" for="cajaOrigen">Sale de</label>
           <input id="cajaOrigen" type="text" class="form-control" readonly
@@ -129,7 +133,7 @@
               <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="Reimprimir ticket" (click)="verTicket(t)">
                 <i class="feather icon-printer"></i>
               </button>
-              <button *ngIf="contexto?.puedeCancelar && t.estatus === 'ACTIVO'" type="button"
+              <button *ngIf="contexto?.puedeCancelar && !contexto?.diaCerrado && t.estatus === 'ACTIVO'" type="button"
                       class="btn btn-sm btn-outline-danger" title="Cancelar" (click)="cancelar(t)">
                 <i class="feather icon-x-circle"></i>
               </button>

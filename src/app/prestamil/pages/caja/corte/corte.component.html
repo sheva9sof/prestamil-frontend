@@ -1,8 +1,14 @@
 <div class="card">
   <div class="card-header d-flex align-items-center justify-content-between">
     <h5 class="mb-0">Corte de caja</h5>
-    <span *ngIf="conCifras && !isLoading" class="text-muted small">
-      Calculado con lo registrado hasta ahora · sin cierre de día
+    <span *ngIf="cierre" class="badge bg-secondary">
+      <i class="feather icon-lock me-1"></i>Cerrado por {{ cierre.usuario }} el {{ fechaHora(cierre.fechaCierre) }}{{ cierre.diaPendiente ? ' · día pendiente' : '' }}
+    </span>
+    <span *ngIf="!cierre && diaPendiente" class="badge bg-warning text-dark">
+      <i class="feather icon-alert-triangle me-1"></i>Pendiente de cierre: lo cierra Sistemas
+    </span>
+    <span *ngIf="!cierre && !diaPendiente && conCifras && !isLoading" class="text-muted small">
+      Calculado con lo registrado hasta ahora · día abierto
     </span>
   </div>
 
@@ -29,9 +35,19 @@
           <span *ngIf="isExportando" class="spinner-border spinner-border-sm me-2"></span>
           <i *ngIf="!isExportando" class="feather icon-download me-1"></i>Exportar Excel
         </button>
+        <!-- CAJ-06: el gerente cierra hoy; Sistemas, un día pendiente -->
+        <button *ngIf="puedeCerrar" type="button" class="btn btn-danger"
+                [disabled]="isLoading || isCerrando || !!avisoCierre" (click)="cerrarDia()">
+          <span *ngIf="isCerrando" class="spinner-border spinner-border-sm me-2"></span>
+          <i *ngIf="!isCerrando" class="feather icon-lock me-1"></i>Cerrar día
+        </button>
       </div>
     </div>
 
+    <div *ngIf="puedeCerrar && avisoCierre" class="alert alert-info py-2 mt-3 mb-0">
+      <i class="feather icon-info me-1"></i>Todavía no se puede cerrar el día: {{ avisoCierre }}
+    </div>
+    <div *ngIf="successMessage" class="alert alert-success py-2 mt-3 mb-0">{{ successMessage }}</div>
     <div *ngIf="errorMessage" class="alert alert-danger py-2 mt-3 mb-0">{{ errorMessage }}</div>
 
     <!-- Antes del arranque o sin saldo de arranque: el servidor no manda cifras -->
@@ -253,3 +269,26 @@
     </div>
   </div>
 </div>
+
+<!-- CAJ-06: confirmación del cierre de día -->
+<ng-template #confirmarCierre let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Cerrar la caja del {{ fechaCorta(corte?.fecha) }}</h5>
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p>Al cerrar, el corte queda congelado y ya no se pueden registrar ni cancelar empeños, cobros ni traspasos con esta fecha.</p>
+    <table class="table table-sm mb-0">
+      <tbody>
+        <tr><td>Saldo final de bóveda</td><td class="text-end">{{ pesos(corte?.saldoFinal) }}</td></tr>
+        <tr><td>Diferencia de ventanilla</td><td class="text-end">{{ pesos(corte?.diferencia) }} {{ nombreIndicador(corte?.indicador ?? null) }}</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancelar</button>
+    <button type="button" class="btn btn-danger" (click)="modal.close('confirmar')">
+      <i class="feather icon-lock me-1"></i>Cerrar día
+    </button>
+  </div>
+</ng-template>

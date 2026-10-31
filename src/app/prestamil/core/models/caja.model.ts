@@ -45,6 +45,8 @@ export interface TraspasoCajaContexto {
   cajaDestino: Caja;
   puedeRegistrar: boolean;
   puedeCancelar: boolean;
+  /** La caja de hoy ya se cerró (CAJ-06): no se registra ni se cancela nada. */
+  diaCerrado: boolean;
 }
 
 /** El servidor pone cajas, fecha y folio; el importe lo coteja contra la suma del desglose (RC-03). */
@@ -139,10 +141,61 @@ export interface CorteCaja {
   saldoFinal: number | null;
 }
 
+/** Un día de caja cerrado (CAJ-06). */
+export interface CierreCaja {
+  id: number;
+  fecha: string;
+  /** Lo cerró Sistemas después de su día. */
+  diaPendiente: boolean;
+  diferencia: number;
+  saldoFinal: number;
+  usuario: string;
+  fechaCierre: string;
+}
+
 /** GET /api/caja/corte: el cajero solo recibe el de hoy (como OTR-01). */
 export interface CorteCajaRespuesta {
   fecha: string;
   hoy: string;
   puedeElegirFecha: boolean;
   corte: CorteCaja;
+  /** null mientras el día siga abierto; si viene, el corte es el congelado al cerrar. */
+  cierre: CierreCaja | null;
+  /** El día ya pasó, tuvo movimientos y nadie lo cerró: solo Sistemas puede cerrarlo. */
+  diaPendiente: boolean;
+  /** El rol del usuario puede cerrar este día y el día no está cerrado. */
+  puedeCerrar: boolean;
+  /** Lo que hoy impide cerrarlo (turno abierto, día anterior pendiente, arranque sin capturar). */
+  avisoCierre: string | null;
+}
+
+// ── Saldo de arranque (CAJ-06) ─────────────────────────────────────────────
+
+export type SerieFolio = 'NOTA_VENTA' | 'TRASPASO_CAJA';
+
+/** Último folio emitido de una serie de `FolioService`. */
+export interface FolioArranque {
+  serie: SerieFolio;
+  ultimoFolio: number;
+}
+
+/** GET /api/caja/arranque. Sin arranque, `fecha` y `saldoBoveda` vienen en null. */
+export interface ArranqueCaja {
+  fecha: string | null;
+  saldoBoveda: number | null;
+  /** Sistemas ya lo capturó: no cambia más. */
+  confirmado: boolean;
+  usuarioCaptura: string | null;
+  fechaCaptura: string | null;
+  fechaUltimoCierre: string | null;
+  folios: FolioArranque[];
+  hoy: string;
+  puedeCapturar: boolean;
+}
+
+/** PUT /api/caja/arranque: solo Sistemas y una sola vez por sucursal. */
+export interface ArranqueCajaRequest {
+  fecha: string;
+  saldoBoveda: number;
+  folios: FolioArranque[];
 }

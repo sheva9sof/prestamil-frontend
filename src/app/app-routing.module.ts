@@ -76,8 +76,10 @@ const routes: Routes = [
           { path: 'concentracion', data: { tipo: 'CONCENTRACION' }, loadComponent: () => import('./prestamil/pages/caja/traspaso/traspaso.component').then((c) => c.TraspasoComponent) },
           { path: 'dotacion', data: { tipo: 'DOTACION' }, loadComponent: () => import('./prestamil/pages/caja/traspaso/traspaso.component').then((c) => c.TraspasoComponent) },
           { path: 'recoleccion', data: { tipo: 'RECOLECCION' }, loadComponent: () => import('./prestamil/pages/caja/traspaso/traspaso.component').then((c) => c.TraspasoComponent) },
-          // CAJ-07a: corte del día con arqueo opcional, todavía sin cierre
-          { path: 'corte', loadComponent: () => import('./prestamil/pages/caja/corte/corte.component').then((c) => c.CorteComponent) }
+          // CAJ-07a: corte del día con arqueo opcional; CAJ-06: cierre de día
+          { path: 'corte', loadComponent: () => import('./prestamil/pages/caja/corte/corte.component').then((c) => c.CorteComponent) },
+          // CAJ-06: saldo de arranque y folios de COCAE, solo Sistemas
+          { path: 'arranque', loadComponent: () => import('./prestamil/pages/caja/arranque/arranque.component').then((c) => c.ArranqueComponent) }
         ]
       },
       {

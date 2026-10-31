@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, TemplateRef, ViewChild, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
@@ -6,14 +6,14 @@ import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { DenominacionesModalComponent } from '../../../core/components/denominaciones-modal/denominaciones-modal.component';
 import { PdfVisorComponent } from '../../../core/components/pdf-visor/pdf-visor.component';
 import { descargarArchivo } from '../../../core/helpers/reporte.helper';
-import { CorteCaja, CorteCajaRenglon, DesgloseCapturado } from '../../../core/models/caja.model';
+import { CierreCaja, CorteCaja, CorteCajaRenglon, DesgloseCapturado } from '../../../core/models/caja.model';
 import { CajaService } from '../../../core/services/caja.service';
 
 /** Las diferencias de ±0.01–0.03 son normales por redondeo (RC-07). */
 const TOLERANCIA_REDONDEO_CENTAVOS = 3;
 
 /**
- * Pantalla del corte de caja (CAJ-07a), todavía sin cierre de día. Muestra los dos bloques de
+ * Pantalla del corte de caja (CAJ-07a) con el cierre de día (CAJ-06). Muestra los dos bloques de
  * `CorteCajaService` en el orden del PDF de COCAE: arriba los movimientos de ventanilla (solo efectivo),
  * aparte lo cobrado con tarjeta (RC-06) y abajo la bóveda y el arqueo (RC-07, RC-08).
  *
@@ -23,6 +23,11 @@ const TOLERANCIA_REDONDEO_CENTAVOS = 3;
  *
  * "Imprimir corte" y "Exportar Excel" sacan el reporte REP-04 del día que está en pantalla, con las mismas
  * cifras (las calcula el servidor con el mismo motor). Sin cifras, el PDF sale con el aviso.
+ *
+ * "Cerrar día" (CAJ-06, B-04) congela el corte: el gerente cierra el día en curso y Sistemas un día que
+ * quedó pendiente. El servidor dice si el usuario puede cerrar y, si algo lo impide (un turno abierto, un
+ * día anterior pendiente, el arranque sin capturar), el botón queda deshabilitado con el motivo. Un día
+ * cerrado se muestra con quién y cuándo lo cerró. La impresión del corte al cerrar queda para CAJ-07b.
  */
 @Component({
   selector: 'app-corte',
@@ -45,9 +50,18 @@ export class CorteComponent implements OnInit {
   /** Conteo de la gaveta del arqueo; se descarta al cambiar de día. */
   conteo: DesgloseCapturado | null = null;
 
+  // Cierre de día (CAJ-06), tal como lo manda el servidor
+  cierre: CierreCaja | null = null;
+  diaPendiente = false;
+  puedeCerrar = false;
+  avisoCierre: string | null = null;
+  @ViewChild('confirmarCierre') confirmarCierreTpl!: TemplateRef<unknown>;
+
   isLoading = false;
   isExportando = false;
+  isCerrando = false;
   errorMessage = '';
+  successMessage = '';
 
   ngOnInit(): void {
     this.cargar();
@@ -66,6 +80,10 @@ export class CorteComponent implements OnInit {
         this.hoy = res.hoy;
         this.puedeElegirFecha = res.puedeElegirFecha;
         this.corte = res.corte;
+        this.cierre = res.cierre;
+        this.diaPendiente = res.diaPendiente;
+        this.puedeCerrar = res.puedeCerrar;
+        this.avisoCierre = res.avisoCierre;
         this.isLoading = false;
       },
       error: (err) => {
@@ -75,6 +93,34 @@ export class CorteComponent implements OnInit {
         this.fecha = this.corte?.fecha ?? this.fecha;
       }
     });
+  }
+
+  /** Pide confirmación y cierra el día que está en pantalla; el corte queda congelado. */
+  cerrarDia(): void {
+    const fecha = this.corte?.fecha;
+    if (!fecha || !this.puedeCerrar || this.avisoCierre || this.isCerrando) return;
+    const ref = this.modalService.open(this.confirmarCierreTpl, { centered: true });
+    ref.result.then(
+      (resultado) => {
+        if (resultado !== 'confirmar') return;
+        this.isCerrando = true;
+        this.errorMessage = '';
+        this.successMessage = '';
+        this.cajaService.cerrarDia(fecha).subscribe({
+          next: (cierre) => {
+            this.isCerrando = false;
+            this.successMessage = `Se cerró la caja del ${this.fechaCorta(cierre.fecha)}.`;
+            this.cargar();
+          },
+          error: (err) => {
+            this.isCerrando = false;
+            this.errorMessage = err?.error?.message ?? 'No se pudo cerrar el día.';
+            this.cargar();
+          }
+        });
+      },
+      () => undefined
+    );
   }
 
   /** Abre el corte del día en pantalla (REP-04) en el visor, para imprimirlo o descargarlo. */
@@ -185,6 +231,12 @@ export class CorteComponent implements OnInit {
     if (!iso) return '';
     const [anio, mes, dia] = iso.substring(0, 10).split('-');
     return `${dia}/${mes}/${anio}`;
+  }
+
+  /** "2026-10-31T18:05:12" → "31/10/2026 18:05". */
+  fechaHora(iso: string | null | undefined): string {
+    if (!iso) return '';
+    return `${this.fechaCorta(iso)} ${iso.substring(11, 16)}`;
   }
 
   /** Importe con signo de menos al frente: "-$1,000.00". */

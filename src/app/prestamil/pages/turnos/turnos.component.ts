@@ -76,7 +76,8 @@ export class TurnosComponent implements OnInit {
             }, 
             error: (e) => {
               console.error('Error al iniciar turno:', e);
-              this.showErrorMessage('Error al iniciar turno');
+              // CAJ-06: el servidor explica si la caja de hoy ya se cerró o hay un día pendiente de cierre
+              this.showErrorMessage(e?.status === 400 && e?.error?.message ? e.error.message : 'Error al iniciar turno');
             }
           });
         }
