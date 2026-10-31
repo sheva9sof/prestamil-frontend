@@ -1,7 +1,7 @@
 <div class="card">
   <div class="card-header d-flex align-items-center justify-content-between">
     <h5 class="mb-0">Corte de caja</h5>
-    <span *ngIf="corte && !isLoading" class="text-muted small">
+    <span *ngIf="conCifras && !isLoading" class="text-muted small">
       Calculado con lo registrado hasta ahora · sin cierre de día
     </span>
   </div>
@@ -18,6 +18,16 @@
         <button type="button" class="btn btn-primary" [disabled]="isLoading" (click)="cargar()">
           <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-2"></span>
           <i *ngIf="!isLoading" class="feather icon-refresh-cw me-1"></i>Actualizar
+        </button>
+      </div>
+      <!-- Reporte REP-04 del día que está en pantalla -->
+      <div *ngIf="corte" class="col-auto ms-auto d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" [disabled]="isLoading" (click)="imprimirCorte()">
+          <i class="feather icon-printer me-1"></i>Imprimir corte
+        </button>
+        <button type="button" class="btn btn-success" [disabled]="isLoading || isExportando" (click)="exportarExcel()">
+          <span *ngIf="isExportando" class="spinner-border spinner-border-sm me-2"></span>
+          <i *ngIf="!isExportando" class="feather icon-download me-1"></i>Exportar Excel
         </button>
       </div>
     </div>

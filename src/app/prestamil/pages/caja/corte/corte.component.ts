@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { DenominacionesModalComponent } from '../../../core/components/denominaciones-modal/denominaciones-modal.component';
+import { PdfVisorComponent } from '../../../core/components/pdf-visor/pdf-visor.component';
+import { descargarArchivo } from '../../../core/helpers/reporte.helper';
 import { CorteCaja, CorteCajaRenglon, DesgloseCapturado } from '../../../core/models/caja.model';
 import { CajaService } from '../../../core/services/caja.service';
 
@@ -18,6 +20,9 @@ const TOLERANCIA_REDONDEO_CENTAVOS = 3;
  * El cajero solo ve el corte de hoy (como OTR-01). Si el día es anterior al arranque o no hay saldo de
  * arranque, el servidor manda un aviso y la pantalla lo muestra sin cifras. El arqueo opcional cuenta la
  * gaveta con `denominaciones-modal` y la compara contra lo que dice el sistema; no se guarda.
+ *
+ * "Imprimir corte" y "Exportar Excel" sacan el reporte REP-04 del día que está en pantalla, con las mismas
+ * cifras (las calcula el servidor con el mismo motor). Sin cifras, el PDF sale con el aviso.
  */
 @Component({
   selector: 'app-corte',
@@ -41,6 +46,7 @@ export class CorteComponent implements OnInit {
   conteo: DesgloseCapturado | null = null;
 
   isLoading = false;
+  isExportando = false;
   errorMessage = '';
 
   ngOnInit(): void {
@@ -67,6 +73,47 @@ export class CorteComponent implements OnInit {
         this.errorMessage = err?.error?.message ?? 'No se pudo calcular el corte de caja.';
         // El selector vuelve al día del corte que sigue en pantalla
         this.fecha = this.corte?.fecha ?? this.fecha;
+      }
+    });
+  }
+
+  /** Abre el corte del día en pantalla (REP-04) en el visor, para imprimirlo o descargarlo. */
+  imprimirCorte(): void {
+    const fecha = this.corte?.fecha;
+    if (!fecha) return;
+    const ref = this.modalService.open(PdfVisorComponent, { size: 'xl', scrollable: true });
+    const visor = ref.componentInstance as PdfVisorComponent;
+    visor.pdf$ = this.cajaService.cortePdf(fecha);
+    visor.titulo = `Corte de caja · ${this.fechaCorta(fecha)}`;
+    visor.nombreArchivo = `corte-caja-${fecha}.pdf`;
+  }
+
+  /** Descarga el corte del día en pantalla en Excel (REP-04). */
+  exportarExcel(): void {
+    const fecha = this.corte?.fecha;
+    if (!fecha || this.isExportando) return;
+    this.isExportando = true;
+    this.errorMessage = '';
+    this.cajaService.corteExcel(fecha).subscribe({
+      next: (blob) => {
+        this.isExportando = false;
+        descargarArchivo(blob, `corte-caja-${fecha}.xlsx`);
+      },
+      error: (err) => {
+        this.isExportando = false;
+        this.errorMessage = 'No se pudo exportar el corte a Excel.';
+        // Con responseType 'blob' el cuerpo del error también llega como Blob
+        const cuerpo = err?.error;
+        if (cuerpo instanceof Blob) {
+          cuerpo.text().then((texto) => {
+            try {
+              const message = JSON.parse(texto)?.message;
+              if (message) this.errorMessage = `No se pudo exportar el corte a Excel: ${message}`;
+            } catch {
+              // Cuerpo no JSON: se queda el mensaje genérico
+            }
+          });
+        }
       }
     });
   }

@@ -1,0 +1,56 @@
+<div class="row g-2 align-items-end mb-3">
+  <div *ngIf="conRamo" class="col-sm-4 col-md-3">
+    <label class="form-label" [for]="id + '-ramo'">Ramo</label>
+    <select
+      class="form-select"
+      [id]="id + '-ramo'"
+      [ngModel]="filtro.ramo"
+      (ngModelChange)="cambiarRamo($event)">
+      <option [ngValue]="null">Todos</option>
+      <option *ngFor="let ramo of ramos" [ngValue]="ramo.id">{{ ramo.tipo }}</option>
+    </select>
+  </div>
+
+  <div class="col-sm-4 col-md-3">
+    <label class="form-label" [for]="id + '-desde'">{{ conRango ? 'Desde' : 'Fecha' }}</label>
+    <input
+      type="date"
+      class="form-control"
+      [id]="id + '-desde'"
+      [ngModel]="filtro.desde"
+      (ngModelChange)="cambiarDesde($event)"
+      [max]="fechaMaxima ?? ''"
+      [readonly]="!fechaEditable" />
+    <div *ngIf="!fechaEditable" class="form-text">{{ avisoFechaFija }}</div>
+  </div>
+
+  <div *ngIf="conRango" class="col-sm-4 col-md-3">
+    <label class="form-label" [for]="id + '-hasta'">Hasta</label>
+    <input
+      type="date"
+      class="form-control"
+      [class.is-invalid]="rangoInvertido"
+      [id]="id + '-hasta'"
+      [ngModel]="filtro.hasta"
+      (ngModelChange)="cambiarHasta($event)"
+      [min]="filtro.desde"
+      [max]="fechaMaxima ?? ''"
+      [readonly]="!fechaEditable" />
+    <div *ngIf="rangoInvertido" class="invalid-feedback">La fecha final es anterior a la inicial.</div>
+  </div>
+
+  <div *ngIf="textoConsultar" class="col-auto">
+    <button type="button" class="btn btn-primary" (click)="onConsultar()" [disabled]="cargando || !filtroValido">
+      {{ textoConsultar }}
+    </button>
+  </div>
+
+  <div class="col-auto ms-auto d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary" (click)="onPantalla()" [disabled]="!filtroValido">
+      {{ textoPantalla }}
+    </button>
+    <button type="button" class="btn btn-success" (click)="onExportar()" [disabled]="!filtroValido">
+      {{ textoExportar }}
+    </button>
+  </div>
+</div>

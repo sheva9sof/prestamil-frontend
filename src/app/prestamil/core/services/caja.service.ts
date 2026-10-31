@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
+import { reporteFiltroParams } from '../helpers/reporte.helper';
 import {
   CorteCajaRespuesta,
   Denominacion,
@@ -11,7 +12,10 @@ import {
   TraspasoCajaRequest
 } from '../models/caja.model';
 
-/** Traspasos entre cajas (CAJ-02, CAJ-03), catálogo de denominaciones y corte de caja (CAJ-07a). */
+/**
+ * Traspasos entre cajas (CAJ-02, CAJ-03), catálogo de denominaciones, corte de caja (CAJ-07a) y su
+ * reporte en PDF y Excel (REP-04).
+ */
 @Injectable({ providedIn: 'root' })
 export class CajaService {
   private readonly http = inject(HttpClient);
@@ -52,5 +56,21 @@ export class CajaService {
     let params = new HttpParams();
     if (fecha) params = params.set('fecha', fecha);
     return this.http.get<CorteCajaRespuesta>(`${this.API_URL}/corte`, { params });
+  }
+
+  /** Corte de caja de un día en PDF (REP-04). El cajero siempre recibe el de hoy. */
+  cortePdf(fecha: string): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/corte/pdf`, {
+      params: reporteFiltroParams({ ramo: null, desde: fecha, hasta: fecha }),
+      responseType: 'blob'
+    });
+  }
+
+  /** Corte de caja de un día en Excel (.xlsx), mismas reglas que el PDF. */
+  corteExcel(fecha: string): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/corte/excel`, {
+      params: reporteFiltroParams({ ramo: null, desde: fecha, hasta: fecha }),
+      responseType: 'blob'
+    });
   }
 }

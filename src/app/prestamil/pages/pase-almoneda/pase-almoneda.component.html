@@ -4,32 +4,19 @@
   </div>
 
   <div class="card-body">
-    <div class="row g-2 align-items-end mb-3">
-      <div class="col-sm-4 col-md-3">
-        <label class="form-label" for="fechaPase">Fecha</label>
-        <input
-          id="fechaPase"
-          type="date"
-          class="form-control"
-          [(ngModel)]="fecha"
-          [readonly]="!puedeElegirFecha"
-          (change)="consultar()" />
-        <div *ngIf="!puedeElegirFecha" class="form-text">Solo se puede consultar el pase de hoy.</div>
-      </div>
-      <div class="col-auto">
-        <button type="button" class="btn btn-primary" (click)="consultar()" [disabled]="cargando">
-          Consultar
-        </button>
-      </div>
-      <div class="col-auto ms-auto d-flex gap-2">
-        <button type="button" class="btn btn-outline-secondary" (click)="exportarPdf()">
-          Exportar PDF
-        </button>
-        <button type="button" class="btn btn-success" (click)="exportarExcel()">
-          Exportar a Excel
-        </button>
-      </div>
-    </div>
+    <app-reporte-filtros
+      [filtro]="filtro"
+      (filtroChange)="cambiarFecha($event)"
+      [conRamo]="false"
+      [conRango]="false"
+      [fechaEditable]="puedeElegirFecha"
+      avisoFechaFija="Solo se puede consultar el pase de hoy."
+      [cargando]="cargando"
+      textoConsultar="Consultar"
+      textoPantalla="Exportar PDF"
+      (consultar)="consultar()"
+      (pantalla)="exportarPdf()"
+      (exportar)="exportarExcel()" />
 
     <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
 
