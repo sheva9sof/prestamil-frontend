@@ -20,6 +20,16 @@
           <i *ngIf="!isLoading" class="feather icon-refresh-cw me-1"></i>Actualizar
         </button>
       </div>
+      <!-- Reporte REP-04 del día que está en pantalla -->
+      <div *ngIf="corte" class="col-auto ms-auto d-flex gap-2">
+        <button type="button" class="btn btn-outline-secondary" [disabled]="isLoading" (click)="imprimirCorte()">
+          <i class="feather icon-printer me-1"></i>Imprimir corte
+        </button>
+        <button type="button" class="btn btn-success" [disabled]="isLoading || isExportando" (click)="exportarExcel()">
+          <span *ngIf="isExportando" class="spinner-border spinner-border-sm me-2"></span>
+          <i *ngIf="!isExportando" class="feather icon-download me-1"></i>Exportar Excel
+        </button>
+      </div>
     </div>
 
     <div *ngIf="errorMessage" class="alert alert-danger py-2 mt-3 mb-0">{{ errorMessage }}</div>
