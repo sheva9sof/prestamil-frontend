@@ -110,6 +110,15 @@
       </ng-container>
 
       <ng-template #noTurno>
+        <!-- CAJ-06 (B-04): con un día pendiente de cierre o la caja de hoy cerrada no se abre turno -->
+        <div *ngIf="puedeAbrir && motivoBloqueoApertura" class="alert alert-warning d-flex gap-2 align-items-start mb-3" role="status">
+          <i class="feather icon-alert-triangle mt-1"></i>
+          <div>
+            <strong>No se puede abrir turno.</strong>
+            <div>{{ motivoBloqueoApertura }}</div>
+          </div>
+        </div>
+
         <div class="turno-shell inactive-turno">
           <div class="turno-main">
             <div class="turno-icon"><i class="feather icon-sunrise"></i></div>
@@ -127,7 +136,7 @@
           </div>
 
           <div class="turno-actions" *ngIf="puedeAbrir; else sinPermiso">
-            <button class="btn btn-primary" (click)="iniciar()">
+            <button class="btn btn-primary" [disabled]="!!motivoBloqueoApertura" (click)="iniciar()">
               <i class="feather icon-play me-1"></i> Iniciar turno
             </button>
           </div>

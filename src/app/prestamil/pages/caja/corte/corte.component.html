@@ -1,18 +1,30 @@
 <div class="card">
   <div class="card-header d-flex align-items-center justify-content-between">
     <h5 class="mb-0">Corte de caja</h5>
-    <span *ngIf="cierre" class="badge bg-secondary">
-      <i class="feather icon-lock me-1"></i>Cerrado por {{ cierre.usuario }} el {{ fechaHora(cierre.fechaCierre) }}{{ cierre.diaPendiente ? ' · día pendiente' : '' }}
+    <span *ngIf="cerrado" class="badge bg-secondary">
+      <i class="feather icon-lock me-1"></i>Día cerrado · solo lectura
     </span>
-    <span *ngIf="!cierre && diaPendiente" class="badge bg-warning text-dark">
+    <span *ngIf="!cerrado && diaPendiente" class="badge bg-warning text-dark">
       <i class="feather icon-alert-triangle me-1"></i>Pendiente de cierre: lo cierra Sistemas
     </span>
-    <span *ngIf="!cierre && !diaPendiente && conCifras && !isLoading" class="text-muted small">
+    <span *ngIf="!cerrado && !diaPendiente && conCifras && !isLoading" class="text-muted small">
       Calculado con lo registrado hasta ahora · día abierto
     </span>
   </div>
 
   <div class="card-body">
+    <!-- CAJ-07b: un día anterior sin cerrar bloquea el turno; solo Sistemas lo cierra -->
+    <div *ngIf="primerDiaPendiente" class="alert alert-warning d-flex flex-wrap align-items-center gap-2 py-2" role="status">
+      <i class="feather icon-alert-triangle"></i>
+      <span class="me-auto">
+        El día {{ fechaCorta(primerDiaPendiente) }} está pendiente de cierre; solo Sistemas puede cerrarlo.
+      </span>
+      <button *ngIf="puedeCerrarPendiente && corte?.fecha !== primerDiaPendiente" type="button"
+              class="btn btn-sm btn-warning" [disabled]="isLoading" (click)="irAlDiaPendiente()">
+        <i class="feather icon-arrow-right me-1"></i>Ir al {{ fechaCorta(primerDiaPendiente) }}
+      </button>
+    </div>
+
     <div class="row g-2 align-items-end">
       <div class="col-sm-4 col-md-3">
         <label class="form-label" for="fechaCorte">Fecha</label>
@@ -35,8 +47,8 @@
           <span *ngIf="isExportando" class="spinner-border spinner-border-sm me-2"></span>
           <i *ngIf="!isExportando" class="feather icon-download me-1"></i>Exportar Excel
         </button>
-        <!-- CAJ-06: el gerente cierra hoy; Sistemas, un día pendiente -->
-        <button *ngIf="puedeCerrar" type="button" class="btn btn-danger"
+        <!-- CAJ-07b: el gerente cierra hoy; Sistemas, también un día pendiente; lo decide el servidor -->
+        <button *ngIf="puedeCerrar" type="button" class="btn btn-danger" [title]="avisoCierre ?? ''"
                 [disabled]="isLoading || isCerrando || !!avisoCierre" (click)="cerrarDia()">
           <span *ngIf="isCerrando" class="spinner-border spinner-border-sm me-2"></span>
           <i *ngIf="!isCerrando" class="feather icon-lock me-1"></i>Cerrar día
@@ -44,8 +56,17 @@
       </div>
     </div>
 
-    <div *ngIf="puedeCerrar && avisoCierre" class="alert alert-info py-2 mt-3 mb-0">
-      <i class="feather icon-info me-1"></i>Todavía no se puede cerrar el día: {{ avisoCierre }}
+    <!-- Si lo impide un día pendiente, el aviso de arriba ya lo explica -->
+    <div *ngIf="puedeCerrar && avisoCierre && !bloqueadoPorPendiente" class="alert alert-info py-2 mt-3 mb-0">
+      <i class="feather icon-info me-1"></i>{{ avisoCierre }}
+    </div>
+    <div *ngIf="cerrado" class="alert alert-secondary py-2 mt-3 mb-0">
+      <i class="feather icon-lock me-1"></i>
+      <ng-container *ngIf="cierre; else congelado">
+        Día cerrado por {{ cierre.usuario }} el {{ fechaHora(cierre.fechaCierre) }}{{ cierre.diaPendiente ? ' (día pendiente, cerrado por Sistemas)' : '' }}.
+      </ng-container>
+      <ng-template #congelado>Día cerrado: no tuvo movimientos y quedó congelado por el cierre de un día posterior.</ng-template>
+      Ya no admite operaciones; el corte se puede imprimir y exportar.
     </div>
     <div *ngIf="successMessage" class="alert alert-success py-2 mt-3 mb-0">{{ successMessage }}</div>
     <div *ngIf="errorMessage" class="alert alert-danger py-2 mt-3 mb-0">{{ errorMessage }}</div>
@@ -218,14 +239,15 @@
     <div class="card mb-0">
       <div class="card-header d-flex align-items-center justify-content-between">
         <h5 class="mb-0">Arqueo de ventanilla</h5>
-        <button *ngIf="esHoy" type="button" class="btn btn-sm btn-outline-primary" (click)="contarGaveta()">
+        <button *ngIf="puedeArquear" type="button" class="btn btn-sm btn-outline-primary" (click)="contarGaveta()">
           <i class="feather icon-grid me-1"></i>{{ conteo ? 'Corregir conteo' : 'Contar gaveta' }}
         </button>
       </div>
       <div class="card-body">
-        <p *ngIf="!esHoy" class="text-muted mb-0">El arqueo de la gaveta solo se hace con el corte de hoy.</p>
+        <p *ngIf="cerrado" class="text-muted mb-0">El día está cerrado: ya no se hace arqueo.</p>
+        <p *ngIf="!cerrado && !esHoy" class="text-muted mb-0">El arqueo de la gaveta solo se hace con el corte de hoy.</p>
 
-        <ng-container *ngIf="esHoy">
+        <ng-container *ngIf="puedeArquear">
           <p *ngIf="!conteo" class="text-muted mb-0">
             Cuenta el efectivo de la gaveta por denominación para compararlo con lo que dice el sistema.
           </p>
@@ -270,20 +292,40 @@
   </div>
 </div>
 
-<!-- CAJ-06: confirmación del cierre de día -->
+<!-- CAJ-07b: confirmación del cierre de día con el resumen del día -->
 <ng-template #confirmarCierre let-modal>
   <div class="modal-header">
     <h5 class="modal-title">Cerrar la caja del {{ fechaCorta(corte?.fecha) }}</h5>
     <button type="button" class="btn-close" aria-label="Cerrar" (click)="modal.dismiss()"></button>
   </div>
   <div class="modal-body">
-    <p>Al cerrar, el corte queda congelado y ya no se pueden registrar ni cancelar empeños, cobros ni traspasos con esta fecha.</p>
-    <table class="table table-sm mb-0">
+    <table class="table table-sm mb-3">
       <tbody>
-        <tr><td>Saldo final de bóveda</td><td class="text-end">{{ pesos(corte?.saldoFinal) }}</td></tr>
-        <tr><td>Diferencia de ventanilla</td><td class="text-end">{{ pesos(corte?.diferencia) }} {{ nombreIndicador(corte?.indicador ?? null) }}</td></tr>
+        <tr><td>Total de ingresos</td><td class="text-end">{{ pesos(corte?.ingresos?.efectivo) }}</td></tr>
+        <tr><td>Total de egresos</td><td class="text-end">{{ pesos(corte?.egresos?.efectivo) }}</td></tr>
+        <tr>
+          <td>Diferencia</td>
+          <td class="text-end">
+            {{ pesos(corte?.diferencia) }}
+            <span class="badge ms-1" [ngClass]="corte?.indicador === 'F' ? 'bg-danger' : corte?.indicador === 'S' ? 'bg-warning text-dark' : 'bg-success'">
+              {{ corte?.indicador ?? '' }} {{ nombreIndicador(corte?.indicador ?? null) }}
+            </span>
+          </td>
+        </tr>
+        <tr class="fw-semibold"><td>Saldo final de bóveda</td><td class="text-end">{{ pesos(corte?.saldoFinal) }}</td></tr>
+        <tr *ngIf="conteo && puedeArquear">
+          <td>Arqueo de la gaveta</td>
+          <td class="text-end" [ngClass]="arqueoCuadra ? 'text-success' : 'text-danger'">
+            {{ arqueoCuadra ? 'Cuadra' : ((diferenciaArqueo ?? 0) < 0 ? 'Faltan ' : 'Sobran ') + pesos(faltaOSobra) }}
+          </td>
+        </tr>
       </tbody>
     </table>
+    <div class="alert alert-warning py-2 mb-0">
+      <i class="feather icon-lock me-1"></i>
+      El día quedará congelado: ya no se podrán registrar ni cancelar operaciones en él (empeños, cobros ni traspasos).
+      Al cerrar se abre el corte para imprimirlo.
+    </div>
   </div>
   <div class="modal-footer">
     <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancelar</button>

@@ -17,6 +17,8 @@ export class TurnosComponent implements OnInit {
   turno: any = null;
   puedeAbrir = false;
   rolesPermitidosAbrir: number[] = [5]; // gerente id=5 por defecto
+  /** CAJ-06: por qué el cierre de caja impide abrir turno hoy (un día pendiente o la caja de hoy cerrada). */
+  motivoBloqueoApertura: string | null = null;
   
   successMessage = '';
   errorMessage = '';
@@ -41,10 +43,22 @@ export class TurnosComponent implements OnInit {
     // cargar turno activo al iniciar
     this.turnoService.currentTurno$.subscribe(t => (this.turno = t));
     this.turnoService.refreshActivo();
+    if (this.puedeAbrir) {
+      this.revisarApertura();
+    }
     
     // Suscribirse al estado de logout
     this.authService.isLoggingOut$.subscribe(isLoggingOut => {
       this.isLoggingOut = isLoggingOut;
+    });
+  }
+
+  /** Pregunta al servidor si el cierre de caja bloquea la apertura, para avisarlo antes de intentarla. */
+  private revisarApertura(): void {
+    this.turnoService.apertura().subscribe({
+      next: (r) => (this.motivoBloqueoApertura = r.motivoBloqueo),
+      // Si no se pudo consultar, la apertura misma responde con el motivo
+      error: () => (this.motivoBloqueoApertura = null)
     });
   }
 
@@ -77,7 +91,9 @@ export class TurnosComponent implements OnInit {
             error: (e) => {
               console.error('Error al iniciar turno:', e);
               // CAJ-06: el servidor explica si la caja de hoy ya se cerró o hay un día pendiente de cierre
-              this.showErrorMessage(e?.status === 400 && e?.error?.message ? e.error.message : 'Error al iniciar turno');
+              const motivo = e?.status === 400 ? e?.error?.message : null;
+              this.showErrorMessage(motivo || 'Error al iniciar turno');
+              if (motivo) this.revisarApertura();
             }
           });
         }
