@@ -1,0 +1,117 @@
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">Saldo de arranque de caja</h5>
+    <span *ngIf="arranque?.confirmado" class="badge bg-secondary">
+      <i class="feather icon-lock me-1"></i>Capturado por {{ arranque?.usuarioCaptura }} el {{ fechaHora(arranque?.fechaCaptura) }}
+    </span>
+  </div>
+
+  <div class="card-body">
+    <div *ngIf="isLoading" class="text-center py-4">
+      <div class="spinner-border text-secondary" role="status"></div>
+    </div>
+
+    <div *ngIf="successMessage" class="alert alert-success d-flex align-items-center gap-2 py-2">
+      <i class="feather icon-check-circle"></i> {{ successMessage }}
+    </div>
+    <div *ngIf="errorMessage" class="alert alert-danger py-2">{{ errorMessage }}</div>
+
+    <ng-container *ngIf="!isLoading && arranque as a">
+      <!-- Ya capturado: solo lectura -->
+      <ng-container *ngIf="a.confirmado">
+        <dl class="row mb-3">
+          <dt class="col-sm-4">Fecha de arranque</dt>
+          <dd class="col-sm-8">{{ fechaCorta(a.fecha) }}</dd>
+          <dt class="col-sm-4">Saldo de la bóveda al abrir ese día</dt>
+          <dd class="col-sm-8">{{ pesos(a.saldoBoveda) }}</dd>
+          <dt class="col-sm-4">Último día cerrado</dt>
+          <dd class="col-sm-8">{{ a.fechaUltimoCierre ? fechaCorta(a.fechaUltimoCierre) : 'Ninguno todavía' }}</dd>
+        </dl>
+        <h6>Último folio emitido por serie</h6>
+        <table class="table table-sm mb-0">
+          <tbody>
+            <tr *ngFor="let f of a.folios">
+              <td>{{ nombreSerie(f.serie) }}</td>
+              <td class="text-end">{{ f.ultimoFolio }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </ng-container>
+
+      <ng-container *ngIf="!a.confirmado">
+        <div *ngIf="a.fecha" class="alert alert-warning py-2">
+          <i class="feather icon-alert-triangle me-1"></i>
+          Arranque provisional: {{ fechaCorta(a.fecha) }} con {{ pesos(a.saldoBoveda) }} en bóveda. El corte lo usa,
+          pero no se puede cerrar ningún día hasta que Sistemas capture el saldo real de la migración.
+        </div>
+        <div *ngIf="!a.puedeCapturar" class="alert alert-info py-2">Solo Sistemas puede capturar el saldo de arranque.</div>
+
+        <form *ngIf="a.puedeCapturar" (ngSubmit)="guardar()">
+          <p class="text-muted">
+            Se captura una sola vez, el día de la migración: después no se puede cambiar.
+          </p>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label" for="fechaArranque">Fecha de arranque</label>
+              <input id="fechaArranque" name="fechaArranque" type="date" class="form-control" required
+                     [(ngModel)]="fecha" [max]="a.hoy" />
+              <div class="form-text">El día de la migración; no puede ser posterior a hoy.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="saldoBoveda">Saldo de la bóveda al abrir ese día</label>
+              <div class="input-group">
+                <span class="input-group-text">$</span>
+                <input id="saldoBoveda" name="saldoBoveda" type="number" class="form-control" required
+                       min="0" step="0.01" [(ngModel)]="saldoBoveda" />
+              </div>
+            </div>
+          </div>
+
+          <h6 class="mt-4">Último folio de COCAE por serie</h6>
+          <p class="text-muted small">Prestamil sigue la numeración desde el siguiente folio.</p>
+          <div class="row g-3">
+            <div class="col-md-6" *ngFor="let f of folios">
+              <label class="form-label" [for]="'folio-' + f.serie">{{ nombreSerie(f.serie) }}</label>
+              <input [id]="'folio-' + f.serie" [name]="'folio-' + f.serie" type="number" class="form-control"
+                     required step="1" [min]="minimo(f.serie)" [(ngModel)]="f.ultimoFolio" />
+              <div class="form-text" [class.text-danger]="f.ultimoFolio < minimo(f.serie)">
+                Prestamil ya emitió hasta el {{ minimo(f.serie) }}: no puede ser menor.
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-4">
+            <button type="submit" class="btn btn-primary" [disabled]="!puedeGuardar">
+              <span *ngIf="isGuardando" class="spinner-border spinner-border-sm me-2"></span>
+              <i *ngIf="!isGuardando" class="feather icon-save me-1"></i>Guardar arranque
+            </button>
+          </div>
+        </form>
+      </ng-container>
+    </ng-container>
+  </div>
+</div>
+
+<ng-template #confirmarArranque let-modal>
+  <div class="modal-header">
+    <h5 class="modal-title">Confirmar saldo de arranque</h5>
+    <button type="button" class="btn-close" aria-label="Cerrar" (click)="modal.dismiss()"></button>
+  </div>
+  <div class="modal-body">
+    <p>Después de guardar ya no se puede cambiar.</p>
+    <table class="table table-sm mb-0">
+      <tbody>
+        <tr><td>Fecha de arranque</td><td class="text-end">{{ fechaCorta(fecha) }}</td></tr>
+        <tr><td>Saldo de la bóveda</td><td class="text-end">{{ pesos(saldoBoveda) }}</td></tr>
+        <tr *ngFor="let f of folios">
+          <td>{{ nombreSerie(f.serie) }}</td>
+          <td class="text-end">sigue en el {{ f.ultimoFolio + 1 }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-outline-secondary" (click)="modal.dismiss()">Cancelar</button>
+    <button type="button" class="btn btn-primary" (click)="modal.close('confirmar')">Guardar arranque</button>
+  </div>
+</ng-template>
