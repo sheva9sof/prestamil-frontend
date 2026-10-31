@@ -93,6 +93,7 @@ function transformOpcion(opcion: OpcionMenu): NavigationItem {
       'Concentración': '/caja/concentracion',
       'Dotación': '/caja/dotacion',
       'Recolección': '/caja/recoleccion',
+      'Corte de caja': '/caja/corte',
       'Prendas': '/catalogos/prendas',
       'Descuentos': '/catalogos/descuentos',
       'Sucursal': '/configuracion/sucursal',

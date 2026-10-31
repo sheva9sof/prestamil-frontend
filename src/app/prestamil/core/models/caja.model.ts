@@ -79,3 +79,70 @@ export interface TraspasoCaja {
   motivoCancelacion: string | null;
   desglose: { denominacionId: number; valor: number; cantidad: number; importe: number }[];
 }
+
+// ── Corte de caja (CAJ-07a) ────────────────────────────────────────────────
+
+export type RenglonCorte =
+  | 'DOTACIONES'
+  | 'EMPENOS'
+  | 'INDEMNIZACIONES'
+  | 'DEVOLUCIONES'
+  | 'DEMASIAS'
+  | 'ABONOS_PARCIALES'
+  | 'ABONOS_CAPITAL'
+  | 'APARTADOS'
+  | 'FINIQUITOS'
+  | 'FINIQUITOS_EXTEMPORANEOS'
+  | 'REFRENDOS'
+  | 'REFRENDOS_EXTEMPORANEOS'
+  | 'REPOSICIONES'
+  | 'VENTAS'
+  | 'RECOLECCION';
+
+/** Renglón del bloque superior, en el orden del PDF de COCAE. Solo el efectivo entra al arqueo (RC-06). */
+export interface CorteCajaRenglon {
+  renglon: RenglonCorte;
+  etiqueta: string;
+  columna: 'INGRESO' | 'EGRESO';
+  efectivo: number;
+  tarjeta: number;
+}
+
+export interface CorteCajaTotales {
+  efectivo: number;
+  tarjeta: number;
+}
+
+/**
+ * `CorteCajaResultado` del backend. Si `aviso` viene, el corte no tiene cifras (antes del arranque o sin
+ * saldo de arranque): los renglones vienen vacíos y los importes en null.
+ */
+export interface CorteCaja {
+  sucursalId: number;
+  fecha: string;
+  aviso: string | null;
+  renglones: CorteCajaRenglon[];
+  ingresos: CorteCajaTotales | null;
+  egresos: CorteCajaTotales | null;
+  saldoAnterior: number | null;
+  ministraciones: number | null;
+  concentraciones: number | null;
+  boveda: number | null;
+  dotaciones: number | null;
+  ingresosEfectivo: number | null;
+  egresosEfectivo: number | null;
+  recolecciones: number | null;
+  /** Lo que debería quedar en la gaveta (RC-07). */
+  diferencia: number | null;
+  /** F si la diferencia es mayor que 0, S si es menor, null si es 0. */
+  indicador: 'F' | 'S' | null;
+  saldoFinal: number | null;
+}
+
+/** GET /api/caja/corte: el cajero solo recibe el de hoy (como OTR-01). */
+export interface CorteCajaRespuesta {
+  fecha: string;
+  hoy: string;
+  puedeElegirFecha: boolean;
+  corte: CorteCaja;
+}

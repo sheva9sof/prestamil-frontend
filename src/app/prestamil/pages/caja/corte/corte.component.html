@@ -1,0 +1,245 @@
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">Corte de caja</h5>
+    <span *ngIf="corte && !isLoading" class="text-muted small">
+      Calculado con lo registrado hasta ahora · sin cierre de día
+    </span>
+  </div>
+
+  <div class="card-body">
+    <div class="row g-2 align-items-end">
+      <div class="col-sm-4 col-md-3">
+        <label class="form-label" for="fechaCorte">Fecha</label>
+        <input id="fechaCorte" name="fechaCorte" type="date" class="form-control"
+               [(ngModel)]="fecha" [max]="hoy ?? ''" [readonly]="!puedeElegirFecha" (change)="cargar()" />
+        <div *ngIf="!puedeElegirFecha && hoy" class="form-text">Solo se puede consultar el corte de hoy.</div>
+      </div>
+      <div class="col-auto">
+        <button type="button" class="btn btn-primary" [disabled]="isLoading" (click)="cargar()">
+          <span *ngIf="isLoading" class="spinner-border spinner-border-sm me-2"></span>
+          <i *ngIf="!isLoading" class="feather icon-refresh-cw me-1"></i>Actualizar
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="errorMessage" class="alert alert-danger py-2 mt-3 mb-0">{{ errorMessage }}</div>
+
+    <!-- Antes del arranque o sin saldo de arranque: el servidor no manda cifras -->
+    <div *ngIf="corte?.aviso" class="corte-aviso mt-3" role="status">
+      <i class="feather icon-alert-triangle"></i>
+      <div>
+        <strong>Sin corte de caja para el {{ fechaCorta(corte?.fecha) }}</strong>
+        <p class="mb-0">{{ corte?.aviso }}</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="conCifras && corte as c" class="row g-3">
+  <!-- Bloque superior: movimientos de ventanilla en efectivo, orden del PDF de COCAE -->
+  <div class="col-xl-7">
+    <div class="card h-100 mb-0">
+      <div class="card-header">
+        <h5 class="mb-0">Movimientos</h5>
+        <small class="text-muted">Efectivo. Corte del {{ fechaCorta(c.fecha) }}</small>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm corte-tabla mb-0">
+          <thead>
+            <tr>
+              <th>Concepto</th>
+              <th class="text-end">Ingresos</th>
+              <th class="text-end">Egresos</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let r of c.renglones" [class.corte-cero]="r.efectivo === 0">
+              <td>{{ r.etiqueta }}</td>
+              <td class="text-end">{{ r.columna === 'INGRESO' ? pesos(r.efectivo) : '' }}</td>
+              <td class="text-end">{{ r.columna === 'EGRESO' ? pesos(r.efectivo) : '' }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="corte-total">
+              <td>TOTALES</td>
+              <td class="text-end">{{ pesos(c.ingresos?.efectivo) }}</td>
+              <td class="text-end">{{ pesos(c.egresos?.efectivo) }}</td>
+            </tr>
+            <tr class="corte-total">
+              <td>DIFERENCIA</td>
+              <td colspan="2" class="text-end">
+                {{ pesos(c.diferencia) }}
+                <span class="badge ms-1" [ngClass]="c.indicador === 'F' ? 'bg-danger' : c.indicador === 'S' ? 'bg-warning text-dark' : 'bg-success'">
+                  {{ c.indicador ?? '' }} {{ nombreIndicador(c.indicador) }}
+                </span>
+              </td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-5 d-flex flex-column gap-3">
+    <!-- Bloque inferior: caja y bóveda (RC-07, RC-08) -->
+    <div class="card mb-0">
+      <div class="card-header">
+        <h5 class="mb-0">Caja</h5>
+      </div>
+      <div class="card-body">
+        <table class="table table-sm corte-tabla mb-0">
+          <thead>
+            <tr>
+              <th>Movimiento</th>
+              <th class="text-end">Bóveda</th>
+              <th class="text-end">Ventanilla</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>SALDO ANTERIOR</td>
+              <td class="text-end">{{ pesos(c.saldoAnterior) }}</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>MINISTRACIONES</td>
+              <td class="text-end">{{ signado(c.ministraciones, 1) }}</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>CONCENTRACIONES</td>
+              <td class="text-end">{{ signado(c.concentraciones, -1) }}</td>
+              <td></td>
+            </tr>
+            <tr class="corte-total">
+              <td>BÓVEDA</td>
+              <td class="text-end">{{ pesos(c.boveda) }}</td>
+              <td></td>
+            </tr>
+            <tr>
+              <td>DOTACIONES</td>
+              <td class="text-end">{{ signado(c.dotaciones, -1) }}</td>
+              <td class="text-end">{{ signado(c.dotaciones, 1) }}</td>
+            </tr>
+            <tr>
+              <td>INGRESOS</td>
+              <td></td>
+              <td class="text-end">{{ signado(c.ingresosEfectivo, 1) }}</td>
+            </tr>
+            <tr>
+              <td>EGRESOS</td>
+              <td></td>
+              <td class="text-end">{{ signado(c.egresosEfectivo, -1) }}</td>
+            </tr>
+            <tr>
+              <td>RECOLECCIONES</td>
+              <td class="text-end">{{ signado(c.recolecciones, 1) }}</td>
+              <td class="text-end">{{ signado(c.recolecciones, -1) }}</td>
+            </tr>
+            <tr class="corte-total">
+              <td>DIFERENCIA</td>
+              <td></td>
+              <td class="text-end">
+                {{ pesos(c.diferencia) }}
+                <span *ngIf="c.indicador" class="badge ms-1" [ngClass]="c.indicador === 'F' ? 'bg-danger' : 'bg-warning text-dark'">
+                  {{ c.indicador }}
+                </span>
+              </td>
+            </tr>
+            <tr class="corte-total corte-saldo-final">
+              <td>SALDO FINAL</td>
+              <td class="text-end">{{ pesos(c.saldoFinal) }}</td>
+              <td></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="form-text mb-0 mt-2">
+          La diferencia es lo que debe estar en la gaveta: <strong>F</strong> si falta por recolectar,
+          <strong>S</strong> si sobra. Después de la recolección del cierre debe quedar en $0.00.
+        </p>
+      </div>
+    </div>
+
+    <!-- Tarjeta aparte: no entra a la gaveta ni al arqueo (RC-06) -->
+    <div class="card mb-0">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Cobrado con tarjeta</h5>
+        <span class="badge bg-light text-dark border">Informativo</span>
+      </div>
+      <div class="card-body">
+        <table *ngIf="renglonesTarjeta.length; else sinTarjeta" class="table table-sm corte-tabla mb-0">
+          <tbody>
+            <tr *ngFor="let r of renglonesTarjeta">
+              <td>{{ r.etiqueta }}</td>
+              <td class="text-end">{{ pesos(r.columna === 'EGRESO' ? -r.tarjeta : r.tarjeta) }}</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr class="corte-total">
+              <td>TOTAL</td>
+              <td class="text-end">{{ pesos(totalTarjeta) }}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <ng-template #sinTarjeta>
+          <p class="text-muted mb-0">Sin cobros con tarjeta en el día.</p>
+        </ng-template>
+        <p class="form-text mb-0 mt-2">No entra a la gaveta ni al arqueo.</p>
+      </div>
+    </div>
+
+    <!-- Arqueo opcional: la gaveta contada contra el sistema; no se guarda -->
+    <div class="card mb-0">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Arqueo de ventanilla</h5>
+        <button *ngIf="esHoy" type="button" class="btn btn-sm btn-outline-primary" (click)="contarGaveta()">
+          <i class="feather icon-grid me-1"></i>{{ conteo ? 'Corregir conteo' : 'Contar gaveta' }}
+        </button>
+      </div>
+      <div class="card-body">
+        <p *ngIf="!esHoy" class="text-muted mb-0">El arqueo de la gaveta solo se hace con el corte de hoy.</p>
+
+        <ng-container *ngIf="esHoy">
+          <p *ngIf="!conteo" class="text-muted mb-0">
+            Cuenta el efectivo de la gaveta por denominación para compararlo con lo que dice el sistema.
+          </p>
+
+          <ng-container *ngIf="conteo">
+            <table class="table table-sm corte-tabla mb-2">
+              <tbody>
+                <tr>
+                  <td>Contado en la gaveta</td>
+                  <td class="text-end">{{ pesos(conteo.total) }}</td>
+                </tr>
+                <tr>
+                  <td>Según el sistema</td>
+                  <td class="text-end">{{ pesos(c.diferencia) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="arqueo-resultado"
+                 [ngClass]="arqueoCuadra ? 'arqueo-cuadra' : (diferenciaArqueo ?? 0) < 0 ? 'arqueo-falta' : 'arqueo-sobra'">
+              <ng-container *ngIf="arqueoCuadra">
+                <i class="feather icon-check-circle"></i> Cuadra
+                <small *ngIf="diferenciaArqueo !== 0">(diferencia de redondeo de {{ pesos(diferenciaArqueo) }})</small>
+              </ng-container>
+              <ng-container *ngIf="!arqueoCuadra">
+                <i class="feather icon-alert-circle"></i>
+                {{ (diferenciaArqueo ?? 0) < 0 ? 'Faltan' : 'Sobran' }} {{ pesos(faltaOSobra) }}
+              </ng-container>
+            </div>
+            <div class="arqueo-desglose mt-2">
+              <span *ngFor="let r of conteo.renglones" class="badge bg-light text-dark border">
+                {{ r.cantidad }} × ${{ r.valor | number: '1.2-2' }}
+              </span>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+              <small class="text-muted">El arqueo no se guarda.</small>
+              <button type="button" class="btn btn-sm btn-link text-secondary p-0" (click)="descartarConteo()">Descartar conteo</button>
+            </div>
+          </ng-container>
+        </ng-container>
+      </div>
+    </div>
+  </div>
+</div>

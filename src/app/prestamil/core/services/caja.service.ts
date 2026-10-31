@@ -3,6 +3,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import {
+  CorteCajaRespuesta,
   Denominacion,
   TipoTraspasoCaja,
   TraspasoCaja,
@@ -10,7 +11,7 @@ import {
   TraspasoCajaRequest
 } from '../models/caja.model';
 
-/** Traspasos entre cajas (CAJ-02, CAJ-03) y catálogo de denominaciones. */
+/** Traspasos entre cajas (CAJ-02, CAJ-03), catálogo de denominaciones y corte de caja (CAJ-07a). */
 @Injectable({ providedIn: 'root' })
 export class CajaService {
   private readonly http = inject(HttpClient);
@@ -44,5 +45,12 @@ export class CajaService {
 
   ticket(id: number): Observable<Blob> {
     return this.http.get(`${this.API_URL}/traspasos/${id}/ticket`, { responseType: 'blob' });
+  }
+
+  /** Corte de caja del día (CAJ-07a); sin fecha, el de hoy. El cajero siempre recibe el de hoy. */
+  corte(fecha?: string | null): Observable<CorteCajaRespuesta> {
+    let params = new HttpParams();
+    if (fecha) params = params.set('fecha', fecha);
+    return this.http.get<CorteCajaRespuesta>(`${this.API_URL}/corte`, { params });
   }
 }
