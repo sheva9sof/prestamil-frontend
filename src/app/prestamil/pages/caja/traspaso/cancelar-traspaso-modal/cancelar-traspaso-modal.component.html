@@ -1,0 +1,52 @@
+<div class="modal-header">
+  <h5 class="modal-title">Cancelar traspaso {{ traspaso.folio }}</h5>
+  <button type="button" class="btn-close" aria-label="Cerrar" [disabled]="isCancelando" (click)="activeModal.dismiss()"></button>
+</div>
+
+<div class="modal-body">
+  <div class="alert alert-warning small py-2">
+    <i class="feather icon-alert-triangle me-1"></i>
+    El importe regresa a <strong>{{ traspaso.cajaOrigenNombre }}</strong>. Solo se cancelan traspasos del día y
+    {{ traspaso.cajaDestinoNombre }} todavía debe tener el dinero.
+  </div>
+
+  <dl class="row small mb-3">
+    <dt class="col-4">Sale de → Entra a</dt>
+    <dd class="col-8">{{ traspaso.cajaOrigenNombre }} → {{ traspaso.cajaDestinoNombre }}</dd>
+    <dt class="col-4">Importe</dt>
+    <dd class="col-8"><strong>{{ moneda(traspaso.importe) }}</strong></dd>
+    <dt class="col-4">Registró</dt>
+    <dd class="col-8">{{ traspaso.nombreUsuario }} · {{ traspaso.fechaRegistro | date: 'HH:mm' }}</dd>
+    <ng-container *ngIf="traspaso.referenciaBancaria">
+      <dt class="col-4">Referencia bancaria</dt>
+      <dd class="col-8">{{ traspaso.referenciaBancaria }}</dd>
+    </ng-container>
+  </dl>
+
+  <label for="motivoCancelacionTraspaso" class="form-label mb-1">
+    Motivo de la cancelación <span class="text-danger">*</span>
+  </label>
+  <textarea
+    id="motivoCancelacionTraspaso"
+    class="form-control"
+    rows="3"
+    maxlength="300"
+    [(ngModel)]="motivo"
+    [disabled]="isCancelando"
+    placeholder="Mínimo 10 caracteres. Ej. Se capturó el importe equivocado."
+  ></textarea>
+  <div class="d-flex justify-content-between small mt-1">
+    <span class="text-danger" *ngIf="errorMessage">{{ errorMessage }}</span>
+    <span class="text-muted ms-auto">{{ motivo.length }} / 300</span>
+  </div>
+</div>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-secondary" [disabled]="isCancelando" (click)="activeModal.dismiss()">
+    No cancelar
+  </button>
+  <button type="button" class="btn btn-danger" [disabled]="!puedeConfirmar" (click)="confirmar()">
+    <span *ngIf="isCancelando" class="spinner-border spinner-border-sm me-2"></span>
+    Cancelar traspaso
+  </button>
+</div>

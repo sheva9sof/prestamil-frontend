@@ -1,0 +1,142 @@
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">{{ nombre }}</h5>
+    <span *ngIf="contexto" class="badge bg-light text-dark border" title="Fecha de operación del servidor">
+      <i class="feather icon-calendar me-1"></i>{{ fechaCorta(contexto.fechaOperacion) }}
+    </span>
+  </div>
+
+  <div class="card-body">
+    <div *ngIf="isLoading" class="text-center py-4">
+      <div class="spinner-border text-secondary" role="status"></div>
+    </div>
+
+    <div *ngIf="successMessage" class="alert alert-success d-flex align-items-center gap-2 py-2">
+      <i class="feather icon-check-circle"></i> {{ successMessage }}
+    </div>
+    <div *ngIf="errorMessage" class="alert alert-danger py-2">{{ errorMessage }}</div>
+
+    <ng-container *ngIf="contexto as ctx">
+      <div *ngIf="!ctx.puedeRegistrar" class="alert alert-info py-2">
+        Tu rol no puede registrar {{ plural.toLowerCase() }}; solo puedes consultar las del día.
+      </div>
+
+      <form *ngIf="ctx.puedeRegistrar" class="row g-3 align-items-end" (ngSubmit)="guardar()">
+        <div class="col-md-3">
+          <label class="form-label" for="cajaOrigen">Sale de</label>
+          <input id="cajaOrigen" type="text" class="form-control" readonly
+                 [value]="ctx.cajaOrigen.clave + ' · ' + ctx.cajaOrigen.nombre" />
+        </div>
+        <div class="col-md-3">
+          <label class="form-label" for="cajaDestino">Entra a</label>
+          <input id="cajaDestino" type="text" class="form-control" readonly
+                 [value]="ctx.cajaDestino.clave + ' · ' + ctx.cajaDestino.nombre" />
+        </div>
+        <div class="col-md-2">
+          <label class="form-label" for="fechaOperacion">Fecha</label>
+          <input id="fechaOperacion" type="text" class="form-control" readonly [value]="fechaCorta(ctx.fechaOperacion)" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="importe">Importe</label>
+          <div class="input-group">
+            <span class="input-group-text">$</span>
+            <input id="importe" type="text" class="form-control text-end fw-bold" readonly
+                   placeholder="Captura el desglose" [value]="desglose ? moneda(importe) : ''" />
+            <button type="button" class="btn btn-outline-primary" [disabled]="isGuardando" (click)="abrirDesglose()">
+              <i class="feather icon-grid me-1"></i>{{ desglose ? 'Corregir desglose' : 'Desglose' }}
+            </button>
+          </div>
+          <div class="form-text">El importe es la suma del desglose por denominación.</div>
+        </div>
+
+        <div *ngIf="esConcentracion" class="col-md-6">
+          <label class="form-label" for="referenciaBancaria">Referencia bancaria</label>
+          <input id="referenciaBancaria" name="referenciaBancaria" type="text" class="form-control"
+                 maxlength="60" placeholder="Ficha o folio del depósito (opcional)"
+                 [(ngModel)]="referenciaBancaria" [disabled]="isGuardando" />
+        </div>
+
+        <div *ngIf="desglose" class="col-12">
+          <div class="traspaso-desglose">
+            <span *ngFor="let r of desglose.renglones" class="badge bg-light text-dark border">
+              {{ r.cantidad }} × ${{ r.valor | number: '1.2-2' }}
+            </span>
+          </div>
+        </div>
+
+        <div class="col-12 d-flex gap-2 justify-content-end">
+          <button type="button" class="btn btn-outline-secondary" [disabled]="isGuardando || !desglose" (click)="limpiar()">
+            Limpiar
+          </button>
+          <button type="submit" class="btn btn-primary" [disabled]="!puedeGuardar">
+            <span *ngIf="isGuardando" class="spinner-border spinner-border-sm me-2"></span>
+            Registrar {{ nombre.toLowerCase() }}
+            <ng-container *ngIf="importe > 0"> por ${{ moneda(importe) }}</ng-container>
+          </button>
+        </div>
+      </form>
+    </ng-container>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <h5 class="mb-0">{{ plural }} del día</h5>
+    <div class="d-flex align-items-center gap-3">
+      <span class="text-muted small">Total vigente: <strong class="text-dark">${{ moneda(totalActivos) }}</strong></span>
+      <button type="button" class="btn btn-sm btn-outline-secondary" title="Actualizar" [disabled]="isLoadingLista" (click)="cargarTraspasos()">
+        <i class="feather icon-refresh-cw"></i>
+      </button>
+    </div>
+  </div>
+  <div class="card-body">
+    <div *ngIf="listaError" class="alert alert-danger py-2">{{ listaError }}</div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Folio</th>
+            <th>Hora</th>
+            <th>Sale de → Entra a</th>
+            <th class="text-end">Importe</th>
+            <th *ngIf="esConcentracion">Referencia bancaria</th>
+            <th>Usuario</th>
+            <th>Estatus</th>
+            <th class="text-end">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngIf="!isLoadingLista && traspasos.length === 0">
+            <td [attr.colspan]="esConcentracion ? 8 : 7" class="text-center text-muted">
+              Sin {{ plural.toLowerCase() }} registradas hoy.
+            </td>
+          </tr>
+          <tr *ngFor="let t of traspasos" [class.traspaso-cancelado]="t.estatus === 'CANCELADO'">
+            <td class="fw-bold">{{ t.folio }}</td>
+            <td>{{ t.fechaRegistro | date: 'HH:mm' }}</td>
+            <td>{{ t.cajaOrigenNombre }} → {{ t.cajaDestinoNombre }}</td>
+            <td class="text-end importe">${{ moneda(t.importe) }}</td>
+            <td *ngIf="esConcentracion">{{ t.referenciaBancaria || '—' }}</td>
+            <td>{{ t.nombreUsuario }}</td>
+            <td>
+              <span *ngIf="t.estatus === 'ACTIVO'" class="badge bg-success">Activo</span>
+              <span *ngIf="t.estatus === 'CANCELADO'" class="badge bg-danger"
+                    [ngbTooltip]="'Canceló ' + t.nombreUsuarioCancela + ' a las ' + (t.fechaCancelacion | date: 'HH:mm') + ': ' + t.motivoCancelacion">
+                Cancelado
+              </span>
+            </td>
+            <td class="text-end text-nowrap">
+              <button type="button" class="btn btn-sm btn-outline-secondary me-1" title="Reimprimir ticket" (click)="verTicket(t)">
+                <i class="feather icon-printer"></i>
+              </button>
+              <button *ngIf="contexto?.puedeCancelar && t.estatus === 'ACTIVO'" type="button"
+                      class="btn btn-sm btn-outline-danger" title="Cancelar" (click)="cancelar(t)">
+                <i class="feather icon-x-circle"></i>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
