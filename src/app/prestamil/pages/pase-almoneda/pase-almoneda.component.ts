@@ -1,9 +1,11 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule, DatePipe, DecimalPipe } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { SharedModule } from 'src/app/theme/shared/shared.module';
 import { PdfVisorComponent } from '../../core/components/pdf-visor/pdf-visor.component';
+import { ReporteFiltrosComponent } from '../../core/components/reporte-filtros/reporte-filtros.component';
+import { descargarArchivo, hoyIso } from '../../core/helpers/reporte.helper';
+import { ReporteFiltro } from '../../core/models/reporte.model';
 import {
   CarteraVencidaRow,
   PaseAlmonedaService,
@@ -16,16 +18,19 @@ import {
  * vencida / Pase a venta) con exportacion a PDF (reporte Jasper en visor modal) y a Excel (CSV UTF-8 BOM).
  * OTR-01: solo Sistemas cambia la fecha; para el resto el campo queda en solo lectura con la fecha
  * de hoy del servidor (el backend la impone aunque se mande otra).
+ * La barra de fecha y exportación es el `reporte-filtros` común de los reportes (REP-00), con una sola fecha
+ * y sin ramo.
  */
 @Component({
   selector: 'app-pase-almoneda',
   standalone: true,
-  imports: [CommonModule, FormsModule, SharedModule],
+  imports: [CommonModule, SharedModule, ReporteFiltrosComponent],
   providers: [DatePipe, DecimalPipe],
   templateUrl: './pase-almoneda.component.html'
 })
 export class PaseAlmonedaComponent implements OnInit {
-  fecha = this.hoyIso();
+  /** Una sola fecha: `desde` = `hasta` = fecha del pase. */
+  filtro: ReporteFiltro = { ramo: null, desde: hoyIso(), hasta: hoyIso() };
   // Hasta que el servidor responda, nadie elige fecha; la respuesta dice si este usuario puede.
   puedeElegirFecha = false;
   activeTab = 1;
@@ -39,6 +44,15 @@ export class PaseAlmonedaComponent implements OnInit {
   private modalService = inject(NgbModal);
 
   ngOnInit(): void {
+    this.consultar();
+  }
+
+  get fecha(): string {
+    return this.filtro.desde;
+  }
+
+  cambiarFecha(filtro: ReporteFiltro): void {
+    this.filtro = filtro;
     this.consultar();
   }
 
@@ -56,7 +70,7 @@ export class PaseAlmonedaComponent implements OnInit {
         this.puedeElegirFecha = res.puedeElegirFecha;
         // Para quien no elige fecha, el campo muestra la fecha que usó el servidor (su "hoy").
         if (!res.puedeElegirFecha) {
-          this.fecha = res.fecha;
+          this.filtro = { ramo: null, desde: res.fecha, hasta: res.fecha };
         }
         this.cargando = false;
       },
@@ -93,30 +107,11 @@ export class PaseAlmonedaComponent implements OnInit {
       : this.service.descargarPaseAVenta(this.fecha);
     const filename = (esCartera ? 'cartera-vencida-' : 'pase-a-venta-') + this.fecha + '.csv';
     peticion$.subscribe({
-      next: (blob) => this.descargarBlob(blob, filename),
+      next: (blob) => descargarArchivo(blob, filename),
       error: (err) => {
         console.error('[PaseAlmoneda] exportar', err);
         this.errorMessage = 'No se pudo exportar el archivo.';
       }
     });
-  }
-
-  private descargarBlob(blob: Blob, filename: string): void {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  private hoyIso(): string {
-    const d = new Date();
-    const yyyy = d.getFullYear();
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    return `${yyyy}-${mm}-${dd}`;
   }
 }
