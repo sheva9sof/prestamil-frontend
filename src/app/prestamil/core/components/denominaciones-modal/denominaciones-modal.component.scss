@@ -1,0 +1,20 @@
+.denom-header { padding: 14px 20px; border-bottom: 1px solid #e7eaf0; }
+.denom-eyebrow { color: #6f7b8f; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+.denom-body { background: #f8f9fb; }
+
+// Filas compactas: las 14 denominaciones caben sin scroll en la pantalla de la caja
+.denom-tabla {
+  background: #fff; border: 1px solid #e7eaf0; border-radius: 8px; overflow: hidden;
+  th { padding: 6px 10px; font-size: 0.75rem; text-transform: uppercase; color: #6f7b8f; }
+  td { padding: 3px 10px; vertical-align: middle; }
+  tr.con-cantidad td { background: #f3f8ff; font-weight: 600; }
+}
+.denom-valor { font-weight: 700; white-space: nowrap; }
+.denom-cantidad { width: 90px; margin: 0 auto; padding: 3px 8px; }
+
+.denom-total {
+  display: flex; align-items: baseline; gap: 10px; margin-right: 12px;
+  small { color: #6f7b8f; font-weight: 700; text-transform: uppercase; }
+  strong { font-size: 1.5rem; color: #243047; }
+}
+.denom-aviso { margin-top: 8px; color: #8a6508; font-size: 0.85rem; }

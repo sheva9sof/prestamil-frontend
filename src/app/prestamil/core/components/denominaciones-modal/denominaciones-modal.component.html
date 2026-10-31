@@ -1,0 +1,70 @@
+<div class="modal-header denom-header">
+  <div>
+    <span *ngIf="subtitulo" class="denom-eyebrow">{{ subtitulo }}</span>
+    <h5 class="modal-title">{{ titulo }}</h5>
+  </div>
+  <button type="button" class="btn-close" aria-label="Cerrar" (click)="activeModal.dismiss()"></button>
+</div>
+
+<form class="modal-body denom-body" (ngSubmit)="aceptar()">
+  <div *ngIf="isLoading" class="text-center py-4">
+    <div class="spinner-border text-secondary" role="status"></div>
+    <p class="text-muted mt-2 mb-0">Cargando denominaciones…</p>
+  </div>
+  <div *ngIf="errorMessage" class="alert alert-danger mb-0">{{ errorMessage }}</div>
+
+  <ng-container *ngIf="!isLoading && !errorMessage">
+    <div class="row g-3">
+      <div class="col-md-6" *ngFor="let grupo of grupos">
+        <table class="table table-sm denom-tabla mb-0">
+          <thead>
+            <tr>
+              <th>{{ grupo.nombre }}</th>
+              <th class="text-center">Cantidad</th>
+              <th class="text-end">Importe</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let d of grupo.lista" [class.con-cantidad]="importe(d) > 0">
+              <td class="denom-valor">${{ d.valor | number: '1.2-2' }}</td>
+              <td>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="form-control form-control-sm text-end denom-cantidad"
+                  [id]="'denom-' + d.id"
+                  [name]="'denom-' + d.id"
+                  [attr.aria-label]="'Cantidad de ' + d.valor"
+                  placeholder="0"
+                  [(ngModel)]="cantidades[d.id]"
+                />
+              </td>
+              <td class="text-end">${{ importe(d) | number: '1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p *ngIf="motivoInvalido" class="denom-aviso mb-0">{{ motivoInvalido }}</p>
+  </ng-container>
+
+  <!-- Enter en cualquier cantidad acepta el desglose -->
+  <button type="submit" class="d-none" aria-hidden="true" tabindex="-1"></button>
+</form>
+
+<div class="modal-footer">
+  <button type="button" class="btn btn-outline-secondary me-auto" [disabled]="isLoading" (click)="limpiar()">
+    Limpiar
+  </button>
+  <!-- El total va en el pie para que se vea sin hacer scroll -->
+  <div class="denom-total">
+    <small>{{ piezas }} pieza{{ piezas === 1 ? '' : 's' }} · Total</small>
+    <strong>${{ total | number: '1.2-2' }}</strong>
+  </div>
+  <button type="button" class="btn btn-secondary" (click)="activeModal.dismiss()">Cancelar</button>
+  <button type="button" class="btn btn-primary" [disabled]="isLoading || !!motivoInvalido" (click)="aceptar()">
+    Aceptar
+  </button>
+</div>
