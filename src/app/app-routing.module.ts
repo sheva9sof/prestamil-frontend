@@ -78,6 +78,8 @@ const routes: Routes = [
           { path: 'recoleccion', data: { tipo: 'RECOLECCION' }, loadComponent: () => import('./prestamil/pages/caja/traspaso/traspaso.component').then((c) => c.TraspasoComponent) },
           // CAJ-07a: corte del día con arqueo opcional; CAJ-06: cierre de día
           { path: 'corte', loadComponent: () => import('./prestamil/pages/caja/corte/corte.component').then((c) => c.CorteComponent) },
+          // REP-06: reporte mensual de corte de caja, gerente y Sistemas
+          { path: 'corte-mensual', loadComponent: () => import('./prestamil/pages/caja/corte-mensual/corte-mensual.component').then((c) => c.CorteMensualComponent) },
           // CAJ-06: saldo de arranque y folios de COCAE, solo Sistemas
           { path: 'arranque', loadComponent: () => import('./prestamil/pages/caja/arranque/arranque.component').then((c) => c.ArranqueComponent) }
         ]

@@ -205,3 +205,13 @@ export interface ArranqueCajaRequest {
   saldoBoveda: number;
   folios: FolioArranque[];
 }
+
+// ── Reporte mensual de corte de caja (REP-06) ──────────────────────────────
+
+/** Arranque de la pantalla del mensual: con qué meses se arma el selector. */
+export interface CorteCajaMensualContexto {
+  /** Hoy del servidor (yyyy-MM-dd); no hay meses posteriores. */
+  hoy: string;
+  /** Día de arranque de caja; antes de su mes el reporte sale sin cifras. null si no hay arranque. */
+  fechaArranque: string | null;
+}

@@ -1,0 +1,51 @@
+<div class="card">
+  <div class="card-header">
+    <h5 class="mb-0">Corte de caja mensual</h5>
+  </div>
+
+  <div class="card-body">
+    <div *ngIf="isLoading" class="text-center py-4">
+      <div class="spinner-border text-secondary" role="status"></div>
+    </div>
+
+    <div *ngIf="sinPermiso" class="alert alert-warning d-flex align-items-center gap-2 py-2" role="status">
+      <i class="feather icon-lock"></i>
+      El reporte mensual de corte de caja solo lo sacan el gerente y Sistemas.
+    </div>
+
+    <ng-container *ngIf="filtro">
+      <p class="text-muted small mb-3">
+        Un renglón por día con saldo inicial, ministraciones, concentraciones, bóveda, dotaciones, ingresos, egresos,
+        recolección, diferencia F/S y saldo final, más los totales del mes. Los días cerrados salen como se cerraron;
+        los que siguen abiertos se calculan con lo registrado hasta ahora y los pendientes de cierre salen marcados.
+      </p>
+
+      <app-reporte-filtros
+        [filtro]="filtro"
+        (filtroChange)="filtro = $event"
+        [conRamo]="false"
+        [conMes]="true"
+        [fechaMinima]="fechaArranque"
+        [fechaMaxima]="hoy"
+        textoPantalla="Ver PDF"
+        textoExportar="Exportar Excel"
+        (pantalla)="verPdf($event)"
+        (exportar)="exportarExcel($event)" />
+
+      <div *ngIf="isExportando" class="text-muted small mb-2">
+        <span class="spinner-border spinner-border-sm me-2"></span>Generando el Excel…
+      </div>
+      <div *ngIf="esMesEnCurso && hoy" class="form-text mb-2">
+        Mes en curso: el reporte llega hasta hoy, {{ fechaCorta(hoy) }}.
+      </div>
+      <div *ngIf="antesDelArranque && fechaArranque" class="alert alert-info py-2 mb-2">
+        El corte de caja empieza el {{ fechaCorta(fechaArranque) }}: {{ nombreMes(filtro.desde) }} saldrá sin cifras.
+      </div>
+      <div *ngIf="!fechaArranque" class="alert alert-info py-2 mb-2">
+        La sucursal todavía no tiene saldo de arranque de caja: el reporte saldrá sin cifras.
+      </div>
+    </ng-container>
+
+    <div *ngIf="errorMessage" class="alert alert-danger py-2">{{ errorMessage }}</div>
+  </div>
+</div>
