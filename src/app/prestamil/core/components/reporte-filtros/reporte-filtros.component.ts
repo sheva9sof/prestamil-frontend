@@ -11,7 +11,9 @@ import { PrendaService, TipoPrendaResponse } from '../../services/prenda.service
  *
  * Se adapta a cada reporte: sin ramo (`conRamo=false`), con una sola fecha (`conRango=false`, entonces
  * `desde` = `hasta`), con la fecha fija para quien no puede elegir otra (`fechaEditable=false`, OTR-01) y
- * con un botón "Consultar" si la página además muestra los datos en una tabla (`textoConsultar`).
+ * con un botón "Consultar" si la página además muestra los datos en una tabla (`textoConsultar`). Con
+ * `conMes=true` (REP-06) el rango es un mes completo: en lugar de las fechas hay un selector de mes y año, y
+ * `desde`/`hasta` son el primer y el último día de ese mes; `fechaMinima` y `fechaMaxima` acotan los meses.
  */
 @Component({
   selector: 'app-reporte-filtros',
@@ -37,6 +39,10 @@ export class ReporteFiltrosComponent implements OnInit {
   @Input() avisoFechaFija = 'Solo se puede consultar el día de hoy.';
   /** Último día seleccionable (yyyy-MM-dd), normalmente hoy del servidor. */
   @Input() fechaMaxima: string | null = null;
+  /** Selector de mes y año en lugar de fechas: `desde` = día 1 y `hasta` = último día del mes. */
+  @Input() conMes = false;
+  /** Con `conMes`: primer día con datos (yyyy-MM-dd); los años del selector empiezan en el suyo. */
+  @Input() fechaMinima: string | null = null;
   @Input() cargando = false;
 
   /** Si se indica, aparece el botón principal que consulta los datos para la tabla de la página. */
@@ -49,6 +55,11 @@ export class ReporteFiltrosComponent implements OnInit {
   @Output() exportar = new EventEmitter<ReporteFiltro>();
 
   ramos: TipoPrendaResponse[] = [];
+
+  readonly nombresMeses = [
+    'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+    'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+  ];
 
   ngOnInit(): void {
     if (this.conRamo) {
@@ -80,6 +91,47 @@ export class ReporteFiltrosComponent implements OnInit {
 
   cambiarHasta(hasta: string): void {
     this.emitirCambio({ ...this.filtro, hasta });
+  }
+
+  /** Mes del filtro (1–12), tomado de `desde` (yyyy-MM-dd). */
+  get mes(): number {
+    return Number(this.filtro.desde?.substring(5, 7)) || 1;
+  }
+
+  get anio(): number {
+    return Number(this.filtro.desde?.substring(0, 4)) || new Date().getFullYear();
+  }
+
+  /** Del año de `fechaMinima` (o el del filtro) al de `fechaMaxima` (o el del filtro). */
+  get anios(): number[] {
+    const desde = Math.min(this.anioDe(this.fechaMinima) ?? this.anio, this.anio);
+    const hasta = Math.max(this.anioDe(this.fechaMaxima) ?? this.anio, this.anio);
+    const anios: number[] = [];
+    for (let a = hasta; a >= desde; a--) anios.push(a);
+    return anios;
+  }
+
+  /** El mes cae después de `fechaMaxima`: todavía no tiene datos. */
+  mesFueraDeRango(mes: number, anio: number): boolean {
+    return !!this.fechaMaxima && this.primerDia(anio, mes) > this.fechaMaxima;
+  }
+
+  /** Arma el rango del mes elegido; si el mes queda en el futuro, se recorre al último permitido. */
+  cambiarMes(mes: number, anio: number): void {
+    if (this.mesFueraDeRango(mes, anio) && this.fechaMaxima) {
+      mes = Number(this.fechaMaxima.substring(5, 7));
+    }
+    const ultimoDia = new Date(anio, mes, 0).getDate();
+    const mm = String(mes).padStart(2, '0');
+    this.emitirCambio({ ...this.filtro, desde: `${anio}-${mm}-01`, hasta: `${anio}-${mm}-${String(ultimoDia).padStart(2, '0')}` });
+  }
+
+  private primerDia(anio: number, mes: number): string {
+    return `${anio}-${String(mes).padStart(2, '0')}-01`;
+  }
+
+  private anioDe(fecha: string | null): number | null {
+    return fecha ? Number(fecha.substring(0, 4)) : null;
   }
 
   onConsultar(): void {

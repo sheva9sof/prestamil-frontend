@@ -3,10 +3,12 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from 'src/environments/environment';
 import { reporteFiltroParams } from '../helpers/reporte.helper';
+import { ReporteFiltro } from '../models/reporte.model';
 import {
   ArranqueCaja,
   ArranqueCajaRequest,
   CierreCaja,
+  CorteCajaMensualContexto,
   CorteCajaRespuesta,
   Denominacion,
   TipoTraspasoCaja,
@@ -17,7 +19,8 @@ import {
 
 /**
  * Traspasos entre cajas (CAJ-02, CAJ-03), catálogo de denominaciones, corte de caja (CAJ-07a) y su
- * reporte en PDF y Excel (REP-04), cierre de día y saldo de arranque (CAJ-06).
+ * reporte en PDF y Excel (REP-04), cierre de día y saldo de arranque (CAJ-06) y el reporte mensual de
+ * corte de caja (REP-06).
  */
 @Injectable({ providedIn: 'root' })
 export class CajaService {
@@ -75,6 +78,21 @@ export class CajaService {
       params: reporteFiltroParams({ ramo: null, desde: fecha, hasta: fecha }),
       responseType: 'blob'
     });
+  }
+
+  /** Hoy del servidor y fecha de arranque para el selector del mensual (REP-06); 403 para el cajero. */
+  corteMensualContexto(): Observable<CorteCajaMensualContexto> {
+    return this.http.get<CorteCajaMensualContexto>(`${this.API_URL}/corte-mensual/contexto`);
+  }
+
+  /** Reporte mensual de corte de caja en PDF (REP-06); `desde`/`hasta` son el primer y el último día del mes. */
+  corteMensualPdf(filtro: ReporteFiltro): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/corte-mensual/pdf`, { params: reporteFiltroParams(filtro), responseType: 'blob' });
+  }
+
+  /** Reporte mensual de corte de caja en Excel (.xlsx), mismos filtros que el PDF. */
+  corteMensualExcel(filtro: ReporteFiltro): Observable<Blob> {
+    return this.http.get(`${this.API_URL}/corte-mensual/excel`, { params: reporteFiltroParams(filtro), responseType: 'blob' });
   }
 
   /** Cierra el día de caja (CAJ-06): el gerente el de hoy, Sistemas uno pendiente. */

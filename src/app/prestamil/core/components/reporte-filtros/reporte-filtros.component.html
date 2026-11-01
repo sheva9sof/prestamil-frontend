@@ -11,7 +11,24 @@
     </select>
   </div>
 
-  <div class="col-sm-4 col-md-3">
+  <ng-container *ngIf="conMes">
+    <div class="col-sm-4 col-md-3">
+      <label class="form-label" [for]="id + '-mes'">Mes</label>
+      <select class="form-select" [id]="id + '-mes'" [ngModel]="mes" (ngModelChange)="cambiarMes($event, anio)">
+        <option *ngFor="let nombre of nombresMeses; let i = index" [ngValue]="i + 1" [disabled]="mesFueraDeRango(i + 1, anio)">
+          {{ nombre }}
+        </option>
+      </select>
+    </div>
+    <div class="col-sm-3 col-md-2">
+      <label class="form-label" [for]="id + '-anio'">Año</label>
+      <select class="form-select" [id]="id + '-anio'" [ngModel]="anio" (ngModelChange)="cambiarMes(mes, $event)">
+        <option *ngFor="let a of anios" [ngValue]="a">{{ a }}</option>
+      </select>
+    </div>
+  </ng-container>
+
+  <div *ngIf="!conMes" class="col-sm-4 col-md-3">
     <label class="form-label" [for]="id + '-desde'">{{ conRango ? 'Desde' : 'Fecha' }}</label>
     <input
       type="date"
@@ -24,7 +41,7 @@
     <div *ngIf="!fechaEditable" class="form-text">{{ avisoFechaFija }}</div>
   </div>
 
-  <div *ngIf="conRango" class="col-sm-4 col-md-3">
+  <div *ngIf="conRango && !conMes" class="col-sm-4 col-md-3">
     <label class="form-label" [for]="id + '-hasta'">Hasta</label>
     <input
       type="date"
